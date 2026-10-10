@@ -59,3 +59,12 @@
 | Share | 从素材页导出完整目录到 Files，确认 MOV/JSONL/原始数据一起到达 | UI入口已验证，接收端待测 |
 
 **M1 仍未通过，继续禁止 ProRes RAW 开发。** 目前已经可以重复取得离线同步与增稳候选；剩余项按真实证据验收。
+
+## 版本对齐核查（2026-10-10 20:23 CST）
+
+- 官方 release v1.6.2 明确加入 ProRes RAW 支持；GitHub API published_at=2025-08-19T18:35:39Z（北京时间2025-08-20）。来源：https://github.com/gyroflow/gyroflow/releases/tag/v1.6.2 。
+- 官方 v1.6.3 是随后修复版，包括 macOS 间歇解码失败修复。目标兼容基线建议采用稳定版 v1.6.3，而不要求用户为了 RAW 必须使用 JSONL 开发版。来源：https://github.com/gyroflow/gyroflow/releases/tag/v1.6.3 。
+- 视频解码支持与运动数据格式支持独立。ProRes RAW 支持不意味着官方 Protobuf JSONL 已在相同稳定版提供。稳定版1.6.3和开发版1.6.3(gh2733)不能只凭版本号视作相同构建。
+- 针对稳定版建议另导出 clip.gcsv（官方版本1.3），与 clip.mov 同名同目录；保留原始 imu_raw.jsonl、诊断/逐帧证据及原要求的官方 clip.jsonl。GCSV不携带伪造硬件readout时间，可用离线运动同步；官方JSONL仍需独立修复和验收。该建议尚未改为App自动GCSV导出。
+- 本机 /Applications/Gyroflow.app 稳定版1.6.3 已实际读取新20秒片段的GCSV：2258条gyro、per_frame_time_offsets=[]、has_accurate_timestamps=false。日志 artifacts/test_logs/stable163_gcsv_metadata.log；解析结果 artifacts/device_runs/roamshot_ui20/stable163/parsed_metadata.json。只验证了稳定版读取，不能将此前开发版同步/导出结果计为稳定版的端到端通过。
+- 尚无本项目真实ProRes RAW文件测试；发行说明的支持声明不代表 iPhone RAW 输入、RAW增稳导出或RAW编码已验收。M1门槛与禁止RAW开发的约束仍保持。
