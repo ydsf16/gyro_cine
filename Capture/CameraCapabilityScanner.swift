@@ -7,6 +7,11 @@ struct CameraMode: Hashable, Identifiable {
     let formatIndex: Int
     var id: String { "\(width)x\(height)@\(fps)#\(formatIndex)" }
     var label: String { "\(width)×\(height) · \(fps) fps" }
+    static func preferred(in modes: [CameraMode], previous: CameraMode?) -> CameraMode? {
+        modes.first { $0.width == previous?.width && $0.height == previous?.height && $0.fps == previous?.fps }
+            ?? modes.first { $0.width == 1920 && $0.height == 1080 && $0.fps == 30 }
+            ?? modes.first { $0.fps == 30 } ?? modes.first
+    }
 }
 
 struct CameraLens: Identifiable, Equatable, Codable {
@@ -47,7 +52,7 @@ enum CameraCapabilityScanner {
             let name = camera.deviceType == .builtInUltraWideCamera ? "超广角" : camera.deviceType == .builtInTelephotoCamera ? "长焦" : "主摄"
             return CameraLens(id: camera.uniqueID, name: name, deviceType: camera.deviceType.rawValue,
                 displayMultiplier: camera.deviceType == .builtInWideAngleCamera ? 1 : ratios[camera.uniqueID],
-                supports4K30: !hevcModes(device: camera).isEmpty)
+                supports4K30: hevcModes(device: camera).contains { $0.width == 3840 && $0.height == 2160 && $0.fps == 30 })
         }.sorted { ($0.displayMultiplier ?? 99) < ($1.displayMultiplier ?? 99) }
     }
 
@@ -58,23 +63,21 @@ enum CameraCapabilityScanner {
     }
 
     static func modes(device: AVCaptureDevice, codec: RecordingCodec) -> [CameraMode] {
-        guard codec.isRAW else { return hevcModes(device: device) }
-        guard #available(iOS 26.0, *) else { return [] }
-        return device.formats.enumerated().compactMap { index, format in
-            let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            guard CMFormatDescriptionGetMediaSubType(format.formatDescription) == kCVPixelFormatType_96VersatileBayerPacked12,
-                  format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) else { return nil }
-            return CameraMode(width: Int(dimensions.width), height: Int(dimensions.height), fps: 30, formatIndex: index)
-        }.sorted { $0.width * $0.height > $1.width * $1.height }
+        var result: [CameraMode] = []
+        var seen = Set<String>()
+        for (index, format) in device.formats.enumerated() {
+            let d = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let isBayer = CMFormatDescriptionGetMediaSubType(format.formatDescription) == kCVPixelFormatType_96VersatileBayerPacked12
+            guard isBayer == codec.isRAW else { continue }
+            if !codec.isRAW && ![(1920, 1080), (3840, 2160)].contains(where: { $0.0 == Int(d.width) && $0.1 == Int(d.height) }) { continue }
+            for fps in [24, 25, 30, 60] where format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= Double(fps) && $0.maxFrameRate >= Double(fps) }) {
+                let key = "\(d.width)x\(d.height)@\(fps)"
+                guard seen.insert(key).inserted else { continue }
+                result.append(CameraMode(width: Int(d.width), height: Int(d.height), fps: fps, formatIndex: index))
+            }
+        }
+        return result.sorted { $0.width * $0.height == $1.width * $1.height ? $0.fps < $1.fps : $0.width * $0.height < $1.width * $1.height }
     }
 
-    static func hevcModes(device: AVCaptureDevice) -> [CameraMode] {
-        device.formats.enumerated().compactMap { index, format in
-            let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            guard CMFormatDescriptionGetMediaSubType(format.formatDescription) != kCVPixelFormatType_96VersatileBayerPacked12,
-                  dimensions.width == 3840, dimensions.height == 2160,
-                  format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) else { return nil }
-            return CameraMode(width: 3840, height: 2160, fps: 30, formatIndex: index)
-        }
-    }
+    static func hevcModes(device: AVCaptureDevice) -> [CameraMode] { modes(device: device, codec: .hevc) }
 }

@@ -9,6 +9,9 @@ struct RecordingDiagnostics: Codable {
     let submittedFrameCount: Int
     let motionEventCount: Int
     let clock: ClockEvidence?
+    var outputMode: RecordingOutputMode? = nil
+    var embeddedTelemetryStatus: String? = nil
+    var requestedFrameRate: Int? = nil
     var selectedLens: CameraLens? = nil
     var requestedShutter: String? = nil
     var exposureControlMode: String? = nil

@@ -61,7 +61,9 @@ enum GyroflowJSONLWriter {
                              gyroscopeX: ClockAligner.degreesPerSecond(gyro.x),
                              gyroscopeY: ClockAligner.degreesPerSecond(gyro.y),
                              gyroscopeZ: ClockAligner.degreesPerSecond(gyro.z),
-                             accelerometerX: accel.x, accelerometerY: accel.y, accelerometerZ: accel.z)
+                             accelerometerX: ClockAligner.exportedAcceleration(accel.x),
+                             accelerometerY: ClockAligner.exportedAcceleration(accel.y),
+                             accelerometerZ: ClockAligner.exportedAcceleration(accel.z))
             }
             let header = index == 0 ? GFHeader(camera: GFCamera(cameraBrand: "Apple", cameraModel: "iPhone"),
                                                 clip: GFClip(frameWidth: video.width, frameHeight: video.height,

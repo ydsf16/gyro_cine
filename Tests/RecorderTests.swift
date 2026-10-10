@@ -4,6 +4,17 @@ import simd
 @testable import RawMotionRecorder
 
 final class RecorderTests: XCTestCase {
+    func testModeSelectionUsesAvailableFormatAndDefaultsTo1080p30() {
+        let hd = CameraMode(width: 1920, height: 1080, fps: 30, formatIndex: 3)
+        let raw24 = CameraMode(width: 4224, height: 2240, fps: 24, formatIndex: 9)
+        let raw30 = CameraMode(width: 4224, height: 2240, fps: 30, formatIndex: 9)
+        XCTAssertEqual(CameraMode.preferred(in: [raw24, hd], previous: nil), hd)
+        XCTAssertEqual(CameraMode.preferred(in: [raw24, raw30], previous: hd), raw30)
+        let old = CameraMode(width: 4224, height: 2240, fps: 24, formatIndex: 1)
+        XCTAssertEqual(CameraMode.preferred(in: [raw24, raw30], previous: old), raw24)
+        XCTAssertNil(CameraMode.preferred(in: [], previous: hd))
+    }
+
     func testAssetReaderCountsEncodedFramesNotControlBuffers() throws {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
         let video = try RecordingFinalizer.inspectVideo(url)

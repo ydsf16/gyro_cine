@@ -54,7 +54,7 @@ enum RecordingFinalizer {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
-    static func finalize(folder: URL, clock: ClockEvidence?) throws {
+    static func finalize(folder: URL, clock: ClockEvidence?, outputMode: RecordingOutputMode = .gcsv) throws {
         guard let clock, abs(clock.callbackMinusPTSSeconds) < 2.0 else {
             throw RecorderError.unavailable("Video PTS and host uptime could not be reconciled; raw files retained")
         }
@@ -63,14 +63,22 @@ enum RecordingFinalizer {
         guard events.contains(where: { $0.kind == .gyro }), events.contains(where: { $0.kind == .accel }) else {
             throw RecorderError.unavailable("Missing gyro or accelerometer samples")
         }
+        let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
+        var diagnostics = try JSONDecoder().decode(RecordingDiagnostics.self, from: Data(contentsOf: diagnosticsURL))
+        diagnostics.outputMode = outputMode
+        try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
+        let requestedFPS = Double(diagnostics.requestedFrameRate ?? 30)
         let fps = video.frames.count > 1 ? Double(video.frames.count - 1) / (video.frames.last!.pts - video.frames.first!.pts) : 30
         guard fps.isFinite, fps > 0 else { throw RecorderError.unavailable("Invalid measured frame rate") }
         let frameIntervals = zip(video.frames, video.frames.dropFirst()).map { $1.pts - $0.pts }
-        guard frameIntervals.allSatisfy({ abs($0 - 1.0 / 30.0) <= 0.005 }) else {
-            throw RecorderError.unavailable("MOV has irregular or dropped frame PTS; constant-rate Gyroflow timeline would be inaccurate. Raw files retained")
+        guard frameIntervals.allSatisfy({ abs($0 - 1.0 / requestedFPS) <= 0.005 }) else {
+            let medianInterval = frameIntervals.sorted()[frameIntervals.count / 2]
+            let observedFPS = medianInterval > 0 ? 1 / medianInterval : 0
+            let maximumGapMs = (frameIntervals.max() ?? 0) * 1000
+            throw RecorderError.unavailable(String(format:
+                "视频帧时间异常：目标%.0ffps，实际约%.1ffps，最大帧间隔%.1fms。视频和原始IMU已保留，Gyroflow导出暂停。",
+                requestedFPS, observedFPS, maximumGapMs))
         }
-        let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
-        var diagnostics = try JSONDecoder().decode(RecordingDiagnostics.self, from: Data(contentsOf: diagnosticsURL))
         let expectedCodec: String = diagnostics.configuredCodec == "ProRes RAW HQ" ? "aprh" : diagnostics.configuredCodec == "ProRes RAW" ? "aprn" : "hvc1"
         guard video.codecFourCC == expectedCodec || (expectedCodec == "hvc1" && video.codecFourCC == "hev1") else {
             throw RecorderError.unavailable("Actual codec \(video.codecFourCC) differs from requested \(expectedCodec)")
@@ -131,6 +139,17 @@ enum RecordingFinalizer {
         }
         diagnostics.gcsvAlignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
                                          sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap)
+        diagnostics.outputMode = outputMode
+        if outputMode != .gcsv {
+            try EmbeddedTelemetryExporter.write(mode: outputMode, folder: folder, video: video,
+                events: events, evidence: evidence, diagnostics: diagnostics,
+                sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps)
+            diagnostics.embeddedTelemetryStatus = "embedded; optical sync and RAW color export unverified"
+            // Remove legacy delivery sidecars only after a verified, atomic MOV replacement.
+            for filename in ["clip.gcsv", "clip.gyroflow", "lens_profile.json"] {
+                try FileManager.default.removeItem(at: folder.appendingPathComponent(filename))
+            }
+        }
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
     }

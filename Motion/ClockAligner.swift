@@ -31,6 +31,9 @@ enum ClockAligner {
                              hardwareReadoutTimeKnown: false)
     }
 
+    // Export convention requested for iPhone acceleration; raw CoreMotion events stay untouched.
+    static func exportedAcceleration(_ value: Double) -> Double { -value }
+
     static func degreesPerSecond(_ radiansPerSecond: Double) -> Double {
         radiansPerSecond * 180.0 / .pi
     }

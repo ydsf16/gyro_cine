@@ -9,8 +9,12 @@ final class RecorderViewModel: ObservableObject {
     @Published var audioEnabled = true
     @Published var codecMode: RecordingCodec = .hevc
     @Published var rawHQ = false
+    @Published var outputMode: RecordingOutputMode = RecordingOutputMode(rawValue: UserDefaults.standard.string(forKey: "recordingOutputMode") ?? "") ?? .gcsv {
+        didSet { UserDefaults.standard.set(outputMode.rawValue, forKey: "recordingOutputMode") }
+    }
+    private var recordingOutputMode: RecordingOutputMode = .gcsv
     var selectedCodec: RecordingCodec { codecMode == .hevc ? .hevc : rawHQ ? .proResRAWHQ : .proResRAW }
-    var videoLabel: String { "\(selectedCodec.label) · \(modes.first?.label ?? "不可用")" }
+    var videoLabel: String { "\(selectedCodec.label) · \(selectedMode?.label ?? "不可用")" }
     var supportsRAW: Bool {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) else { return false }
         return !CameraCapabilityScanner.modes(device: device, codec: .proResRAW).isEmpty
@@ -35,9 +39,29 @@ final class RecorderViewModel: ObservableObject {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) ?? CameraCapabilityScanner.mainCamera() else { return [] }
         return CameraCapabilityScanner.modes(device: device, codec: selectedCodec)
     }
+    @Published private(set) var selectedMode: CameraMode?
+    var resolutionOptions: [CameraMode] {
+        var seen = Set<String>()
+        return modes.filter { seen.insert("\($0.width)x\($0.height)").inserted }
+    }
+    var resolutionKey: String { selectedMode.map { "\($0.width)x\($0.height)" } ?? "" }
+    var frameRateOptions: [Int] {
+        modes.filter { "\($0.width)x\($0.height)" == resolutionKey }.map(\.fps)
+    }
+    func selectResolution(_ key: String) {
+        guard canSelectLens else { return }
+        let candidates = modes.filter { "\($0.width)x\($0.height)" == key }
+        selectedMode = candidates.first { $0.fps == selectedMode?.fps } ?? candidates.first { $0.fps == 30 } ?? candidates.first
+        reconfigure()
+    }
+    func selectFrameRate(_ fps: Int) {
+        guard canSelectLens, let mode = modes.first(where: { "\($0.width)x\($0.height)" == resolutionKey && $0.fps == fps }) else { return }
+        selectedMode = mode
+        reconfigure()
+    }
     var supportedShutters: [ShutterSetting] {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }),
-              let mode = modes.first else { return [.auto] }
+              let mode = selectedMode else { return [.auto] }
         return ShutterSetting.allCases.filter { $0.isSupported(by: device, mode: mode) }
     }
     var capabilityLabel: String { modes.isEmpty ? "当前镜头不支持所选编码" : "\(videoLabel) · 编码器按实际会话验证" }
@@ -76,7 +100,7 @@ final class RecorderViewModel: ObservableObject {
             Task { @MainActor in self?.motion.stop() }
         }
         coordinator.onCompleted = { [weak self] url, clock, frames, error in
-            Task { @MainActor in self?.finish(url: url, clock: clock, frames: frames, error: error) }
+            Task { @MainActor in await self?.finish(url: url, clock: clock, frames: frames, error: error) }
         }
         coordinator.onExposureReading = { [weak self] duration, iso in
             Task { @MainActor in
@@ -105,8 +129,11 @@ final class RecorderViewModel: ObservableObject {
 
     func reconfigure() {
         guard state != .recording, state != .finalizing, state != .configuring else { return }
+        let available = modes
+        selectedMode = CameraMode.preferred(in: available, previous: selectedMode)
+        if !supportedShutters.contains(shutter) { shutter = .auto }
         state = .configuring
-        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter, codec: selectedCodec)
+        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter, codec: selectedCodec, requestedMode: selectedMode)
     }
 
     func start() {
@@ -144,7 +171,8 @@ final class RecorderViewModel: ObservableObject {
             let folder = documents.appendingPathComponent("recording_\(date.string(from: Date()))")
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             currentFolder = folder
-            DiagnosticsCollector.record("start requested codec=\(selectedCodec.label) video=\(modes.first?.label ?? "unknown") audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
+            recordingOutputMode = outputMode
+            DiagnosticsCollector.record("start requested codec=\(selectedCodec.label) video=\(selectedMode?.label ?? "unknown") audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
             DiagnosticsCollector.record("IMU pre-roll started; waiting for 100ms of gyro samples", folder: folder)
             primingTask = Task { @MainActor [weak self] in
@@ -207,9 +235,11 @@ final class RecorderViewModel: ObservableObject {
         guard let folder = currentFolder else { return }
         var diagnostics = RecordingDiagnostics(deviceModel: RecorderIdentity.cameraModel,
             systemVersion: UIDevice.current.systemVersion, configuredCodec: selectedCodec.label,
-            audioEnabled: audioEnabled, requestedVideo: modes.first?.label ?? "unknown",
+            audioEnabled: audioEnabled, requestedVideo: selectedMode?.label ?? "unknown",
             submittedFrameCount: 0, motionEventCount: motion.count,
             clock: nil, captureError: reason, status: "failed")
+        diagnostics.outputMode = recordingOutputMode
+        diagnostics.requestedFrameRate = selectedMode?.fps
         diagnostics.selectedLens = selectedLens
         diagnostics.requestedShutter = shutter.label
         diagnostics.exposureControlMode = "continuousAutoExposureWithDurationLimit"
@@ -218,7 +248,7 @@ final class RecorderViewModel: ObservableObject {
         DiagnosticsCollector.record("failed reason=\(reason)", folder: folder)
     }
 
-    private func finish(url: URL, clock: ClockEvidence?, frames: Int, error: String?) {
+    private func finish(url: URL, clock: ClockEvidence?, frames: Int, error: String?) async {
         primingTask?.cancel()
         primingTask = nil
         motion.stop()
@@ -226,10 +256,12 @@ final class RecorderViewModel: ObservableObject {
         var diagnostics = RecordingDiagnostics(
             deviceModel: RecorderIdentity.cameraModel,
             systemVersion: UIDevice.current.systemVersion,
-            configuredCodec: selectedCodec.label, audioEnabled: audioEnabled, requestedVideo: modes.first?.label ?? "unknown",
+            configuredCodec: selectedCodec.label, audioEnabled: audioEnabled, requestedVideo: selectedMode?.label ?? "unknown",
             submittedFrameCount: frames, motionEventCount: motion.count,
             clock: clock, captureError: error ?? motion.error,
             status: error == nil && motion.error == nil ? "finalizing" : "failed")
+        diagnostics.outputMode = recordingOutputMode
+        diagnostics.requestedFrameRate = selectedMode?.fps
         diagnostics.selectedLens = selectedLens
         diagnostics.requestedShutter = shutter.label
         diagnostics.exposureControlMode = "continuousAutoExposureWithDurationLimit"
@@ -239,7 +271,10 @@ final class RecorderViewModel: ObservableObject {
             guard error == nil, motion.error == nil, frames > 0 else {
                 throw RecorderError.unavailable(error ?? motion.error ?? "No video frames written")
             }
-            try RecordingFinalizer.finalize(folder: folder, clock: clock)
+            let mode = recordingOutputMode
+            try await Task.detached(priority: .userInitiated) {
+                try RecordingFinalizer.finalize(folder: folder, clock: clock, outputMode: mode)
+            }.value
             state = .completed
             message = "Saved \(folder.lastPathComponent)"
             DiagnosticsCollector.record("completed actualFrames=\(frames) imuEvents=\(motion.count)", folder: folder)

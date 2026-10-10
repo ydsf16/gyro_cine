@@ -1,6 +1,30 @@
 import XCTest
 
 final class DeviceRecordingTests: XCTestCase {
+    func testOutputModeSettingsPersist() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10))
+        app.buttons["settingsButton"].tap()
+        let picker = app.buttons["outputModePicker"]
+        for _ in 0..<8 { if picker.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(picker.isHittable, app.debugDescription)
+        for label in ["Sony MOV（兼容实验）", "Gyroflow Protobuf MOV", "GCSV + 原始视频"] {
+            picker.tap()
+            let choice = app.buttons[label]
+            XCTAssertTrue(choice.waitForExistence(timeout: 3), app.debugDescription)
+            choice.tap()
+            XCTAssertTrue(picker.label.contains(label), app.debugDescription)
+        }
+        picker.tap()
+        app.buttons["Gyroflow Protobuf MOV"].tap()
+        app.terminate(); app.launch()
+        app.buttons["settingsButton"].tap()
+        for _ in 0..<8 { if picker.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(picker.label.contains("Gyroflow Protobuf MOV"), app.debugDescription)
+        picker.tap(); app.buttons["GCSV + 原始视频"].tap()
+    }
+
     func testCameraNavigation() {
         let app = XCUIApplication()
         app.launch()

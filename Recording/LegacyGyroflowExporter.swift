@@ -24,7 +24,7 @@ enum LegacyGyroflowExporter {
             "lens_model": lens.map { "\($0.name) \($0.label) (\($0.deviceType))" } ?? "Unknown physical lens",
             "calibrated_by": "Apple API intrinsics / RawMotionRecorder (not calibrated)",
             "date": String(ISO8601DateFormatter().string(from: Date()).prefix(10)),
-            "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") \(codecLabel) \(video.width)x\(video.height) 30fps",
+            "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") \(codecLabel) \(video.width)x\(video.height) \(fps)fps",
             "calibrator_version": "RawMotion-API-K-unvalidated-v1", "official": false,
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height], "fps": fps,

@@ -156,6 +156,19 @@ struct SettingsView: View {
                         Text("RAW / RAW HQ 需要外接 SSD，HQ 文件更大。录制后复制回手机素材文件夹，SSD 上的原片保留。白平衡锁定。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    Picker("分辨率", selection: Binding(get: { model.resolutionKey }, set: { model.selectResolution($0) })) {
+                        ForEach(model.resolutionOptions) { mode in
+                            Text(mode.width == 1920 && mode.height == 1080 ? "1080p · 1920×1080" : "\(mode.width)×\(mode.height)")
+                                .tag("\(mode.width)x\(mode.height)")
+                        }
+                    }.disabled(!model.canSelectLens)
+                    Picker("帧率", selection: Binding(get: { model.selectedMode?.fps ?? 30 }, set: { model.selectFrameRate($0) })) {
+                        ForEach(model.frameRateOptions, id: \.self) { fps in Text("\(fps) fps").tag(fps) }
+                    }.disabled(!model.canSelectLens)
+                    if model.codecMode.isRAW {
+                        Text("仅列出传感器支持的原生 RAW 规格；未列出1080p时，该镜头无法录制1080p RAW。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     LabeledContent("视频格式", value: model.videoLabel)
                     LabeledContent("镜头", value: (model.selectedLens.map { "\($0.name) \($0.label) · 录制中固定" } ?? "无可用镜头"))
                     Toggle("录制音频", isOn: $model.audioEnabled)
@@ -169,11 +182,16 @@ struct SettingsView: View {
                     Text("快门和 ISO 由系统自动调节，曝光时间不会超过所选上限。达到 ISO 上限后，暗处仍可能曝光不足。")
                         .font(.caption).foregroundStyle(.secondary)
                     LabeledContent("原始 gyro + accel", value: "始终开启")
-                    LabeledContent("Gyroflow 1.6.3", value: "MOV + GCSV + 镜头 + 工程")
+                    Picker("保存格式", selection: $model.outputMode) {
+                        ForEach(RecordingOutputMode.allCases) { mode in Text(mode.label).tag(mode) }
+                    }.accessibilityIdentifier("outputModePicker").disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                    Text(model.outputMode.detail).font(.caption).foregroundStyle(.secondary)
+                    Text("每次录制保存一个文件夹，保留原始 IMU、逐帧采集信息和诊断日志。RAW 模式下 Gyroflow 彩色导出仍待验证。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }.listRowBackground(RecorderTheme.surface)
                 Section("设备能力") {
                     Text(model.capabilityLabel).font(.footnote)
-                    LabeledContent("可用 4K30 格式", value: "\(model.modes.count)")
+                    LabeledContent("可用录制规格", value: "\(model.modes.count)")
                     LabeledContent("温度状态", value: model.thermalLabel)
                     LabeledContent("剩余存储", value: model.freeSpaceLabel)
                 }.listRowBackground(RecorderTheme.surface)

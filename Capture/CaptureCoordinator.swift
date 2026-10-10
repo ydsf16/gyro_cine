@@ -31,7 +31,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     var onCaptureFinished: (() -> Void)?
     var onExposureReading: ((Double, Float) -> Void)?
 
-    func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto, codec: RecordingCodec = .hevc) {
+    func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto, codec: RecordingCodec = .hevc, requestedMode: CameraMode? = nil) {
         sessionQueue.async {
             self.onState?(.configuring, nil)
             do {
@@ -39,9 +39,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 guard cameraGranted else { throw RecorderError.cameraPermission }
                 if audio && !awaitPermission(.audio) { throw RecorderError.microphonePermission }
                 guard let device = cameraID.flatMap({ CameraCapabilityScanner.device(id: $0) }) ?? (cameraID == nil ? CameraCapabilityScanner.mainCamera() : nil) else { throw RecorderError.noCamera }
-                guard let mode = CameraCapabilityScanner.modes(device: device, codec: codec).first,
+                guard let mode = CameraCapabilityScanner.modes(device: device, codec: codec).first(where: { $0 == requestedMode }),
                       let targetCodec = codec.avCodec else {
-                    throw RecorderError.unavailable("This lens/system has no \(codec.label) 30fps mode")
+                    throw RecorderError.unavailable("This lens/system has no \(codec.label) requested mode")
                 }
                 self.codec = codec
                 self.device = device
@@ -57,8 +57,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 try device.lockForConfiguration()
                 device.activeFormat = device.formats[mode.formatIndex]
                 device.videoZoomFactor = 1.0
-                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
                 if codec.isRAW {
                     guard device.isWhiteBalanceModeSupported(.locked) else {
                         device.unlockForConfiguration()
@@ -113,14 +113,30 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     throw RecorderError.unavailable("\(codec.label) encoder unavailable for active format; available: \(available.map(\.rawValue))")
                 }
                 guard shutter.isSupported(by: device, mode: mode) else {
-                    throw RecorderError.unavailable("Selected exposure limit is unsupported for this camera at 4K30")
+                    throw RecorderError.unavailable("Selected exposure limit is unsupported for the selected camera mode")
                 }
                 try device.lockForConfiguration()
                 device.exposureMode = .continuousAutoExposure
                 device.activeMaxExposureDuration = shutter.durationSeconds.map {
                     CMTime(seconds: $0, preferredTimescale: 1_000_000)
                 } ?? .invalid
+                // Adding inputs / configuring exposure can reset frame durations.
+                // Apply the requested cadence last, after the session is running.
+                let frameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                device.activeVideoMinFrameDuration = frameDuration
+                device.activeVideoMaxFrameDuration = frameDuration
+                let actualMin = device.activeVideoMinFrameDuration.seconds
+                let actualMax = device.activeVideoMaxFrameDuration.seconds
                 device.unlockForConfiguration()
+                var configuredCapability = capability
+                configuredCapability["configuredMinFrameDurationSeconds"] = actualMin
+                configuredCapability["configuredMaxFrameDurationSeconds"] = actualMax
+                try JSONSerialization.data(withJSONObject: configuredCapability, options: [.prettyPrinted, .sortedKeys])
+                    .write(to: root.appendingPathComponent("capture_capabilities_\(targetCodec.rawValue).json"))
+                guard abs(actualMin - frameDuration.seconds) < 0.000001,
+                      abs(actualMax - frameDuration.seconds) < 0.000001 else {
+                    throw RecorderError.unavailable("Camera did not accept requested frame rate")
+                }
                 self.onExposureReading?(device.exposureDuration.seconds, device.iso)
                 self.onState?(.ready, nil)
             } catch { self.onState?(.failed, error.localizedDescription) }
@@ -156,10 +172,13 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     item.value = value as NSString
                     return item
                 }
+                let pixelRatio = Double(mode.width * mode.height) / 8_294_400.0
+                let frameRateRatio = Double(mode.fps) / 30.0
+                let hevcBitRate = Int(40_000_000.0 * pixelRatio * frameRateRatio)
                 var outputSettings: [String: Any] = [
                     AVVideoCodecKey: AVVideoCodecType.hevc,
                     AVVideoWidthKey: mode.width, AVVideoHeightKey: mode.height,
-                    AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 40_000_000]
+                    AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: hevcBitRate]
                 ]
                 if self.codec.isRAW {
                     guard #available(iOS 26.0, *), let output = self.captureVideoOutput,
