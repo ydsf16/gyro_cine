@@ -16,6 +16,26 @@ final class DeviceRecordingTests: XCTestCase {
         add(screenshot)
     }
 
+    func testDeviceFourFileShareSheet() {
+        let app = XCUIApplication()
+        app.launch()
+        let library = app.buttons["libraryButton"]
+        XCTAssertTrue(library.waitForExistence(timeout: 15))
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: library)
+        waitForExpectations(timeout: 20)
+        library.tap()
+        let share = app.buttons["导出 Gyroflow 四文件"].firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        share.tap()
+        let save = app.cells.matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "存储到“文件”")).firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10), app.debugDescription)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        XCTAssertTrue(app.otherElements["ActivityListView"].exists)
+        XCTAssertTrue(app.navigationBars["4个文稿"].exists, "Share sheet must contain four files")
+    }
+
     func testDeviceShortRecording() throws {
         try record(seconds: 5)
     }
@@ -23,7 +43,10 @@ final class DeviceRecordingTests: XCTestCase {
     func testDevice60SecondRecording() throws { try record(seconds: 60) }
     func testDevice20SecondRecording() throws { try record(seconds: 20) }
 
-    private func record(seconds: TimeInterval) throws {
+    func testDeviceMainLens20Seconds() throws { try record(seconds: 20, lensName: "主摄") }
+    func testDeviceUltraWide20Seconds() throws { try record(seconds: 20, lensName: "超广角") }
+
+    private func record(seconds: TimeInterval, lensName: String? = nil) throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -38,11 +61,24 @@ final class DeviceRecordingTests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.5)
         }
         XCTAssertTrue(toggle.exists && toggle.isEnabled, "Camera did not reach ready: \(app.debugDescription)")
+        if let lensName {
+            let lens = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "lens_", lensName)).firstMatch
+            XCTAssertTrue(lens.exists && lens.isEnabled, "Lens unavailable: \(lensName); \(app.debugDescription)")
+            lens.tap()
+            let ready = NSPredicate(format: "enabled == true")
+            expectation(for: ready, evaluatedWith: toggle)
+            waitForExpectations(timeout: 15)
+        }
         toggle.tap()
         XCTAssertTrue(app.staticTexts["recordingState"].waitForExistence(timeout: 10))
         let recording = NSPredicate(format: "label BEGINSWITH %@", "Recording")
         expectation(for: recording, evaluatedWith: app.staticTexts["recordingState"])
         waitForExpectations(timeout: 10)
+        if lensName != nil {
+            for lens in app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "lens_")).allElementsBoundByIndex {
+                XCTAssertFalse(lens.isEnabled, "Lens must be locked while recording")
+            }
+        }
         Thread.sleep(forTimeInterval: seconds)
         toggle.tap()
         let completed = NSPredicate(format: "label BEGINSWITH %@", "Completed")

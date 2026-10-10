@@ -1,3 +1,5 @@
+> Updated device results: [iPhone 16 lens acceptance](PHYSICAL_LENS_DEVICE_REPORT.md). Earlier pending/offline statements below describe the previous stage.
+
 # Fixed 1x / Gyroflow 1.6.3 acceptance — 2026-10-10
 
 This user-approved scope supersedes the default JSONL export requirement for M1.

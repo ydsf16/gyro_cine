@@ -161,7 +161,21 @@ struct SettingsView: View {
     }
 }
 
+private struct RecordingShare: Identifiable {
+    let id = UUID()
+    let files: [URL]
+}
+
+private struct RecordingActivityView: UIViewControllerRepresentable {
+    let files: [URL]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: files, applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
 struct RecordingLibraryView: View {
+    @State private var sharing: RecordingShare?
     @ObservedObject var model: RecorderViewModel
     @Environment(\.dismiss) private var dismiss
     var body: some View {
@@ -183,15 +197,18 @@ struct RecordingLibraryView: View {
                         let files = ["clip.mov", "clip.gcsv", "lens_profile.json", "clip.gyroflow"]
                             .map { folder.appendingPathComponent($0) }
                         if files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) {
-                            ShareLink(items: files) { Image(systemName: "square.and.arrow.up") }
+                            Button { sharing = RecordingShare(files: files) } label: { Image(systemName: "square.and.arrow.up") }
+                                .buttonStyle(.borderless)
                                 .accessibilityLabel("导出 Gyroflow 四文件")
                         } else {
-                            ShareLink(item: folder) { Image(systemName: "square.and.arrow.up") }
+                            Button { sharing = RecordingShare(files: [folder]) } label: { Image(systemName: "square.and.arrow.up") }
+                                .buttonStyle(.borderless)
                                 .accessibilityLabel("导出原始诊断文件夹")
                         }
                     }.padding(.vertical, 5).listRowBackground(RecorderTheme.surface)
                 }
             }.scrollContentBackground(.hidden).background(RecorderTheme.background)
+                .sheet(item: $sharing) { RecordingActivityView(files: $0.files) }
                 .navigationTitle("素材").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         }

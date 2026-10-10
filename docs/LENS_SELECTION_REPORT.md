@@ -1,3 +1,5 @@
+> Updated device results: [iPhone 16 lens acceptance](PHYSICAL_LENS_DEVICE_REPORT.md). Earlier pending/offline statements below describe the previous stage.
+
 # Lens selection acceptance — 2026-10-10
 
 ## Behavior
