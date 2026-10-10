@@ -1,5 +1,7 @@
 # Metadata, RoamShot clock comparison and cropping — 2026-10-10
 
+> Update: the clock-fit residual gate is now 2 ms. See [MOV timebase validation](CLOCK_FIT_GATE_REPORT.md). The 1 ms figure below records the earlier implementation.
+
 ## Confirmed findings
 
 1. RoamShot `App/Capture/RecordingWriter.swift` converts each sample PTS from `AVCaptureSession.synchronizationClock` to `CMClockGetHostTimeClock()` with CMSyncConvertTime. `Sources/CaptureCore/StabilizationInput.swift` fits paired frame host/video times with a centered affine clock map. `Engine/src/lib.rs` feeds IMU directly to Gyroflow with has_accurate_timestamps=true. It bypasses GCSV normalization. These source facts do not prove hardware exposure/IMU synchronization accuracy.

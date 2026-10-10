@@ -1,4 +1,4 @@
-> Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.
+> Latest timing gate correction: [MOV timebase validation](CLOCK_FIT_GATE_REPORT.md). The 2 ms fit bound applies to new builds; earlier 1 ms statements describe the previous implementation.
 
 # Time conventions
 

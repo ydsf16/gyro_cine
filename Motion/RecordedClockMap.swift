@@ -2,6 +2,10 @@ import Foundation
 
 /// Fit paired per-frame host and encoded-video times; centered to retain precision.
 struct RecordedClockMap: Codable {
+    // The HEVC MOV on the tested iPhone uses a 1/600 s track time base. AVAssetWriter
+    // can move a frame PTS by one track tick while the source-to-MOV check still
+    // stays within its separate 1 ms bound. Allow one tick plus rounding margin.
+    static let maximumFitResidualSeconds = 0.002
     let origin: Double
     let slope: Double
     let intercept: Double
@@ -24,8 +28,8 @@ struct RecordedClockMap: Codable {
         intercept = my - slope * mx
         let a = slope, b = intercept
         maxResidual = zip(x, video).map { abs($1 - (a * $0 + b)) }.max() ?? 0
-        guard (0.999...1.001).contains(slope), maxResidual <= 0.001 else {
-            throw RecorderError.unavailable("Clock fit outside 1000 ppm or 1ms residual; raw files retained")
+        guard (0.999...1.001).contains(slope), maxResidual <= Self.maximumFitResidualSeconds else {
+            throw RecorderError.unavailable("Clock fit outside 1000 ppm or 2ms residual; raw files retained")
         }
     }
 

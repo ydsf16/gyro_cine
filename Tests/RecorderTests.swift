@@ -101,6 +101,19 @@ final class RecorderTests: XCTestCase {
         XCTAssertThrowsError(try RecordedClockMap(host: [1, 1], video: [0, 1]))
     }
 
+    func testRecordedClockFitAllowsOneMOVTickButRejectsTwo() throws {
+        // A device recording had 270 complete frames; the last three MOV PTS
+        // moved by one 1/600 s tick and triggered the former 1 ms gate.
+        let host = (0..<270).map { 31_199.099388093 + Double($0) / 30 }
+        let expected = (0..<270).map { Double($0) / 30 }
+        let oneTick = expected.enumerated().map { $0.offset >= 267 ? $0.element + 1.0 / 600 : $0.element }
+        let twoTicks = expected.enumerated().map { $0.offset >= 267 ? $0.element + 2.0 / 600 : $0.element }
+        let map = try RecordedClockMap(host: host, video: oneTick)
+        XCTAssertGreaterThan(map.maxResidual, 0.001)
+        XCTAssertLessThanOrEqual(map.maxResidual, RecordedClockMap.maximumFitResidualSeconds)
+        XCTAssertThrowsError(try RecordedClockMap(host: host, video: twoTicks))
+    }
+
     func testHostClockConversionRejectsMissingClockAndPreservesHostPTS() throws {
         let host = CMClockGetHostTimeClock()
         let pts = CMClockGetTime(host)
