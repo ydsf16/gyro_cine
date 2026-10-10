@@ -21,6 +21,10 @@ struct RecordingDiagnostics: Codable {
     var lastVideoPTSSeconds: Double? = nil
     var gyroStats: MotionRateStats? = nil
     var accelStats: MotionRateStats? = nil
+    var sourceVideoSampleCount: Int? = nil
+    var framesWithAPIIntrinsics: Int? = nil
+    var maximumSourceToAssetTimingResidualMs: Double? = nil
+    var intrinsicCalibrationStatus: String = "API K is optional; lens distortion, readout and OIS remain unknown"
     var actualAudioTrackPresent: Bool? = nil
 }
 

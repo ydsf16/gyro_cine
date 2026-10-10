@@ -1,6 +1,21 @@
 import XCTest
 
 final class DeviceRecordingTests: XCTestCase {
+    func testCameraNavigation() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.navigationBars["录制设置"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        app.buttons["libraryButton"].tap()
+        XCTAssertTrue(app.navigationBars["素材"].waitForExistence(timeout: 5))
+        app.buttons["完成"].tap()
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testDeviceShortRecording() throws {
         try record(seconds: 5)
     }

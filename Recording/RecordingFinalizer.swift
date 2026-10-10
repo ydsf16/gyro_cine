@@ -91,6 +91,25 @@ enum RecordingFinalizer {
         diagnostics.gyroStats = MotionRateStats.events(events, kind: .gyro)
         diagnostics.accelStats = MotionRateStats.events(events, kind: .accel)
         diagnostics.actualAudioTrackPresent = hasAudio
+        let evidenceURL = folder.appendingPathComponent("video_samples.jsonl")
+        if FileManager.default.fileExists(atPath: evidenceURL.path) {
+            let text = try String(contentsOf: evidenceURL, encoding: .utf8)
+            let evidence = try text.split(whereSeparator: \.isNewline).map {
+                try JSONDecoder().decode(CaptureFrameEvidence.self, from: Data($0.utf8))
+            }.sorted { $0.sourcePTSSeconds < $1.sourcePTSSeconds }
+            guard evidence.count == video.frames.count else {
+                throw RecorderError.unavailable("Source timing count differs from actual MOV frame count")
+            }
+            let residuals = zip(evidence, video.frames).map {
+                abs($0.sourcePTSSeconds - clock.firstVideoPTSSeconds + video.frames[0].pts - $1.pts)
+            }
+            guard residuals.allSatisfy({ $0 <= 0.001 }) else {
+                throw RecorderError.unavailable("Source sample PTS and MOV frame mapping differ by more than 1ms")
+            }
+            diagnostics.sourceVideoSampleCount = evidence.count
+            diagnostics.framesWithAPIIntrinsics = evidence.filter { $0.cameraIntrinsicMatrix != nil }.count
+            diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
+        }
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
     }

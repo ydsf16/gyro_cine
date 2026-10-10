@@ -14,3 +14,11 @@
 The pinned official parser emits FirstFrameTimestamp from non-optional start_timestamp_us, which defaults to zero when omitted. Its generated per-frame offset becomes negative playback PTS. Latest Gyroflow applies these offsets when looking up motion; successful schema parsing is therefore insufficient to establish usable synchronization. Do not treat this sidecar as verified stabilization input until reader handling or an explicitly documented estimated/offline timing workflow is validated.
 
 Confirmed on official nightly 1.6.3 (gh2733): parsed metadata has 675 offsets from 0 to approximately −22,465 ms and has_accurate_timestamps=true. This is a reader-level blocker, not merely an unmeasured fixed sync offset.
+
+## Source/MOV mapping audit and offline workaround
+
+New recordings retain video_samples.jsonl, one diagnostic record per successfully appended video buffer, with source PTS and optional native-coordinate API K. Finalization compares these with actual MOV frames; count mismatch or residual over1ms fails. The674-frame device clip had maximum residual0.8328ms, not an exposure synchronization proof.
+
+prepare_gyroflow.py outputs a separate GCSV using original raw gyro events and the same provisional epoch mapping. Official Gyroflow reports no per-frame offsets and has_accurate_timestamps=false, enabling actual offline sync. It leaves official clip.jsonl untouched. Three sync estimates for the new clip are35.83/36.99/39.88ms; these are clip-specific optimization results, not a universal clock offset.
+
+User scope update: rolling-shutter correction is deferred from M1 acceptance. Current offline candidate uses no RS correction; unmeasured readout remains unknown. This does not turn missing native protobuf frame timestamps into valid playback timing.

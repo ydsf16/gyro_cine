@@ -6,3 +6,5 @@
 - 签名真机构建、安装、启动通过；iPhone 16 / iOS 18.2.1 实际进入 Ready，UI 自动化可录制，最终 MOV 确认主摄 4K30。
 - 最终真机 XCTest 4/4 通过。Settings 各选项行为和权限拒绝路径待单独验收。
 - 详见 M1_REPORT.md。
+
+RoamShot-style full-screen UI and Settings/Library sheets now implemented. Device navigation and20s capture passed; API K/source timing added. See UI_REPORT.md for the final preview-only direction fix and device-offline limitation.

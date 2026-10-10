@@ -19,6 +19,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var mode: CameraMode?
     private var audioEnabled = true
     private var fileURL: URL?
+    private var frameEvidenceHandle: FileHandle?
+    private let evidenceEncoder = JSONEncoder()
 
     var onState: ((RecordingState, String?) -> Void)?
     var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
@@ -54,8 +56,10 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 video.setSampleBufferDelegate(self, queue: self.sampleQueue)
                 guard self.session.canAddOutput(video) else { throw RecorderError.unavailable("Cannot add video output") }
                 self.session.addOutput(video)
-                if let connection = video.connection(with: .video), connection.isVideoStabilizationSupported {
-                    connection.preferredVideoStabilizationMode = .off
+                if let connection = video.connection(with: .video) {
+                    if connection.isVideoStabilizationSupported { connection.preferredVideoStabilizationMode = .off }
+                    if connection.isVideoRotationAngleSupported(0) { connection.videoRotationAngle = 0 }
+                    if connection.isCameraIntrinsicMatrixDeliverySupported { connection.isCameraIntrinsicMatrixDeliveryEnabled = true }
                 }
                 if audio {
                     guard let microphone = AVCaptureDevice.default(for: .audio) else { throw RecorderError.unavailable("Microphone unavailable") }
@@ -103,6 +107,11 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     else { throw RecorderError.unavailable("Cannot add AAC audio writer input") }
                 }
                 guard writer.startWriting() else { throw writer.error ?? RecorderError.unavailable("Writer did not start") }
+                let evidenceURL = url.deletingLastPathComponent().appendingPathComponent("video_samples.jsonl")
+                guard FileManager.default.createFile(atPath: evidenceURL.path, contents: nil) else {
+                    throw RecorderError.unavailable("Cannot create video timing evidence")
+                }
+                self.frameEvidenceHandle = try FileHandle(forWritingTo: evidenceURL)
                 self.writer = writer
                 self.fileURL = url
                 self.firstPTS = nil
@@ -118,9 +127,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     func stop() {
         sampleQueue.async {
-            guard let writer = self.writer, let url = self.fileURL else { return }
+            guard self.recordingActive, let writer = self.writer, let url = self.fileURL else { return }
             self.recordingActive = false
             self.onState?(.finalizing, nil)
+            do {
+                try self.frameEvidenceHandle?.synchronize()
+                try self.frameEvidenceHandle?.close()
+            } catch { self.appendError = "Video timing evidence close failed: \(error.localizedDescription)" }
+            self.frameEvidenceHandle = nil
             self.videoInput?.markAsFinished()
             self.audioInput?.markAsFinished()
             writer.finishWriting {
@@ -156,7 +170,16 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 appendError = "Video writer backpressure: frame dropped"
                 return
             }
-            if videoInput.append(sampleBuffer) { frameCount += 1; lastPTS = pts }
+            if videoInput.append(sampleBuffer) {
+                frameCount += 1
+                lastPTS = pts
+                let evidence = CaptureFrameEvidence(sourcePTSSeconds: CMTimeGetSeconds(pts),
+                    cameraIntrinsicMatrix: CaptureFrameEvidence.intrinsicMatrix(sampleBuffer),
+                    intrinsicSource: "kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix; native unrotated output buffer coordinates",
+                    activeVideoStabilizationMode: connection.activeVideoStabilizationMode.rawValue)
+                do { try frameEvidenceHandle?.write(contentsOf: evidenceEncoder.encode(evidence) + Data([0x0A])) }
+                catch { appendError = "Video timing evidence write failed: \(error.localizedDescription)" }
+            }
             else { appendError = writer.error?.localizedDescription ?? "Video append failed" }
         } else if firstPTS != nil, let audioInput, audioInput.isReadyForMoreMediaData {
             if !audioInput.append(sampleBuffer) { appendError = writer.error?.localizedDescription ?? "Audio append failed" }

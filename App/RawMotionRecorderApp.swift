@@ -6,7 +6,7 @@ struct RawMotionRecorderApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(model: model)
+            ContentView(model: model).preferredColorScheme(.dark).tint(RecorderTheme.accent)
         }
     }
 }

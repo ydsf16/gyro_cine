@@ -9,3 +9,5 @@
 Observed: Gyroflow 1.6.3 opens HEVC but rejects manual JSONL import with Unsupported file format. Official parser round-trip succeeds, but missing hardware frame timestamps have unresolved playback-time semantics. See M1_REPORT.md.
 
 Official nightly 1.6.3 (gh2733) auto-loads JSONL and displays motion. CLI `--export-project 2` and `--export-metadata 2:<path>` succeeded. Parsed metadata confirms `has_accurate_timestamps=true` with incorrect descending per-frame offsets; synchronization and stabilization remain FAIL/PENDING. See archived metadata and logs in M1_REPORT.md.
+
+A separate raw-gyro GCSV/offline-sync workflow has now exported a 674-frame 4K stabilization candidate. This does not fix native JSONL readout semantics. Measured offsets, image comparison, calibration assumptions and reproducible steps are in ISSUE_RESOLUTION.md.
