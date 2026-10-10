@@ -41,7 +41,8 @@ final class RecorderTests: XCTestCase {
             x: Double(i), y: -2, z: 3) } + [MotionEvent(kind: .accel, timestamp: 100, x: 0, y: 0, z: 9.8)]
         let evidence = (0..<3).map { index in CaptureFrameEvidence(sourcePTSSeconds: 100 + Double(index) / 30,
             cameraIntrinsicMatrix: [2000, 0, 1920, 0, 2000, 1080, 0, 0, 1],
-            intrinsicSource: "API", activeVideoStabilizationMode: 0) }
+            intrinsicSource: "API", activeVideoStabilizationMode: 0,
+            deviceExposureDurationAtCallbackSeconds: 1.0 / 120) }
         let alignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
                                          sourceFirstPTS: 100, fps: 30, evidence: evidence,
                                          lens: CameraLens(id: "test-ultra", name: "超广角", deviceType: "test",
@@ -52,11 +53,11 @@ final class RecorderTests: XCTestCase {
         let firstRow = rows[0].split(separator: ",").compactMap { Double($0) }
         let lastRow = rows[11].split(separator: ",").compactMap { Double($0) }
         XCTAssertEqual(firstRow[0], 0, accuracy: 1e-12)
-        XCTAssertEqual(firstRow[1], 1.5, accuracy: 1e-9)
+        XCTAssertEqual(firstRow[1], 1.5 - 100.0 / 240, accuracy: 1e-9)
         XCTAssertEqual(lastRow[0], 0.1, accuracy: 1e-9)
-        XCTAssertEqual(lastRow[1], 11.5, accuracy: 1e-9)
-        XCTAssertEqual(alignment.preRollMs, 15, accuracy: 1e-7)
-        XCTAssertEqual(alignment.postRollMs, 15, accuracy: 1e-7)
+        XCTAssertEqual(lastRow[1], 11.5 - 100.0 / 240, accuracy: 1e-9)
+        XCTAssertEqual(alignment.preRollMs, 15 - 1000.0 / 240, accuracy: 1e-7)
+        XCTAssertEqual(alignment.postRollMs, 15 + 1000.0 / 240, accuracy: 1e-7)
         let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf:
             folder.appendingPathComponent("clip.gyroflow"))) as? [String: Any])
         XCTAssertTrue(((project["calibration_data"] as? [String: Any])?["camera_setting"] as? String)?.contains("超广角 0.5×") == true)
@@ -75,6 +76,19 @@ final class RecorderTests: XCTestCase {
             sourceFirstPTS: 100, fps: 30, evidence: []))
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: [events[0], events[0]],
             sourceFirstPTS: 100, fps: 30, evidence: evidence))
+    }
+
+    func testExposureTimingUsesPositiveHalfDurationAndRejectsMissingEvidence() throws {
+        for exposure in [1.0 / 30, 1.0 / 240] {
+            let timing = try ExposureTimingCompensation(exposures: [exposure, exposure])
+            // A motion impulse before the video timestamp moves onto that video frame.
+            XCTAssertEqual(timing.videoTime(forMotionTime: 0.5 - exposure / 2), 0.5, accuracy: 1e-12)
+        }
+        let varying = try ExposureTimingCompensation(exposures: [0.004, 0.032])
+        XCTAssertEqual(varying.videoTime(forMotionTime: -0.009), 0, accuracy: 1e-12)
+        XCTAssertEqual(varying.videoTime(forMotionTime: 0.991), 1, accuracy: 1e-12)
+        XCTAssertThrowsError(try ExposureTimingCompensation(exposures: []))
+        XCTAssertThrowsError(try ExposureTimingCompensation(exposures: [.nan]))
     }
 
     func testGyroTimelineRejectsUncoveredBoundaryAndSensorGap() throws {

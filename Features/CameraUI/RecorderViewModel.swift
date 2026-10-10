@@ -183,6 +183,8 @@ final class RecorderViewModel: ObservableObject {
             clock: nil, captureError: reason, status: "failed")
         diagnostics.selectedLens = selectedLens
         diagnostics.requestedShutter = shutter.label
+        diagnostics.exposureControlMode = "continuousAutoExposureWithDurationLimit"
+        diagnostics.requestedMaximumExposureDurationSeconds = shutter.durationSeconds
         try? JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
         DiagnosticsCollector.record("failed reason=\(reason)", folder: folder)
     }
@@ -201,6 +203,8 @@ final class RecorderViewModel: ObservableObject {
             status: error == nil && motion.error == nil ? "finalizing" : "failed")
         diagnostics.selectedLens = selectedLens
         diagnostics.requestedShutter = shutter.label
+        diagnostics.exposureControlMode = "continuousAutoExposureWithDurationLimit"
+        diagnostics.requestedMaximumExposureDurationSeconds = shutter.durationSeconds
         do {
             try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
             guard error == nil, motion.error == nil, frames > 0 else {

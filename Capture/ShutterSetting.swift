@@ -8,13 +8,13 @@ enum ShutterSetting: Int, CaseIterable, Identifiable {
     case oneTwoFortieth = 240
 
     var id: Int { rawValue }
-    var label: String { self == .auto ? "自动" : "1/\(rawValue) 秒" }
+    var label: String { self == .auto ? "系统默认" : "1/\(rawValue) 秒" }
     var durationSeconds: Double? { self == .auto ? nil : 1.0 / Double(rawValue) }
 
     func isSupported(by device: AVCaptureDevice, mode: CameraMode) -> Bool {
         guard let durationSeconds else { return true }
         let format = device.formats[mode.formatIndex]
-        return device.isExposureModeSupported(.custom)
+        return device.isExposureModeSupported(.continuousAutoExposure)
             && durationSeconds >= format.minExposureDuration.seconds - 0.00001
             && durationSeconds <= min(format.maxExposureDuration.seconds, 1.0 / Double(mode.fps)) + 0.00001
     }

@@ -31,6 +31,20 @@ def validate(folder):
         return ((event['timestamp'] - mapping['origin']) * mapping['slope'] + mapping['intercept']) if mapping else event['timestamp'] - host_first + asset_first
     mapped = [[video_time(e), e['x'], e['y'], e['z']] for e in gyro]
     alignment = diagnostics.get('gcsvAlignment')
+    if alignment and alignment.get('exposureTimingModel'):
+        assert alignment['exposureTimingModel'] == 'positive_mean_half_exposure_v1'
+        exposures = [e['deviceExposureDurationAtCallbackSeconds'] for e in evidence]
+        assert len(exposures) == diagnostics['actualFrameCount']
+        assert all(math.isfinite(x) and 0 < x <= .034 for x in exposures)
+        cap = diagnostics.get('requestedMaximumExposureDurationSeconds')
+        if cap is not None:
+            assert diagnostics['exposureControlMode'] == 'continuousAutoExposureWithDurationLimit'
+            assert max(exposures) <= cap + .00005, 'Observed exposure exceeds selected limit'
+
+        correction = sum(exposures) / len(exposures) / 2
+        assert abs(alignment['exposureTimingCorrectionMs'] - correction * 1000) < 1e-9
+        mapped = [[e[0] + correction] + e[1:] for e in mapped]
+
     if alignment:
         start_time = asset_first
         end_time = start_time + alignment['videoEndSeconds']
@@ -81,6 +95,8 @@ def validate(folder):
                 sourceToAssetResidualMs=residual*1000, durationSeconds=diagnostics['actualDurationSeconds'],
                 gyroPeakRadPerSec=max(math.sqrt(e['x']**2+e['y']**2+e['z']**2) for e in gyro),
                 cameraMatrix=profile['fisheye_params']['camera_matrix'],
+                exposureTimingCorrectionMs=(alignment or {}).get('exposureTimingCorrectionMs'),
+                exposureLimitSeconds=diagnostics.get('requestedMaximumExposureDurationSeconds'),
                 stabilizationQualityVerified=False, distortionCalibrated=False)
 
 

@@ -61,3 +61,26 @@ enum GyroTimeline {
             maximumBoundaryGapSeconds: max(firstGap, lastGap))
     }
 }
+
+/// Empirical +mean(T)/2 correction, based on the user's positive Gyroflow offsets.
+/// This is not a claim that Apple PTS identifies a hardware exposure boundary.
+struct ExposureTimingCompensation {
+    let correctionSeconds: Double
+    let minimumHalfExposureSeconds: Double
+    let maximumHalfExposureSeconds: Double
+
+    init(exposures: [Double]) throws {
+        guard !exposures.isEmpty,
+              exposures.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 0.034 }) else {
+            throw RecorderError.unavailable("Missing or invalid exposure evidence for timing compensation")
+        }
+        correctionSeconds = exposures.reduce(0, +) / Double(exposures.count) / 2
+        minimumHalfExposureSeconds = exposures.min()! / 2
+        maximumHalfExposureSeconds = exposures.max()! / 2
+    }
+
+    // Gyroflow evaluates a positive offset as gyroTime = videoTime - offset.
+    // Move gyro samples forward by this fixed amount, then trim/interpolate once.
+    // This retains pre-roll data needed for the first compensated video frame.
+    func videoTime(forMotionTime time: Double) -> Double { time + correctionSeconds }
+}

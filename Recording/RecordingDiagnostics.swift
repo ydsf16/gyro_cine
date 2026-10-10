@@ -11,6 +11,8 @@ struct RecordingDiagnostics: Codable {
     let clock: ClockEvidence?
     var selectedLens: CameraLens? = nil
     var requestedShutter: String? = nil
+    var exposureControlMode: String? = nil
+    var requestedMaximumExposureDurationSeconds: Double? = nil
     var medianDeviceExposureDurationAtCallbackSeconds: Double? = nil
     var minimumDeviceExposureDurationAtCallbackSeconds: Double? = nil
     var maximumDeviceExposureDurationAtCallbackSeconds: Double? = nil
@@ -43,6 +45,10 @@ struct GCSVAlignmentDiagnostics: Codable {
     let postRollMs: Double
     let maximumBoundaryInterpolationGapMs: Double
     let videoEndSeconds: Double
+    var exposureTimingModel: String? = nil
+    var exposureTimingCorrectionMs: Double? = nil
+    var minimumExposureTimingCorrectionMs: Double? = nil
+    var maximumExposureTimingCorrectionMs: Double? = nil
 }
 
 struct MotionRateStats: Codable {

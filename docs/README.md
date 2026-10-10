@@ -1,3 +1,5 @@
+最新自动曝光上限与同步补偿：[EXPOSURE_COMPENSATION_REPORT.md](EXPOSURE_COMPENSATION_REPORT.md)
+
 > Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.
 
 > Latest connected-device run: [physical lens report](PHYSICAL_LENS_DEVICE_REPORT.md). Capture and four-item share UI passed; main offline sync and calibration remain unresolved.

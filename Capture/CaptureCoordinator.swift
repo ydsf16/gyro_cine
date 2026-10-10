@@ -21,8 +21,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var fileURL: URL?
     private var frameEvidenceHandle: FileHandle?
     private let evidenceEncoder = JSONEncoder()
-    private var configurationID = 0
-    private var configurationReady = false
+    private var previewFrameCount = 0
 
     var onState: ((RecordingState, String?) -> Void)?
     var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
@@ -30,9 +29,6 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto) {
         sessionQueue.async {
-            self.configurationID += 1
-            let configurationID = self.configurationID
-            self.configurationReady = false
             self.onState?(.configuring, nil)
             do {
                 let cameraGranted = awaitPermission(.video)
@@ -82,42 +78,16 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 configurationOpen = false
                 self.session.startRunning()
                 guard shutter.isSupported(by: device, mode: mode) else {
-                    throw RecorderError.unavailable("Selected shutter is unsupported for this camera at 4K30")
+                    throw RecorderError.unavailable("Selected exposure limit is unsupported for this camera at 4K30")
                 }
                 try device.lockForConfiguration()
-                if let durationSeconds = shutter.durationSeconds {
-                    let duration = CMTime(seconds: durationSeconds, preferredTimescale: 1_000_000)
-                    device.setExposureModeCustom(duration: duration, iso: AVCaptureDevice.currentISO) { [weak self] _ in
-                        guard let self else { return }
-                        self.sessionQueue.async {
-                            guard self.configurationID == configurationID, !self.configurationReady else { return }
-                            do {
-                                try device.lockForConfiguration()
-                                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-                                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
-                                device.unlockForConfiguration()
-                                self.configurationReady = true
-                                self.onExposureReading?(device.exposureDuration.seconds, device.iso)
-                                self.onState?(.ready, nil)
-                            } catch {
-                                self.configurationReady = true
-                                self.onState?(.failed, error.localizedDescription)
-                            }
-                        }
-                    }
-                    device.unlockForConfiguration()
-                    self.sessionQueue.asyncAfter(deadline: .now() + 3) {
-                        guard self.configurationID == configurationID, !self.configurationReady else { return }
-                        self.configurationReady = true
-                        self.onState?(.failed, "Timed out applying shutter setting")
-                    }
-                } else {
-                    device.exposureMode = .continuousAutoExposure
-                    device.unlockForConfiguration()
-                    self.configurationReady = true
-                    self.onExposureReading?(device.exposureDuration.seconds, device.iso)
-                    self.onState?(.ready, nil)
-                }
+                device.exposureMode = .continuousAutoExposure
+                device.activeMaxExposureDuration = shutter.durationSeconds.map {
+                    CMTime(seconds: $0, preferredTimescale: 1_000_000)
+                } ?? .invalid
+                device.unlockForConfiguration()
+                self.onExposureReading?(device.exposureDuration.seconds, device.iso)
+                self.onState?(.ready, nil)
             } catch { self.onState?(.failed, error.localizedDescription) }
         }
     }
@@ -204,6 +174,12 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output is AVCaptureVideoDataOutput {
+            previewFrameCount += 1
+            if previewFrameCount % 30 == 1, let device {
+                onExposureReading?(device.exposureDuration.seconds, device.iso)
+            }
+        }
         guard recordingActive, let writer else { return }
         guard writer.status == .writing else {
             if writer.status == .failed {

@@ -144,11 +144,13 @@ struct SettingsView: View {
                     LabeledContent("镜头", value: (model.selectedLens.map { "\($0.name) \($0.label) · 录制中固定" } ?? "无可用镜头"))
                     Toggle("录制音频", isOn: $model.audioEnabled)
                         .disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
-                    Picker("快门", selection: $model.shutter) {
+                    Picker("最长曝光时间", selection: $model.shutter) {
                         ForEach(model.supportedShutters) { option in Text(option.label).tag(option) }
                     }.disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                    LabeledContent("ISO", value: "自动")
                     LabeledContent("曝光读数", value: model.exposureReadout)
-                    Text("固定快门会锁定设置瞬间的 ISO；画面亮度可能变化。")
+                    LabeledContent("同步时间补偿", value: "整段平均曝光时长的一半")
+                    Text("快门和 ISO 由系统自动调节，曝光时间不会超过所选上限。达到 ISO 上限后，暗处仍可能曝光不足。")
                         .font(.caption).foregroundStyle(.secondary)
                     LabeledContent("原始 gyro + accel", value: "始终开启")
                     LabeledContent("Gyroflow 1.6.3", value: "MOV + GCSV + 镜头 + 工程")

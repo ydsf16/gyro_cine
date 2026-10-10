@@ -45,14 +45,14 @@ final class DeviceRecordingTests: XCTestCase {
     func testDeviceMainLens20Seconds() throws { try record(seconds: 20, lensName: "主摄") }
     func testDeviceUltraWide20Seconds() throws { try record(seconds: 20, lensName: "超广角") }
 
-    func testDeviceManualShutterRecording() throws {
+    func testDeviceCappedExposureRecording() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
         let settings = app.buttons["settingsButton"]
         XCTAssertTrue(settings.waitForExistence(timeout: 15))
         settings.tap()
-        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "快门")).firstMatch
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "最长曝光时间")).firstMatch
         XCTAssertTrue(picker.waitForExistence(timeout: 10), app.debugDescription)
         picker.tap()
         let shutter = app.buttons["1/120 秒"].firstMatch
