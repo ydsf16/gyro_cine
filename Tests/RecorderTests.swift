@@ -56,9 +56,16 @@ final class RecorderTests: XCTestCase {
             folder.appendingPathComponent("clip.gyroflow"))) as? [String: Any])
         XCTAssertTrue(((project["calibration_data"] as? [String: Any])?["camera_setting"] as? String)?.contains("超广角 0.5×") == true)
         XCTAssertTrue(csv.contains("lens_info,0.5×"))
+        let stabilization = try XCTUnwrap(project["stabilization"] as? [String: Any])
+        XCTAssertEqual(stabilization["adaptive_zoom_window"] as? Double, 4.0)
+        XCTAssertTrue(stabilization["max_zoom"] is NSNull)
+        let profile = try XCTUnwrap(project["calibration_data"] as? [String: Any])
+        XCTAssertNotNil(profile["camera_model"])
+        XCTAssertNotNil(profile["lens_model"])
+        XCTAssertTrue((profile["calibrated_by"] as? String)?.contains("not calibrated") == true)
         XCTAssertEqual(project["videofile"] as? String, folder.appendingPathComponent("clip.mov").absoluteString)
         XCTAssertEqual((project["gyro_source"] as? [String: Any])?["filepath"] as? String, folder.appendingPathComponent("clip.gcsv").absoluteString)
-        XCTAssertTrue((project["offsets"] as? [String: Double])?.isEmpty == true)
+        XCTAssertEqual((project["offsets"] as? [String: Double])?["0"], -250)
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
             sourceFirstPTS: 100, fps: 30, evidence: []))
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: [events[0], events[0]],
@@ -82,6 +89,28 @@ final class RecorderTests: XCTestCase {
         }
         model.state = .completed
         XCTAssertTrue(model.canSelectLens)
+    }
+
+    func testRecordedClockFitHandlesRateDifferenceAndRejectsOutliers() throws {
+        let host = [10000.0, 10001, 10002, 10003]
+        let video = [0.002, 1.0021, 2.0022, 3.0023]
+        let map = try RecordedClockMap(host: host, video: video)
+        XCTAssertEqual(map.slope, 1.0001, accuracy: 1e-9)
+        XCTAssertEqual(map.videoSeconds(for: 10000.5), 0.50205, accuracy: 1e-9)
+        XCTAssertThrowsError(try RecordedClockMap(host: host, video: [0, 1, 2.1, 3]))
+        XCTAssertThrowsError(try RecordedClockMap(host: [1, 1], video: [0, 1]))
+    }
+
+    func testHostClockConversionRejectsMissingClockAndPreservesHostPTS() throws {
+        let host = CMClockGetHostTimeClock()
+        let pts = CMClockGetTime(host)
+        XCTAssertEqual(try ClockAligner.hostTime(pts, clock: host), pts.seconds, accuracy: 1e-8)
+        XCTAssertThrowsError(try ClockAligner.hostTime(pts, clock: nil))
+        XCTAssertThrowsError(try ClockAligner.hostTime(.invalid, clock: host))
+        let evidence = ClockAligner.evidence(firstPTS: CMTime(seconds: 10, preferredTimescale: 1000),
+                                             hostPTS: 10.05, callbackHostTime: 10.07)
+        XCTAssertEqual(evidence.firstVideoHostPTSSeconds, 10.05)
+        XCTAssertEqual(evidence.callbackMinusPTSSeconds, 0.02, accuracy: 1e-8)
     }
 
     func testRadiansToDegrees() {

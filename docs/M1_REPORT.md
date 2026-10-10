@@ -1,3 +1,5 @@
+> Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.
+
 > Latest connected-device run: [physical lens report](PHYSICAL_LENS_DEVICE_REPORT.md). Capture and four-item share UI passed; main offline sync and calibration remain unresolved.
 
 > Current M1 scope (2026-10-10): selectable physical lens (fixed during each clip), Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [lens selection](LENS_SELECTION_REPORT.md). See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.

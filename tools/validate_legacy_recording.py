@@ -24,9 +24,12 @@ def validate(folder):
     samples = [[float(x) for x in row] for row in csv.reader(lines[start+1:])]
     assert len(samples) == len(gyro) > 0
     first = diagnostics['clock']['firstVideoPTSSeconds']
+    host_first = diagnostics['clock'].get('firstVideoHostPTSSeconds', first)
     asset_first = diagnostics['firstVideoPTSSeconds']
     for row, event in zip(samples, gyro):
-        expected = [event['timestamp'] - first + asset_first, event['x'], event['y'], event['z']]
+        mapping = diagnostics.get('recordedClockMap')
+        time = ((event['timestamp'] - mapping['origin']) * mapping['slope'] + mapping['intercept']) if mapping else event['timestamp'] - host_first + asset_first
+        expected = [time, event['x'], event['y'], event['z']]
         assert len(row) == 4 and all(math.isfinite(x) for x in row)
         assert all(abs(a-b) < 1e-10 for a,b in zip(row, expected))
     assert all(a[0] < b[0] for a,b in zip(samples, samples[1:]))
@@ -41,7 +44,7 @@ def validate(folder):
     assert all(len(e.get('cameraIntrinsicMatrix', [])) == 9 for e in evidence)
     assert all(e['activeVideoStabilizationMode'] == 0 for e in evidence)
     assert project['calibration_data'] == profile
-    assert project['offsets'] == {}
+    assert abs(project['offsets']['0'] - samples[0][0]*1000) < 1e-8
     assert diagnostics['selectedLens']['name'] in profile['camera_setting']
     assert diagnostics['status'] == 'completed_unverified_on_device'
     return dict(status='PASS-format-and-clock-mapping', lens=diagnostics['selectedLens'],

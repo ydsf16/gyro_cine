@@ -1,3 +1,5 @@
+> Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.
+
 # iPhone 16 physical lens acceptance — 2026-10-10
 
 Device: YJJY, iPhone16 / iOS18.2.1. App built and installed through Xcode on the connected device. Main 1x and ultrawide 0.5x were discovered; no physical telephoto button was shown.

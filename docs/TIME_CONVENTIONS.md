@@ -1,3 +1,5 @@
+> Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.
+
 # Time conventions
 
 - CoreMotion gyroscope and accelerometer `timestamp` values are persisted unchanged in `imu_raw.jsonl`. Values are seconds from a system monotonic clock, not callback arrival times.

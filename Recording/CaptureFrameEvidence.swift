@@ -3,6 +3,7 @@ import simd
 
 // Own diagnostic format: source PTS and API-provided K, never hardware readout timestamps.
 struct CaptureFrameEvidence: Codable {
+    var hostPTSSeconds: Double? = nil
     let sourcePTSSeconds: Double
     let cameraIntrinsicMatrix: [Double]?
     let intrinsicSource: String

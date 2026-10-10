@@ -15,12 +15,14 @@
 		23B209C65070C152AB43A486 /* writer3frames.mov in Resources */ = {isa = PBXBuildFile; fileRef = CEA307E7546A091B2BE4E026 /* writer3frames.mov */; };
 		4332C8A8181DB72BEFB54D48 /* RecordingFinalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA2D0C6872EC9C41717967B /* RecordingFinalizer.swift */; };
 		51A38E0CBB92ACABDFC6F2AA /* RecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C772CA08E640F9864485B406 /* RecorderTests.swift */; };
+		5C0AC18BB6DEB364F1D0F240 /* RecordedClockMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A215EB74A2030189C5DCC93 /* RecordedClockMap.swift */; };
 		89A28A8AD1D3806872CAF261 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2585E92CAD16FF11732C5A /* ClockAligner.swift */; };
 		935CE390DD86AE7F1B4937B1 /* DiagnosticsCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69872594EA34DC72D6A97B1 /* DiagnosticsCollector.swift */; };
 		967DE8E675A7A20BACE429EC /* RecorderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4748A03F62D86E045EC0072E /* RecorderViewModel.swift */; };
 		9FD20741E0A11074E5B1432C /* RawMotionRecorderApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA2B662518474ADD710AD8A /* RawMotionRecorderApp.swift */; };
 		A24CD42A1ECB934E46711E36 /* RecordingDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */; };
 		ACA75716DCA459CFADE7FCE6 /* CameraCapabilityScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C33D85848E73CD1B4DCE883 /* CameraCapabilityScanner.swift */; };
+		AECCCA58E7FE775F8AE707AA /* RecorderIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4492C3148BEA96424F78E05C /* RecorderIdentity.swift */; };
 		B8B10F0430A8B5B54B77238F /* gyroflow.proto in Resources */ = {isa = PBXBuildFile; fileRef = FA2EE098AA671DD1C0E448EC /* gyroflow.proto */; };
 		EAB4C48549953B154F0EF30A /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */; };
 		EB59D332219801C318CB1C68 /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7791383521674BC09C46030C /* CaptureCoordinator.swift */; };
@@ -48,8 +50,10 @@
 /* Begin PBXFileReference section */
 		0C33D85848E73CD1B4DCE883 /* CameraCapabilityScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCapabilityScanner.swift; sourceTree = "<group>"; };
 		10215CADB2C07FEE614B1A5A /* GyroflowJSONLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowJSONLWriter.swift; sourceTree = "<group>"; };
+		2A215EB74A2030189C5DCC93 /* RecordedClockMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedClockMap.swift; sourceTree = "<group>"; };
 		359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDiagnostics.swift; sourceTree = "<group>"; };
 		41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
+		4492C3148BEA96424F78E05C /* RecorderIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderIdentity.swift; sourceTree = "<group>"; };
 		4748A03F62D86E045EC0072E /* RecorderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderViewModel.swift; sourceTree = "<group>"; };
 		49AAFD24C0C559A91A760D79 /* RawMotionRecorderUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawMotionRecorderUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
@@ -96,6 +100,7 @@
 				41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */,
 				C69872594EA34DC72D6A97B1 /* DiagnosticsCollector.swift */,
 				D13DC68DAF23A8C23998D1D9 /* LegacyGyroflowExporter.swift */,
+				4492C3148BEA96424F78E05C /* RecorderIdentity.swift */,
 				359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */,
 				6EA2D0C6872EC9C41717967B /* RecordingFinalizer.swift */,
 				60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */,
@@ -157,6 +162,7 @@
 			children = (
 				6D2585E92CAD16FF11732C5A /* ClockAligner.swift */,
 				C05436145E23FF3640F81E85 /* MotionRecorder.swift */,
+				2A215EB74A2030189C5DCC93 /* RecordedClockMap.swift */,
 			);
 			path = Motion;
 			sourceTree = "<group>";
@@ -348,6 +354,8 @@
 				03C3B371C91E96F6FFA20172 /* LegacyGyroflowExporter.swift in Sources */,
 				1A493D64F3860F3BD678AD7A /* MotionRecorder.swift in Sources */,
 				9FD20741E0A11074E5B1432C /* RawMotionRecorderApp.swift in Sources */,
+				5C0AC18BB6DEB364F1D0F240 /* RecordedClockMap.swift in Sources */,
+				AECCCA58E7FE775F8AE707AA /* RecorderIdentity.swift in Sources */,
 				0D88B07F93CF897633139175 /* RecorderTheme.swift in Sources */,
 				967DE8E675A7A20BACE429EC /* RecorderViewModel.swift in Sources */,
 				A24CD42A1ECB934E46711E36 /* RecordingDiagnostics.swift in Sources */,

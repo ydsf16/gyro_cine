@@ -85,6 +85,17 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             do {
                 guard let mode = self.mode else { throw RecorderError.unavailable("Camera not configured") }
                 let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                writer.metadata = [
+                    (AVMetadataIdentifier.quickTimeMetadataMake, "Apple"),
+                    (.quickTimeMetadataModel, RecorderIdentity.cameraModel),
+                    (.quickTimeMetadataSoftware, "RawMotionRecorder"),
+                    (.quickTimeMetadataCreationDate, ISO8601DateFormatter().string(from: Date()))
+                ].map { identifier, value in
+                    let item = AVMutableMetadataItem()
+                    item.identifier = identifier
+                    item.value = value as NSString
+                    return item
+                }
                 let outputSettings: [String: Any] = [
                     AVVideoCodecKey: AVVideoCodecType.hevc,
                     AVVideoWidthKey: mode.width, AVVideoHeightKey: mode.height,
@@ -161,9 +172,16 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         if output is AVCaptureVideoDataOutput {
+            let hostPTS: Double
+            do { hostPTS = try ClockAligner.hostTime(pts, clock: session.synchronizationClock) }
+            catch {
+                appendError = error.localizedDescription
+                stop()
+                return
+            }
             if firstPTS == nil {
                 firstPTS = pts
-                clockEvidence = ClockAligner.evidence(firstPTS: pts,
+                clockEvidence = ClockAligner.evidence(firstPTS: pts, hostPTS: hostPTS,
                     callbackHostTime: CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock())))
                 writer.startSession(atSourceTime: pts)
             }
@@ -174,7 +192,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             if videoInput.append(sampleBuffer) {
                 frameCount += 1
                 lastPTS = pts
-                let evidence = CaptureFrameEvidence(sourcePTSSeconds: CMTimeGetSeconds(pts),
+                let evidence = CaptureFrameEvidence(hostPTSSeconds: hostPTS, sourcePTSSeconds: CMTimeGetSeconds(pts),
                     cameraIntrinsicMatrix: CaptureFrameEvidence.intrinsicMatrix(sampleBuffer),
                     intrinsicSource: "kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix; native unrotated output buffer coordinates",
                     activeVideoStabilizationMode: connection.activeVideoStabilizationMode.rawValue)

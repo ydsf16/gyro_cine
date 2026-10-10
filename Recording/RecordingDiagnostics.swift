@@ -22,6 +22,8 @@ struct RecordingDiagnostics: Codable {
     var lastVideoPTSSeconds: Double? = nil
     var gyroStats: MotionRateStats? = nil
     var accelStats: MotionRateStats? = nil
+    var recordedClockMap: RecordedClockMap? = nil
+    var maximumCaptureToHostClockDriftMs: Double? = nil
     var sourceVideoSampleCount: Int? = nil
     var framesWithAPIIntrinsics: Int? = nil
     var maximumSourceToAssetTimingResidualMs: Double? = nil

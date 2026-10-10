@@ -130,7 +130,7 @@ final class RecorderViewModel: ObservableObject {
 
     private func recordFailure(_ reason: String) {
         guard let folder = currentFolder else { return }
-        var diagnostics = RecordingDiagnostics(deviceModel: UIDevice.current.model,
+        var diagnostics = RecordingDiagnostics(deviceModel: RecorderIdentity.cameraModel,
             systemVersion: UIDevice.current.systemVersion, configuredCodec: "HEVC",
             audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
             submittedFrameCount: 0, motionEventCount: motion.count,
@@ -144,7 +144,7 @@ final class RecorderViewModel: ObservableObject {
         motion.stop()
         guard let folder = currentFolder else { return }
         var diagnostics = RecordingDiagnostics(
-            deviceModel: UIDevice.current.model,
+            deviceModel: RecorderIdentity.cameraModel,
             systemVersion: UIDevice.current.systemVersion,
             configuredCodec: "HEVC", audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
             submittedFrameCount: frames, motionEventCount: motion.count,

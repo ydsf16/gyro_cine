@@ -105,12 +105,21 @@ enum RecordingFinalizer {
             guard residuals.allSatisfy({ $0 <= 0.001 }) else {
                 throw RecorderError.unavailable("Source sample PTS and MOV frame mapping differ by more than 1ms")
             }
+            if let hostOrigin = clock.firstVideoHostPTSSeconds {
+                let hostTimes = evidence.compactMap(\.hostPTSSeconds)
+                guard hostTimes.count == evidence.count else { throw RecorderError.unavailable("Missing converted frame timestamps") }
+                let drift = zip(hostTimes, evidence).map {
+                    abs(($0 - hostOrigin) - ($1.sourcePTSSeconds - clock.firstVideoPTSSeconds))
+                }.max() ?? 0
+                diagnostics.recordedClockMap = try RecordedClockMap(host: hostTimes, video: video.frames.map(\.pts))
+                diagnostics.maximumCaptureToHostClockDriftMs = drift * 1000
+            }
             diagnostics.sourceVideoSampleCount = evidence.count
             diagnostics.framesWithAPIIntrinsics = evidence.filter { $0.cameraIntrinsicMatrix != nil }.count
             diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
         }
         try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
-                                         sourceFirstPTS: clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens)
+                                         sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap)
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
     }
