@@ -37,7 +37,7 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingLibrary = false
     private var recording: Bool { model.state == .recording }
-    private var busy: Bool { recording || model.state == .finalizing }
+    private var busy: Bool { recording || model.state == .finalizing || model.state == .configuring }
 
     var body: some View {
         ZStack {
@@ -81,8 +81,19 @@ struct ContentView: View {
                         .font(.caption).accessibilityIdentifier("recordingState")
                     Text("剩余 \(model.freeSpaceLabel) · IMU \(model.imuRateLabel)")
                         .font(.caption2).foregroundStyle(.white.opacity(0.8))
-                    Text("1×").font(.subheadline.weight(.semibold)).foregroundStyle(.yellow)
-                        .frame(width: 44, height: 44).background(.black.opacity(0.45), in: Circle())
+                    HStack(spacing: 12) {
+                        ForEach(model.lenses) { lens in
+                            Button { model.selectLens(lens) } label: {
+                                Text(lens.label).font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(model.selectedLens?.id == lens.id ? .yellow : .white)
+                                    .frame(minWidth: 44, minHeight: 44)
+                                    .background(.black.opacity(0.45), in: Capsule())
+                            }.disabled(!model.canSelectLens || !lens.supports4K30)
+                                .opacity(lens.supports4K30 ? 1 : 0.35)
+                                .accessibilityLabel("\(lens.name) \(lens.label)" + (lens.supports4K30 ? "" : " 不支持4K30"))
+                                .accessibilityIdentifier("lens_" + lens.deviceType)
+                        }
+                    }
                     Text(model.state == .finalizing ? "正在保存…" : "视频 + 原始 IMU")
                         .font(.system(size: 14, weight: .semibold)).foregroundStyle(.yellow)
                     HStack {
@@ -111,7 +122,7 @@ struct ContentView: View {
             .sheet(isPresented: $showingLibrary) { RecordingLibraryView(model: model) }
             .task { model.prepare() }
             .onChange(of: model.audioEnabled) { _, enabled in
-                if !busy { model.coordinator.configure(audio: enabled) }
+                if !busy { model.reconfigure() }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active && recording { model.stop() }
@@ -127,9 +138,9 @@ struct SettingsView: View {
             Form {
                 Section("录制") {
                     LabeledContent("视频格式", value: "HEVC · 4K / 30 fps")
-                    LabeledContent("镜头", value: "后置主摄 · 固定 1×")
+                    LabeledContent("镜头", value: (model.selectedLens.map { "\($0.name) \($0.label) · 录制中固定" } ?? "无可用镜头"))
                     Toggle("录制音频", isOn: $model.audioEnabled)
-                        .disabled(model.state == .recording || model.state == .finalizing)
+                        .disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
                     LabeledContent("原始 gyro + accel", value: "始终开启")
                     LabeledContent("Gyroflow 1.6.3", value: "MOV + GCSV + 镜头 + 工程")
                 }.listRowBackground(RecorderTheme.surface)

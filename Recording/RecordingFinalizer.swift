@@ -110,7 +110,7 @@ enum RecordingFinalizer {
             diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
         }
         try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
-                                         sourceFirstPTS: clock.firstVideoPTSSeconds, fps: fps, evidence: evidence)
+                                         sourceFirstPTS: clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens)
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
     }

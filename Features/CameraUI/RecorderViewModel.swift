@@ -10,6 +10,9 @@ final class RecorderViewModel: ObservableObject {
     @Published var recordings: [URL] = []
     @Published var imuRateLabel = "pending"
     @Published var elapsedSeconds = 0
+    @Published private(set) var lenses: [CameraLens] = []
+    @Published private(set) var selectedLens: CameraLens?
+    var canSelectLens: Bool { state == .ready || state == .completed || state == .failed }
     let coordinator = CaptureCoordinator()
     private let motion = MotionRecorder()
     private var currentFolder: URL?
@@ -18,7 +21,7 @@ final class RecorderViewModel: ObservableObject {
 
     var previewSession: AVCaptureSession { coordinator.session }
     var modes: [CameraMode] {
-        guard let device = CameraCapabilityScanner.mainCamera() else { return [] }
+        guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) ?? CameraCapabilityScanner.mainCamera() else { return [] }
         return CameraCapabilityScanner.hevcModes(device: device)
     }
     var capabilityLabel: String { modes.isEmpty ? "4K30 unavailable or camera inaccessible" : "HEVC 4K30 candidate; recording requires verification" }
@@ -62,10 +65,28 @@ final class RecorderViewModel: ObservableObject {
         guard !started else { return }
         started = true
         refreshRecordings()
-        coordinator.configure(audio: audioEnabled)
+        lenses = CameraCapabilityScanner.lenses()
+        selectedLens = lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue && $0.supports4K30 }
+            ?? lenses.first { $0.supports4K30 }
+        reconfigure()
+    }
+
+    func selectLens(_ lens: CameraLens) {
+        guard canSelectLens, lens.supports4K30, lenses.contains(lens), lens.id != selectedLens?.id else { return }
+        selectedLens = lens
+        reconfigure()
+    }
+
+    func reconfigure() {
+        guard state != .recording, state != .finalizing, state != .configuring else { return }
+        state = .configuring
+        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id)
     }
 
     func start() {
+        guard state == .ready || state == .completed else { return }
+        state = .configuring // Disable lens changes immediately, including before the first video sample.
+
         do {
             guard motion.isAvailable else { throw RecorderError.unavailable("Raw motion sensors unavailable") }
             let freeBytes = (try? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -79,7 +100,7 @@ final class RecorderViewModel: ObservableObject {
             let folder = documents.appendingPathComponent("recording_\(date.string(from: Date()))")
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             currentFolder = folder
-            DiagnosticsCollector.record("start requested codec=HEVC video=3840x2160@30 audio=\(audioEnabled)", folder: folder)
+            DiagnosticsCollector.record("start requested codec=HEVC video=3840x2160@30 audio=\(audioEnabled) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
             coordinator.start(at: folder.appendingPathComponent("clip.mov"))
         } catch {
@@ -104,16 +125,17 @@ final class RecorderViewModel: ObservableObject {
 
     func retry() {
         currentFolder = nil
-        coordinator.configure(audio: audioEnabled)
+        reconfigure()
     }
 
     private func recordFailure(_ reason: String) {
         guard let folder = currentFolder else { return }
-        let diagnostics = RecordingDiagnostics(deviceModel: UIDevice.current.model,
+        var diagnostics = RecordingDiagnostics(deviceModel: UIDevice.current.model,
             systemVersion: UIDevice.current.systemVersion, configuredCodec: "HEVC",
             audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
             submittedFrameCount: 0, motionEventCount: motion.count,
             clock: nil, captureError: reason, status: "failed")
+        diagnostics.selectedLens = selectedLens
         try? JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
         DiagnosticsCollector.record("failed reason=\(reason)", folder: folder)
     }
@@ -121,13 +143,14 @@ final class RecorderViewModel: ObservableObject {
     private func finish(url: URL, clock: ClockEvidence?, frames: Int, error: String?) {
         motion.stop()
         guard let folder = currentFolder else { return }
-        let diagnostics = RecordingDiagnostics(
+        var diagnostics = RecordingDiagnostics(
             deviceModel: UIDevice.current.model,
             systemVersion: UIDevice.current.systemVersion,
             configuredCodec: "HEVC", audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
             submittedFrameCount: frames, motionEventCount: motion.count,
             clock: clock, captureError: error ?? motion.error,
             status: error == nil && motion.error == nil ? "finalizing" : "failed")
+        diagnostics.selectedLens = selectedLens
         do {
             try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
             guard error == nil, motion.error == nil, frames > 0 else {

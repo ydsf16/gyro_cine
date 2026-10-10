@@ -3,7 +3,7 @@ import Foundation
 /// Gyroflow 1.6.3 bundle. The project intentionally starts without synchronization offsets.
 enum LegacyGyroflowExporter {
     static func write(folder: URL, video: ActualVideoInfo, events: [MotionEvent],
-                      sourceFirstPTS: Double, fps: Double, evidence: [CaptureFrameEvidence]) throws {
+                      sourceFirstPTS: Double, fps: Double, evidence: [CaptureFrameEvidence], lens: CameraLens? = nil) throws {
         let gyro = events.filter { $0.kind == .gyro }
         guard sourceFirstPTS.isFinite, let first = video.frames.first, !gyro.isEmpty,
               gyro.allSatisfy({ [$0.timestamp, $0.x, $0.y, $0.z].allSatisfy(\.isFinite) }),
@@ -19,9 +19,9 @@ enum LegacyGyroflowExporter {
             return (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
         }
         let profile: [String: Any] = [
-            "name": "RawMotion 1x API intrinsics - distortion UNCALIBRATED",
+            "name": "RawMotion \(lens?.label ?? "fixed lens") API intrinsics - distortion UNCALIBRATED",
             "note": "Median output-image API K. Zero distortion is an uncalibrated approximation. Offline sync and axis validation required.",
-            "camera_brand": "Apple", "camera_setting": "Main wide camera 1x HEVC 4K30",
+            "camera_brand": "Apple", "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") HEVC 4K30",
             "calibrator_version": "RawMotion-API-K-unvalidated-v1", "official": false,
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height], "fps": fps,
@@ -42,7 +42,7 @@ enum LegacyGyroflowExporter {
             "sync": ["do_autosync": false],
             "output": ["audio": true]
         ]
-        var csv = "GYROFLOW IMU LOG\nversion,1.3\nid,RawMotionRecorder\norientation,XYZ\nvideofilename,clip.mov\nlens_info,wide 1x\nnote,Offline sync required; axes unverified; rolling shutter correction disabled\ntscale,1\ngscale,1\nt,gx,gy,gz\n"
+        var csv = "GYROFLOW IMU LOG\nversion,1.3\nid,RawMotionRecorder\norientation,XYZ\nvideofilename,clip.mov\nlens_info,\(lens?.label ?? "fixed lens")\nnote,Offline sync required; axes unverified; rolling shutter correction disabled\ntscale,1\ngscale,1\nt,gx,gy,gz\n"
         for event in gyro {
             csv += [event.timestamp - sourceFirstPTS + first.pts, event.x, event.y, event.z]
                 .map { String($0) }.joined(separator: ",") + "\n"

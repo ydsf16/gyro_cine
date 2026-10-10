@@ -25,14 +25,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     var onState: ((RecordingState, String?) -> Void)?
     var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
 
-    func configure(audio: Bool) {
+    func configure(audio: Bool, cameraID: String? = nil) {
         sessionQueue.async {
             self.onState?(.configuring, nil)
             do {
                 let cameraGranted = awaitPermission(.video)
                 guard cameraGranted else { throw RecorderError.cameraPermission }
                 if audio && !awaitPermission(.audio) { throw RecorderError.microphonePermission }
-                guard let device = CameraCapabilityScanner.mainCamera() else { throw RecorderError.noCamera }
+                guard let device = cameraID.flatMap({ CameraCapabilityScanner.device(id: $0) }) ?? (cameraID == nil ? CameraCapabilityScanner.mainCamera() : nil) else { throw RecorderError.noCamera }
                 guard let mode = CameraCapabilityScanner.hevcModes(device: device).first else { throw RecorderError.unsupported4K30 }
                 self.device = device
                 self.mode = mode

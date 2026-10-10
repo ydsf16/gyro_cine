@@ -1,4 +1,4 @@
-> Current M1 scope (2026-10-10): fixed main-camera 1x, Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.
+> Current M1 scope (2026-10-10): selectable physical lens (fixed during each clip), Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [lens selection](LENS_SELECTION_REPORT.md). See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.
 
 # RawMotion Recorder (M1 implementation candidate)
 

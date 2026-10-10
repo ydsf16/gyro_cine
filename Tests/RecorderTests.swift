@@ -44,7 +44,9 @@ final class RecorderTests: XCTestCase {
             cameraIntrinsicMatrix: [2000, 0, 1920, 0, 2000, 1080, 0, 0, 1],
             intrinsicSource: "API", activeVideoStabilizationMode: 0)]
         try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
-                                         sourceFirstPTS: 100, fps: 30, evidence: evidence)
+                                         sourceFirstPTS: 100, fps: 30, evidence: evidence,
+                                         lens: CameraLens(id: "test-ultra", name: "超广角", deviceType: "test",
+                                                          displayMultiplier: 0.5, supports4K30: true))
         let csv = try String(contentsOf: folder.appendingPathComponent("clip.gcsv"), encoding: .utf8)
         let rows = csv.components(separatedBy: "t,gx,gy,gz\n")[1].split(separator: "\n")
         XCTAssertEqual(rows.count, 2)
@@ -52,6 +54,8 @@ final class RecorderTests: XCTestCase {
         XCTAssertEqual(rows[1].split(separator: ",").compactMap { Double($0) }, [0.75, 4, 5, 6])
         let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf:
             folder.appendingPathComponent("clip.gyroflow"))) as? [String: Any])
+        XCTAssertTrue(((project["calibration_data"] as? [String: Any])?["camera_setting"] as? String)?.contains("超广角 0.5×") == true)
+        XCTAssertTrue(csv.contains("lens_info,0.5×"))
         XCTAssertEqual(project["videofile"] as? String, folder.appendingPathComponent("clip.mov").absoluteString)
         XCTAssertEqual((project["gyro_source"] as? [String: Any])?["filepath"] as? String, folder.appendingPathComponent("clip.gcsv").absoluteString)
         XCTAssertTrue((project["offsets"] as? [String: Double])?.isEmpty == true)
@@ -59,6 +63,25 @@ final class RecorderTests: XCTestCase {
             sourceFirstPTS: 100, fps: 30, evidence: []))
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: [events[0], events[0]],
             sourceFirstPTS: 100, fps: 30, evidence: evidence))
+    }
+
+    func testLensFactorsNormalizeAgainstMainCamera() {
+        XCTAssertEqual(CameraCapabilityScanner.normalizedLensFactors([2, 6], wideIndex: 1), [0.5, 1, 3])
+        XCTAssertEqual(CameraCapabilityScanner.normalizedLensFactors([2, 10], wideIndex: 1), [0.5, 1, 5])
+        XCTAssertEqual(CameraCapabilityScanner.normalizedLensFactors([2], wideIndex: 0), [1, 2])
+        XCTAssertNil(CameraCapabilityScanner.normalizedLensFactors([0], wideIndex: 1))
+        XCTAssertNil(CameraCapabilityScanner.normalizedLensFactors([2], wideIndex: 2))
+    }
+
+    @MainActor
+    func testLensSelectionLockedDuringCaptureAndFinalization() {
+        let model = RecorderViewModel()
+        for state in [RecordingState.configuring, .recording, .finalizing] {
+            model.state = state
+            XCTAssertFalse(model.canSelectLens)
+        }
+        model.state = .completed
+        XCTAssertTrue(model.canSelectLens)
     }
 
     func testRadiansToDegrees() {
