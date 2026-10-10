@@ -124,8 +124,11 @@ struct ContentView: View {
             .onChange(of: model.audioEnabled) { _, enabled in
                 if !busy { model.reconfigure() }
             }
+            .onChange(of: model.shutter) { _, _ in
+                if !busy { model.reconfigure() }
+            }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active && recording { model.stop() }
+                if phase != .active && (recording || model.state == .configuring) { model.stop() }
             }
     }
 }
@@ -141,6 +144,12 @@ struct SettingsView: View {
                     LabeledContent("镜头", value: (model.selectedLens.map { "\($0.name) \($0.label) · 录制中固定" } ?? "无可用镜头"))
                     Toggle("录制音频", isOn: $model.audioEnabled)
                         .disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                    Picker("快门", selection: $model.shutter) {
+                        ForEach(model.supportedShutters) { option in Text(option.label).tag(option) }
+                    }.disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                    LabeledContent("曝光读数", value: model.exposureReadout)
+                    Text("固定快门会锁定设置瞬间的 ISO；画面亮度可能变化。")
+                        .font(.caption).foregroundStyle(.secondary)
                     LabeledContent("原始 gyro + accel", value: "始终开启")
                     LabeledContent("Gyroflow 1.6.3", value: "MOV + GCSV + 镜头 + 工程")
                 }.listRowBackground(RecorderTheme.surface)
@@ -197,9 +206,11 @@ struct RecordingLibraryView: View {
                         let files = ["clip.mov", "clip.gcsv", "lens_profile.json", "clip.gyroflow"]
                             .map { folder.appendingPathComponent($0) }
                         if files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) {
-                            Button { sharing = RecordingShare(files: files) } label: { Image(systemName: "square.and.arrow.up") }
+                            Button { sharing = RecordingShare(files: [folder]) } label: {
+                                Image(systemName: "square.and.arrow.up")
+                            }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel("导出 Gyroflow 四文件")
+                                .accessibilityLabel("分享 Gyroflow 录制文件夹")
                         } else {
                             Button { sharing = RecordingShare(files: [folder]) } label: { Image(systemName: "square.and.arrow.up") }
                                 .buttonStyle(.borderless)
@@ -207,6 +218,8 @@ struct RecordingLibraryView: View {
                         }
                     }.padding(.vertical, 5).listRowBackground(RecorderTheme.surface)
                 }
+                Text("文件 App → 我的 iPhone → RawMotionRecorder → 对应录制文件夹")
+                    .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }.scrollContentBackground(.hidden).background(RecorderTheme.background)
                 .sheet(item: $sharing) { RecordingActivityView(files: $0.files) }
                 .navigationTitle("素材").navigationBarTitleDisplayMode(.inline)

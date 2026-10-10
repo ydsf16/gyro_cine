@@ -21,12 +21,18 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var fileURL: URL?
     private var frameEvidenceHandle: FileHandle?
     private let evidenceEncoder = JSONEncoder()
+    private var configurationID = 0
+    private var configurationReady = false
 
     var onState: ((RecordingState, String?) -> Void)?
     var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
+    var onExposureReading: ((Double, Float) -> Void)?
 
-    func configure(audio: Bool, cameraID: String? = nil) {
+    func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto) {
         sessionQueue.async {
+            self.configurationID += 1
+            let configurationID = self.configurationID
+            self.configurationReady = false
             self.onState?(.configuring, nil)
             do {
                 let cameraGranted = awaitPermission(.video)
@@ -75,7 +81,43 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.session.commitConfiguration()
                 configurationOpen = false
                 self.session.startRunning()
-                self.onState?(.ready, nil)
+                guard shutter.isSupported(by: device, mode: mode) else {
+                    throw RecorderError.unavailable("Selected shutter is unsupported for this camera at 4K30")
+                }
+                try device.lockForConfiguration()
+                if let durationSeconds = shutter.durationSeconds {
+                    let duration = CMTime(seconds: durationSeconds, preferredTimescale: 1_000_000)
+                    device.setExposureModeCustom(duration: duration, iso: AVCaptureDevice.currentISO) { [weak self] _ in
+                        guard let self else { return }
+                        self.sessionQueue.async {
+                            guard self.configurationID == configurationID, !self.configurationReady else { return }
+                            do {
+                                try device.lockForConfiguration()
+                                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
+                                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+                                device.unlockForConfiguration()
+                                self.configurationReady = true
+                                self.onExposureReading?(device.exposureDuration.seconds, device.iso)
+                                self.onState?(.ready, nil)
+                            } catch {
+                                self.configurationReady = true
+                                self.onState?(.failed, error.localizedDescription)
+                            }
+                        }
+                    }
+                    device.unlockForConfiguration()
+                    self.sessionQueue.asyncAfter(deadline: .now() + 3) {
+                        guard self.configurationID == configurationID, !self.configurationReady else { return }
+                        self.configurationReady = true
+                        self.onState?(.failed, "Timed out applying shutter setting")
+                    }
+                } else {
+                    device.exposureMode = .continuousAutoExposure
+                    device.unlockForConfiguration()
+                    self.configurationReady = true
+                    self.onExposureReading?(device.exposureDuration.seconds, device.iso)
+                    self.onState?(.ready, nil)
+                }
             } catch { self.onState?(.failed, error.localizedDescription) }
         }
     }
@@ -195,7 +237,13 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 let evidence = CaptureFrameEvidence(hostPTSSeconds: hostPTS, sourcePTSSeconds: CMTimeGetSeconds(pts),
                     cameraIntrinsicMatrix: CaptureFrameEvidence.intrinsicMatrix(sampleBuffer),
                     intrinsicSource: "kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix; native unrotated output buffer coordinates",
-                    activeVideoStabilizationMode: connection.activeVideoStabilizationMode.rawValue)
+                    activeVideoStabilizationMode: connection.activeVideoStabilizationMode.rawValue,
+                    deviceExposureDurationAtCallbackSeconds: device?.exposureDuration.seconds,
+                    deviceISOAtCallback: device?.iso)
+                if frameCount % 30 == 1, let exposure = evidence.deviceExposureDurationAtCallbackSeconds,
+                   let iso = evidence.deviceISOAtCallback {
+                    onExposureReading?(exposure, iso)
+                }
                 do { try frameEvidenceHandle?.write(contentsOf: evidenceEncoder.encode(evidence) + Data([0x0A])) }
                 catch { appendError = "Video timing evidence write failed: \(error.localizedDescription)" }
             }

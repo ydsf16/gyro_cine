@@ -117,8 +117,18 @@ enum RecordingFinalizer {
             diagnostics.sourceVideoSampleCount = evidence.count
             diagnostics.framesWithAPIIntrinsics = evidence.filter { $0.cameraIntrinsicMatrix != nil }.count
             diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
+            let exposures = evidence.compactMap(\.deviceExposureDurationAtCallbackSeconds)
+                .filter { $0.isFinite && $0 > 0 }.sorted()
+            if !exposures.isEmpty {
+                diagnostics.medianDeviceExposureDurationAtCallbackSeconds = exposures[exposures.count / 2]
+                diagnostics.minimumDeviceExposureDurationAtCallbackSeconds = exposures.first
+                diagnostics.maximumDeviceExposureDurationAtCallbackSeconds = exposures.last
+            }
+            let isos = evidence.compactMap(\.deviceISOAtCallback).map(Double.init)
+                .filter { $0.isFinite && $0 > 0 }.sorted()
+            if !isos.isEmpty { diagnostics.medianDeviceISOAtCallback = isos[isos.count / 2] }
         }
-        try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
+        diagnostics.gcsvAlignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
                                          sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap)
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)

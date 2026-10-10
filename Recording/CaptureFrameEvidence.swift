@@ -8,6 +8,10 @@ struct CaptureFrameEvidence: Codable {
     let cameraIntrinsicMatrix: [Double]?
     let intrinsicSource: String
     let activeVideoStabilizationMode: Int
+    // AVCaptureDevice state sampled at callback; useful for verifying a fixed shutter,
+    // but it is not a frame-embedded exposure-start or sensor readout timestamp.
+    var deviceExposureDurationAtCallbackSeconds: Double? = nil
+    var deviceISOAtCallback: Float? = nil
 
     static func intrinsicMatrix(_ sample: CMSampleBuffer) -> [Double]? {
         guard let attachment = CMGetAttachment(sample, key: kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix,

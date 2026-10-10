@@ -16,7 +16,7 @@ final class DeviceRecordingTests: XCTestCase {
         add(screenshot)
     }
 
-    func testDeviceFourFileShareSheet() {
+    func testDeviceFolderShareSheet() {
         let app = XCUIApplication()
         app.launch()
         let library = app.buttons["libraryButton"]
@@ -24,7 +24,7 @@ final class DeviceRecordingTests: XCTestCase {
         expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: library)
         waitForExpectations(timeout: 20)
         library.tap()
-        let share = app.buttons["导出 Gyroflow 四文件"].firstMatch
+        let share = app.buttons["分享 Gyroflow 录制文件夹"].firstMatch
         XCTAssertTrue(share.waitForExistence(timeout: 10))
         share.tap()
         let save = app.cells.matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@", "Save to Files", "存储到“文件”")).firstMatch
@@ -33,7 +33,6 @@ final class DeviceRecordingTests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         XCTAssertTrue(app.otherElements["ActivityListView"].exists)
-        XCTAssertTrue(app.navigationBars["4个文稿"].exists, "Share sheet must contain four files")
     }
 
     func testDeviceShortRecording() throws {
@@ -45,6 +44,34 @@ final class DeviceRecordingTests: XCTestCase {
 
     func testDeviceMainLens20Seconds() throws { try record(seconds: 20, lensName: "主摄") }
     func testDeviceUltraWide20Seconds() throws { try record(seconds: 20, lensName: "超广角") }
+
+    func testDeviceManualShutterRecording() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let settings = app.buttons["settingsButton"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        settings.tap()
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "快门")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), app.debugDescription)
+        picker.tap()
+        let shutter = app.buttons["1/120 秒"].firstMatch
+        XCTAssertTrue(shutter.waitForExistence(timeout: 10), app.debugDescription)
+        shutter.tap()
+        app.buttons["完成"].tap()
+        let toggle = app.buttons["recordToggle"]
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: toggle)
+        waitForExpectations(timeout: 20)
+        toggle.tap()
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Recording"),
+                    evaluatedWith: app.staticTexts["recordingState"])
+        waitForExpectations(timeout: 15)
+        Thread.sleep(forTimeInterval: 5)
+        toggle.tap()
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Completed"),
+                    evaluatedWith: app.staticTexts["recordingState"])
+        waitForExpectations(timeout: 40)
+    }
 
     private func record(seconds: TimeInterval, lensName: String? = nil) throws {
         continueAfterFailure = false

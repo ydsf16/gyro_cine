@@ -16,17 +16,26 @@ final class MotionRecorder {
     private let lock = NSLock()
     private var handle: FileHandle?
     private var eventCount = 0
+    private var firstGyroTimestamp: TimeInterval?
+    private var latestGyroTimestamp: TimeInterval?
     private var writeFailure: String?
     private let encoder = JSONEncoder()
 
     var isAvailable: Bool { manager.isGyroAvailable && manager.isAccelerometerAvailable }
     var count: Int { lock.lock(); defer { lock.unlock() }; return eventCount }
+    var gyroSpanSeconds: TimeInterval {
+        lock.lock(); defer { lock.unlock() }
+        guard let firstGyroTimestamp, let latestGyroTimestamp else { return 0 }
+        return latestGyroTimestamp - firstGyroTimestamp
+    }
     var error: String? { lock.lock(); defer { lock.unlock() }; return writeFailure }
 
     func start(at url: URL) throws {
         guard isAvailable else { throw RecorderError.unavailable("Raw gyro or accelerometer unavailable") }
         lock.lock()
         eventCount = 0
+        firstGyroTimestamp = nil
+        latestGyroTimestamp = nil
         writeFailure = nil
         lock.unlock()
         guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
@@ -60,6 +69,10 @@ final class MotionRecorder {
             let data = try encoder.encode(sample)
             try handle?.write(contentsOf: data + Data([0x0A]))
             eventCount += 1
+            if sample.kind == .gyro {
+                if firstGyroTimestamp == nil { firstGyroTimestamp = sample.timestamp }
+                latestGyroTimestamp = sample.timestamp
+            }
         } catch { writeFailure = error.localizedDescription }
     }
 

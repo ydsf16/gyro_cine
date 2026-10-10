@@ -10,6 +10,11 @@ struct RecordingDiagnostics: Codable {
     let motionEventCount: Int
     let clock: ClockEvidence?
     var selectedLens: CameraLens? = nil
+    var requestedShutter: String? = nil
+    var medianDeviceExposureDurationAtCallbackSeconds: Double? = nil
+    var minimumDeviceExposureDurationAtCallbackSeconds: Double? = nil
+    var maximumDeviceExposureDurationAtCallbackSeconds: Double? = nil
+    var medianDeviceISOAtCallback: Double? = nil
     var captureError: String?
     var status: String
     var actualCodecFourCC: String? = nil
@@ -29,6 +34,15 @@ struct RecordingDiagnostics: Codable {
     var maximumSourceToAssetTimingResidualMs: Double? = nil
     var intrinsicCalibrationStatus: String = "API K is optional; lens distortion, readout and OIS remain unknown"
     var actualAudioTrackPresent: Bool? = nil
+    var gcsvAlignment: GCSVAlignmentDiagnostics? = nil
+}
+
+struct GCSVAlignmentDiagnostics: Codable {
+    let sampleCount: Int
+    let preRollMs: Double
+    let postRollMs: Double
+    let maximumBoundaryInterpolationGapMs: Double
+    let videoEndSeconds: Double
 }
 
 struct MotionRateStats: Codable {

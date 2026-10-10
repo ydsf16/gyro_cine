@@ -31,27 +31,32 @@ final class RecorderTests: XCTestCase {
         XCTAssertNil(CaptureFrameEvidence.intrinsicMatrix(sample))
     }
 
-    func testLegacyBundlePreservesGyroClockUnitsAndPortableReferences() throws {
+    func testLegacyBundleAlignsGyroBoundariesAndPortableReferences() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        let video = ActualVideoInfo(frames: [ActualVideoFrame(pts: 0.25)], width: 3840, height: 2160,
+        let video = ActualVideoInfo(frames: [0.255, 0.255 + 1.0 / 30, 0.255 + 2.0 / 30].map(ActualVideoFrame.init(pts:)), width: 3840, height: 2160,
                                     duration: 1, codecFourCC: "hvc1")
-        let events = [MotionEvent(kind: .gyro, timestamp: 99.5, x: .pi, y: -2, z: 3),
-                      MotionEvent(kind: .accel, timestamp: 99.6, x: 0, y: 0, z: 9.8),
-                      MotionEvent(kind: .gyro, timestamp: 100.5, x: 4, y: 5, z: 6)]
-        let evidence = [CaptureFrameEvidence(sourcePTSSeconds: 100,
+        let events = (0..<14).map { i in MotionEvent(kind: .gyro, timestamp: 99.985 + Double(i) * 0.01,
+            x: Double(i), y: -2, z: 3) } + [MotionEvent(kind: .accel, timestamp: 100, x: 0, y: 0, z: 9.8)]
+        let evidence = (0..<3).map { index in CaptureFrameEvidence(sourcePTSSeconds: 100 + Double(index) / 30,
             cameraIntrinsicMatrix: [2000, 0, 1920, 0, 2000, 1080, 0, 0, 1],
-            intrinsicSource: "API", activeVideoStabilizationMode: 0)]
-        try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
+            intrinsicSource: "API", activeVideoStabilizationMode: 0) }
+        let alignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
                                          sourceFirstPTS: 100, fps: 30, evidence: evidence,
                                          lens: CameraLens(id: "test-ultra", name: "超广角", deviceType: "test",
                                                           displayMultiplier: 0.5, supports4K30: true))
         let csv = try String(contentsOf: folder.appendingPathComponent("clip.gcsv"), encoding: .utf8)
         let rows = csv.components(separatedBy: "t,gx,gy,gz\n")[1].split(separator: "\n")
-        XCTAssertEqual(rows.count, 2)
-        XCTAssertEqual(rows[0].split(separator: ",").compactMap { Double($0) }, [-0.25, .pi, -2, 3])
-        XCTAssertEqual(rows[1].split(separator: ",").compactMap { Double($0) }, [0.75, 4, 5, 6])
+        XCTAssertEqual(rows.count, 12)
+        let firstRow = rows[0].split(separator: ",").compactMap { Double($0) }
+        let lastRow = rows[11].split(separator: ",").compactMap { Double($0) }
+        XCTAssertEqual(firstRow[0], 0, accuracy: 1e-12)
+        XCTAssertEqual(firstRow[1], 1.5, accuracy: 1e-9)
+        XCTAssertEqual(lastRow[0], 0.1, accuracy: 1e-9)
+        XCTAssertEqual(lastRow[1], 11.5, accuracy: 1e-9)
+        XCTAssertEqual(alignment.preRollMs, 15, accuracy: 1e-7)
+        XCTAssertEqual(alignment.postRollMs, 15, accuracy: 1e-7)
         let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf:
             folder.appendingPathComponent("clip.gyroflow"))) as? [String: Any])
         XCTAssertTrue(((project["calibration_data"] as? [String: Any])?["camera_setting"] as? String)?.contains("超广角 0.5×") == true)
@@ -65,11 +70,21 @@ final class RecorderTests: XCTestCase {
         XCTAssertTrue((profile["calibrated_by"] as? String)?.contains("not calibrated") == true)
         XCTAssertEqual(project["videofile"] as? String, folder.appendingPathComponent("clip.mov").absoluteString)
         XCTAssertEqual((project["gyro_source"] as? [String: Any])?["filepath"] as? String, folder.appendingPathComponent("clip.gcsv").absoluteString)
-        XCTAssertEqual((project["offsets"] as? [String: Double])?["0"], -250)
+        XCTAssertEqual((project["offsets"] as? [String: Double])?["0"], 0)
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
             sourceFirstPTS: 100, fps: 30, evidence: []))
         XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: [events[0], events[0]],
             sourceFirstPTS: 100, fps: 30, evidence: evidence))
+    }
+
+    func testGyroTimelineRejectsUncoveredBoundaryAndSensorGap() throws {
+        let noPreRoll = [MotionEvent(kind: .gyro, timestamp: 0.01, x: 0, y: 0, z: 0),
+                         MotionEvent(kind: .gyro, timestamp: 0.02, x: 1, y: 0, z: 0)]
+        XCTAssertThrowsError(try GyroTimeline.align(events: noPreRoll, videoStart: 0, videoEnd: 0.015, map: { $0 }))
+        let gap = [MotionEvent(kind: .gyro, timestamp: -0.02, x: 0, y: 0, z: 0),
+                   MotionEvent(kind: .gyro, timestamp: 0.02, x: 1, y: 0, z: 0),
+                   MotionEvent(kind: .gyro, timestamp: 0.03, x: 2, y: 0, z: 0)]
+        XCTAssertThrowsError(try GyroTimeline.align(events: gap, videoStart: 0, videoEnd: 0.025, map: { $0 }))
     }
 
     func testLensFactorsNormalizeAgainstMainCamera() {

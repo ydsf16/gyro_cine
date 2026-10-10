@@ -7,6 +7,8 @@ final class RecorderViewModel: ObservableObject {
     @Published var state: RecordingState = .idle
     @Published var message: String?
     @Published var audioEnabled = true
+    @Published var shutter: ShutterSetting = .auto
+    @Published var exposureReadout = "等待相机读数"
     @Published var recordings: [URL] = []
     @Published var imuRateLabel = "pending"
     @Published var elapsedSeconds = 0
@@ -18,11 +20,17 @@ final class RecorderViewModel: ObservableObject {
     private var currentFolder: URL?
     private var started = false
     private var recordingTimer: Timer?
+    private var primingTask: Task<Void, Never>?
 
     var previewSession: AVCaptureSession { coordinator.session }
     var modes: [CameraMode] {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) ?? CameraCapabilityScanner.mainCamera() else { return [] }
         return CameraCapabilityScanner.hevcModes(device: device)
+    }
+    var supportedShutters: [ShutterSetting] {
+        guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }),
+              let mode = modes.first else { return [.auto] }
+        return ShutterSetting.allCases.filter { $0.isSupported(by: device, mode: mode) }
     }
     var capabilityLabel: String { modes.isEmpty ? "4K30 unavailable or camera inaccessible" : "HEVC 4K30 candidate; recording requires verification" }
     var canToggle: Bool { state == .ready || state == .recording || state == .completed }
@@ -59,6 +67,12 @@ final class RecorderViewModel: ObservableObject {
         coordinator.onCompleted = { [weak self] url, clock, frames, error in
             Task { @MainActor in self?.finish(url: url, clock: clock, frames: frames, error: error) }
         }
+        coordinator.onExposureReading = { [weak self] duration, iso in
+            Task { @MainActor in
+                guard duration.isFinite, duration > 0, iso.isFinite else { return }
+                self?.exposureReadout = String(format: "实际约 1/%.1f 秒 · ISO %.0f", 1 / duration, iso)
+            }
+        }
     }
 
     func prepare() {
@@ -74,13 +88,14 @@ final class RecorderViewModel: ObservableObject {
     func selectLens(_ lens: CameraLens) {
         guard canSelectLens, lens.supports4K30, lenses.contains(lens), lens.id != selectedLens?.id else { return }
         selectedLens = lens
+        if !supportedShutters.contains(shutter) { shutter = .auto }
         reconfigure()
     }
 
     func reconfigure() {
         guard state != .recording, state != .finalizing, state != .configuring else { return }
         state = .configuring
-        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id)
+        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter)
     }
 
     func start() {
@@ -100,16 +115,47 @@ final class RecorderViewModel: ObservableObject {
             let folder = documents.appendingPathComponent("recording_\(date.string(from: Date()))")
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             currentFolder = folder
-            DiagnosticsCollector.record("start requested codec=HEVC video=3840x2160@30 audio=\(audioEnabled) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
+            DiagnosticsCollector.record("start requested codec=HEVC video=3840x2160@30 audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
-            coordinator.start(at: folder.appendingPathComponent("clip.mov"))
+            DiagnosticsCollector.record("IMU pre-roll started; waiting for 100ms of gyro samples", folder: folder)
+            primingTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                for _ in 0..<200 {
+                    if Task.isCancelled { return }
+                    if self.motion.gyroSpanSeconds >= 0.100 { break }
+                    try? await Task.sleep(for: .milliseconds(10))
+                }
+                guard !Task.isCancelled, self.currentFolder == folder, self.state == .configuring else { return }
+                guard self.motion.gyroSpanSeconds >= 0.100, self.motion.error == nil else {
+                    self.motion.stop()
+                    self.state = .failed
+                    self.message = self.motion.error ?? "Gyroscope did not supply 100ms of pre-roll samples"
+                    self.recordFailure(self.message ?? "IMU pre-roll failed")
+                    self.refreshRecordings()
+                    return
+                }
+                DiagnosticsCollector.record("IMU pre-roll ready spanMs=\(self.motion.gyroSpanSeconds * 1000)", folder: folder)
+                self.coordinator.start(at: folder.appendingPathComponent("clip.mov"))
+                self.primingTask = nil
+            }
         } catch {
             state = .failed
             message = error.localizedDescription
         }
     }
 
-    func stop() { coordinator.stop() }
+    func stop() {
+        if state == .configuring, primingTask != nil {
+            primingTask?.cancel()
+            primingTask = nil
+            motion.stop()
+            state = .ready
+            message = "Recording cancelled during IMU pre-roll"
+            currentFolder = nil
+            return
+        }
+        coordinator.stop()
+    }
 
     private func startStatusTimer() {
         elapsedSeconds = 0
@@ -136,11 +182,14 @@ final class RecorderViewModel: ObservableObject {
             submittedFrameCount: 0, motionEventCount: motion.count,
             clock: nil, captureError: reason, status: "failed")
         diagnostics.selectedLens = selectedLens
+        diagnostics.requestedShutter = shutter.label
         try? JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
         DiagnosticsCollector.record("failed reason=\(reason)", folder: folder)
     }
 
     private func finish(url: URL, clock: ClockEvidence?, frames: Int, error: String?) {
+        primingTask?.cancel()
+        primingTask = nil
         motion.stop()
         guard let folder = currentFolder else { return }
         var diagnostics = RecordingDiagnostics(
@@ -151,6 +200,7 @@ final class RecorderViewModel: ObservableObject {
             clock: clock, captureError: error ?? motion.error,
             status: error == nil && motion.error == nil ? "finalizing" : "failed")
         diagnostics.selectedLens = selectedLens
+        diagnostics.requestedShutter = shutter.label
         do {
             try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
             guard error == nil, motion.error == nil, frames > 0 else {
