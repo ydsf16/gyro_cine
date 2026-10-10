@@ -127,11 +127,11 @@ struct SettingsView: View {
             Form {
                 Section("录制") {
                     LabeledContent("视频格式", value: "HEVC · 4K / 30 fps")
-                    LabeledContent("镜头", value: "后置主摄 1×")
+                    LabeledContent("镜头", value: "后置主摄 · 固定 1×")
                     Toggle("录制音频", isOn: $model.audioEnabled)
                         .disabled(model.state == .recording || model.state == .finalizing)
                     LabeledContent("原始 gyro + accel", value: "始终开启")
-                    LabeledContent("Gyroflow JSONL", value: "始终导出")
+                    LabeledContent("Gyroflow 1.6.3", value: "MOV + GCSV + 镜头 + 工程")
                 }.listRowBackground(RecorderTheme.surface)
                 Section("设备能力") {
                     Text(model.capabilityLabel).font(.footnote)
@@ -140,7 +140,7 @@ struct SettingsView: View {
                     LabeledContent("剩余存储", value: model.freeSpaceLabel)
                 }.listRowBackground(RecorderTheme.surface)
                 Section {
-                    Text("运动同步与镜头校准待验证。ProRes RAW 在 M1 验收后开放。")
+                    Text("工程需离线同步，镜头畸变尚未校准。ProRes RAW 在 M1 验收后开放。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }.listRowBackground(RecorderTheme.surface)
             }.scrollContentBackground(.hidden).background(RecorderTheme.background)
@@ -166,11 +166,18 @@ struct RecordingLibraryView: View {
                             .frame(width: 44, height: 44).background(RecorderTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                         VStack(alignment: .leading, spacing: 5) {
                             Text(folder.lastPathComponent).font(.subheadline).lineLimit(1)
-                            Text("MOV · JSONL · 原始 IMU").font(.caption).foregroundStyle(.secondary)
+                            Text("MOV · GCSV · 镜头 · 工程").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        ShareLink(item: folder) { Image(systemName: "square.and.arrow.up") }
-                            .accessibilityLabel("导出完整素材文件夹")
+                        let files = ["clip.mov", "clip.gcsv", "lens_profile.json", "clip.gyroflow"]
+                            .map { folder.appendingPathComponent($0) }
+                        if files.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }) {
+                            ShareLink(items: files) { Image(systemName: "square.and.arrow.up") }
+                                .accessibilityLabel("导出 Gyroflow 四文件")
+                        } else {
+                            ShareLink(item: folder) { Image(systemName: "square.and.arrow.up") }
+                                .accessibilityLabel("导出原始诊断文件夹")
+                        }
                     }.padding(.vertical, 5).listRowBackground(RecorderTheme.surface)
                 }
             }.scrollContentBackground(.hidden).background(RecorderTheme.background)

@@ -1,3 +1,5 @@
+> Current M1 scope (2026-10-10): fixed main-camera 1x, Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.
+
 # 当前问题与解决路线 — 2026-10-10
 
 用户最新范围：M1 暂不考虑 rolling shutter，关闭 RS 校正。readout 未知不是当前验收阻塞项；不会填入猜测的读出数值。优先完成采集、离线同步、轴方向检查和基础增稳。

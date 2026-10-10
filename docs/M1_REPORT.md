@@ -1,3 +1,5 @@
+> Current M1 scope (2026-10-10): fixed main-camera 1x, Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.
+
 # M1 真机验收报告 — 2026-10-10
 
 ## 状态

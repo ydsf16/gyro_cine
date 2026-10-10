@@ -72,8 +72,6 @@ enum RecordingFinalizer {
         guard frameIntervals.allSatisfy({ abs($0 - 1.0 / 30.0) <= 0.005 }) else {
             throw RecorderError.unavailable("MOV has irregular or dropped frame PTS; constant-rate Gyroflow timeline would be inaccurate. Raw files retained")
         }
-        try GyroflowJSONLWriter.write(to: folder.appendingPathComponent("clip.jsonl"), video: video, events: events,
-                                      sourceVideoFirstPTS: clock.firstVideoPTSSeconds, fileFrameRate: fps)
         let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
         var diagnostics = try JSONDecoder().decode(RecordingDiagnostics.self, from: Data(contentsOf: diagnosticsURL))
         let hasAudio = !AVURLAsset(url: folder.appendingPathComponent("clip.mov")).tracks(withMediaType: .audio).isEmpty
@@ -92,9 +90,10 @@ enum RecordingFinalizer {
         diagnostics.accelStats = MotionRateStats.events(events, kind: .accel)
         diagnostics.actualAudioTrackPresent = hasAudio
         let evidenceURL = folder.appendingPathComponent("video_samples.jsonl")
+        var evidence: [CaptureFrameEvidence] = []
         if FileManager.default.fileExists(atPath: evidenceURL.path) {
             let text = try String(contentsOf: evidenceURL, encoding: .utf8)
-            let evidence = try text.split(whereSeparator: \.isNewline).map {
+            evidence = try text.split(whereSeparator: \.isNewline).map {
                 try JSONDecoder().decode(CaptureFrameEvidence.self, from: Data($0.utf8))
             }.sorted { $0.sourcePTSSeconds < $1.sourcePTSSeconds }
             guard evidence.count == video.frames.count else {
@@ -110,6 +109,8 @@ enum RecordingFinalizer {
             diagnostics.framesWithAPIIntrinsics = evidence.filter { $0.cameraIntrinsicMatrix != nil }.count
             diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
         }
+        try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
+                                         sourceFirstPTS: clock.firstVideoPTSSeconds, fps: fps, evidence: evidence)
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
     }

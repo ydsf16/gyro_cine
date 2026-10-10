@@ -45,6 +45,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.session.outputs.forEach(self.session.removeOutput)
                 try device.lockForConfiguration()
                 device.activeFormat = device.formats[mode.formatIndex]
+                device.videoZoomFactor = 1.0
                 device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
                 device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
                 device.unlockForConfiguration()

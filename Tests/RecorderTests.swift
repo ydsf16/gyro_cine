@@ -31,6 +31,36 @@ final class RecorderTests: XCTestCase {
         XCTAssertNil(CaptureFrameEvidence.intrinsicMatrix(sample))
     }
 
+    func testLegacyBundlePreservesGyroClockUnitsAndPortableReferences() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let video = ActualVideoInfo(frames: [ActualVideoFrame(pts: 0.25)], width: 3840, height: 2160,
+                                    duration: 1, codecFourCC: "hvc1")
+        let events = [MotionEvent(kind: .gyro, timestamp: 99.5, x: .pi, y: -2, z: 3),
+                      MotionEvent(kind: .accel, timestamp: 99.6, x: 0, y: 0, z: 9.8),
+                      MotionEvent(kind: .gyro, timestamp: 100.5, x: 4, y: 5, z: 6)]
+        let evidence = [CaptureFrameEvidence(sourcePTSSeconds: 100,
+            cameraIntrinsicMatrix: [2000, 0, 1920, 0, 2000, 1080, 0, 0, 1],
+            intrinsicSource: "API", activeVideoStabilizationMode: 0)]
+        try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
+                                         sourceFirstPTS: 100, fps: 30, evidence: evidence)
+        let csv = try String(contentsOf: folder.appendingPathComponent("clip.gcsv"), encoding: .utf8)
+        let rows = csv.components(separatedBy: "t,gx,gy,gz\n")[1].split(separator: "\n")
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].split(separator: ",").compactMap { Double($0) }, [-0.25, .pi, -2, 3])
+        XCTAssertEqual(rows[1].split(separator: ",").compactMap { Double($0) }, [0.75, 4, 5, 6])
+        let project = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf:
+            folder.appendingPathComponent("clip.gyroflow"))) as? [String: Any])
+        XCTAssertEqual(project["videofile"] as? String, folder.appendingPathComponent("clip.mov").absoluteString)
+        XCTAssertEqual((project["gyro_source"] as? [String: Any])?["filepath"] as? String, folder.appendingPathComponent("clip.gcsv").absoluteString)
+        XCTAssertTrue((project["offsets"] as? [String: Double])?.isEmpty == true)
+        XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
+            sourceFirstPTS: 100, fps: 30, evidence: []))
+        XCTAssertThrowsError(try LegacyGyroflowExporter.write(folder: folder, video: video, events: [events[0], events[0]],
+            sourceFirstPTS: 100, fps: 30, evidence: evidence))
+    }
+
     func testRadiansToDegrees() {
         XCTAssertEqual(ClockAligner.degreesPerSecond(.pi), 180, accuracy: 1e-10)
     }

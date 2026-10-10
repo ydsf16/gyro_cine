@@ -1,3 +1,5 @@
+> Current M1 scope (2026-10-10): fixed main-camera 1x, Gyroflow 1.6.3, MOV + GCSV + lens_profile.json + clip.gyroflow. Native JSONL is deferred. See [fixed-lens export report](LEGACY_EXPORT_REPORT.md); earlier sections below are historical.
+
 # RawMotion Recorder (M1 implementation candidate)
 
 New SwiftUI iOS 18.2+ app for fixed back wide-camera HEVC 4K30 video, AAC audio, and separate raw CoreMotion gyro/accelerometer capture. ProRes RAW work is locked until M1 device and Gyroflow acceptance passes.

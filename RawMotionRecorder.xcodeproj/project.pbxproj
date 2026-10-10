@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03C3B371C91E96F6FFA20172 /* LegacyGyroflowExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13DC68DAF23A8C23998D1D9 /* LegacyGyroflowExporter.swift */; };
 		070142D24D17EC330BEC1818 /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */; };
 		0D88B07F93CF897633139175 /* RecorderTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55091C1C23A5D4403F4E46C /* RecorderTheme.swift */; };
 		0F36D76DB70A84EA1FFB2A0D /* DeviceRecordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3EAF700FDB46C748700C84 /* DeviceRecordingTests.swift */; };
@@ -63,6 +64,7 @@
 		C772CA08E640F9864485B406 /* RecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderTests.swift; sourceTree = "<group>"; };
 		CEA307E7546A091B2BE4E026 /* writer3frames.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = writer3frames.mov; sourceTree = "<group>"; };
 		CF3EAF700FDB46C748700C84 /* DeviceRecordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingTests.swift; sourceTree = "<group>"; };
+		D13DC68DAF23A8C23998D1D9 /* LegacyGyroflowExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyGyroflowExporter.swift; sourceTree = "<group>"; };
 		E18C0EF83144A57B88B64DE4 /* RawMotionRecorderTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawMotionRecorderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F94B371ECD632716FCEF57C7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FA2EE098AA671DD1C0E448EC /* gyroflow.proto */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.protobuf; path = gyroflow.proto; sourceTree = "<group>"; };
@@ -93,6 +95,7 @@
 			children = (
 				41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */,
 				C69872594EA34DC72D6A97B1 /* DiagnosticsCollector.swift */,
+				D13DC68DAF23A8C23998D1D9 /* LegacyGyroflowExporter.swift */,
 				359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */,
 				6EA2D0C6872EC9C41717967B /* RecordingFinalizer.swift */,
 				60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */,
@@ -342,6 +345,7 @@
 				F44A0875FD28BE856F62C438 /* ContentView.swift in Sources */,
 				935CE390DD86AE7F1B4937B1 /* DiagnosticsCollector.swift in Sources */,
 				F460F819D7FAC0DEDBF42DC6 /* GyroflowJSONLWriter.swift in Sources */,
+				03C3B371C91E96F6FFA20172 /* LegacyGyroflowExporter.swift in Sources */,
 				1A493D64F3860F3BD678AD7A /* MotionRecorder.swift in Sources */,
 				9FD20741E0A11074E5B1432C /* RawMotionRecorderApp.swift in Sources */,
 				0D88B07F93CF897633139175 /* RecorderTheme.swift in Sources */,
