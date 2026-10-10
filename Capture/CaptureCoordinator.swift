@@ -1,0 +1,175 @@
+import AVFoundation
+import CoreMedia
+import Foundation
+
+final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+    let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "capture.session")
+    private let sampleQueue = DispatchQueue(label: "capture.samples")
+    private var writer: AVAssetWriter?
+    private var videoInput: AVAssetWriterInput?
+    private var audioInput: AVAssetWriterInput?
+    private var firstPTS: CMTime?
+    private var lastPTS: CMTime?
+    private var clockEvidence: ClockEvidence?
+    private var frameCount = 0
+    private var recordingActive = false
+    private var appendError: String?
+    private var device: AVCaptureDevice?
+    private var mode: CameraMode?
+    private var audioEnabled = true
+    private var fileURL: URL?
+
+    var onState: ((RecordingState, String?) -> Void)?
+    var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
+
+    func configure(audio: Bool) {
+        sessionQueue.async {
+            self.onState?(.configuring, nil)
+            do {
+                let cameraGranted = awaitPermission(.video)
+                guard cameraGranted else { throw RecorderError.cameraPermission }
+                if audio && !awaitPermission(.audio) { throw RecorderError.microphonePermission }
+                guard let device = CameraCapabilityScanner.mainCamera() else { throw RecorderError.noCamera }
+                guard let mode = CameraCapabilityScanner.hevcModes(device: device).first else { throw RecorderError.unsupported4K30 }
+                self.device = device
+                self.mode = mode
+                self.audioEnabled = audio
+                self.session.beginConfiguration()
+                defer { self.session.commitConfiguration() }
+                self.session.sessionPreset = .inputPriority
+                self.session.inputs.forEach(self.session.removeInput)
+                self.session.outputs.forEach(self.session.removeOutput)
+                try device.lockForConfiguration()
+                device.activeFormat = device.formats[mode.formatIndex]
+                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
+                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+                device.unlockForConfiguration()
+                let cameraInput = try AVCaptureDeviceInput(device: device)
+                guard self.session.canAddInput(cameraInput) else { throw RecorderError.unavailable("Cannot add camera input") }
+                self.session.addInput(cameraInput)
+                let video = AVCaptureVideoDataOutput()
+                video.alwaysDiscardsLateVideoFrames = false
+                video.setSampleBufferDelegate(self, queue: self.sampleQueue)
+                guard self.session.canAddOutput(video) else { throw RecorderError.unavailable("Cannot add video output") }
+                self.session.addOutput(video)
+                if let connection = video.connection(with: .video), connection.isVideoStabilizationSupported {
+                    connection.preferredVideoStabilizationMode = .off
+                }
+                if audio {
+                    guard let microphone = AVCaptureDevice.default(for: .audio) else { throw RecorderError.unavailable("Microphone unavailable") }
+                    let microphoneInput = try AVCaptureDeviceInput(device: microphone)
+                    guard self.session.canAddInput(microphoneInput) else { throw RecorderError.unavailable("Cannot add microphone input") }
+                    self.session.addInput(microphoneInput)
+                    let output = AVCaptureAudioDataOutput()
+                    output.setSampleBufferDelegate(self, queue: self.sampleQueue)
+                    guard self.session.canAddOutput(output) else { throw RecorderError.unavailable("Cannot add audio output") }
+                    self.session.addOutput(output)
+                }
+                self.session.startRunning()
+                self.onState?(.ready, nil)
+            } catch { self.onState?(.failed, error.localizedDescription) }
+        }
+    }
+
+    func start(at url: URL) {
+        sampleQueue.async {
+            do {
+                guard let mode = self.mode else { throw RecorderError.unavailable("Camera not configured") }
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                let outputSettings: [String: Any] = [
+                    AVVideoCodecKey: AVVideoCodecType.hevc,
+                    AVVideoWidthKey: mode.width, AVVideoHeightKey: mode.height,
+                    AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 40_000_000]
+                ]
+                guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else { throw RecorderError.noHEVC }
+                let video = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+                video.expectsMediaDataInRealTime = true
+                guard writer.canAdd(video) else { throw RecorderError.noHEVC }
+                writer.add(video)
+                self.videoInput = video
+                if self.audioEnabled {
+                    let audio = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                        AVFormatIDKey: kAudioFormatMPEG4AAC,
+                        AVNumberOfChannelsKey: 1,
+                        AVSampleRateKey: 48_000,
+                        AVEncoderBitRateKey: 128_000
+                    ])
+                    audio.expectsMediaDataInRealTime = true
+                    if writer.canAdd(audio) { writer.add(audio); self.audioInput = audio }
+                    else { throw RecorderError.unavailable("Cannot add AAC audio writer input") }
+                }
+                guard writer.startWriting() else { throw writer.error ?? RecorderError.unavailable("Writer did not start") }
+                self.writer = writer
+                self.fileURL = url
+                self.firstPTS = nil
+                self.lastPTS = nil
+                self.clockEvidence = nil
+                self.frameCount = 0
+                self.appendError = nil
+                self.recordingActive = true
+                self.onState?(.recording, nil)
+            } catch { self.onState?(.failed, error.localizedDescription) }
+        }
+    }
+
+    func stop() {
+        sampleQueue.async {
+            guard let writer = self.writer, let url = self.fileURL else { return }
+            self.recordingActive = false
+            self.onState?(.finalizing, nil)
+            self.videoInput?.markAsFinished()
+            self.audioInput?.markAsFinished()
+            writer.finishWriting {
+                let error = self.appendError ?? writer.error?.localizedDescription
+                self.sampleQueue.async {
+                    self.onCompleted?(url, self.clockEvidence, self.frameCount, error)
+                    self.writer = nil
+                    self.videoInput = nil
+                    self.audioInput = nil
+                }
+            }
+        }
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard recordingActive, let writer else { return }
+        guard writer.status == .writing else {
+            if writer.status == .failed {
+                recordingActive = false
+                onState?(.failed, writer.error?.localizedDescription ?? "Video writer failed")
+            }
+            return
+        }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        if output is AVCaptureVideoDataOutput {
+            if firstPTS == nil {
+                firstPTS = pts
+                clockEvidence = ClockAligner.evidence(firstPTS: pts,
+                    callbackHostTime: CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock())))
+                writer.startSession(atSourceTime: pts)
+            }
+            guard let videoInput, videoInput.isReadyForMoreMediaData else {
+                appendError = "Video writer backpressure: frame dropped"
+                return
+            }
+            if videoInput.append(sampleBuffer) { frameCount += 1; lastPTS = pts }
+            else { appendError = writer.error?.localizedDescription ?? "Video append failed" }
+        } else if firstPTS != nil, let audioInput, audioInput.isReadyForMoreMediaData {
+            if !audioInput.append(sampleBuffer) { appendError = writer.error?.localizedDescription ?? "Audio append failed" }
+        }
+    }
+}
+
+private func awaitPermission(_ type: AVMediaType) -> Bool {
+    let semaphore = DispatchSemaphore(value: 0)
+    var granted = false
+    switch AVCaptureDevice.authorizationStatus(for: type) {
+    case .authorized: return true
+    case .notDetermined:
+        AVCaptureDevice.requestAccess(for: type) { result in granted = result; semaphore.signal() }
+        semaphore.wait()
+        return granted
+    default: return false
+    }
+}
