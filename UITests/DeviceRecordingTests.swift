@@ -45,6 +45,73 @@ final class DeviceRecordingTests: XCTestCase {
     func testDeviceMainLens20Seconds() throws { try record(seconds: 20, lensName: "主摄") }
     func testDeviceUltraWide20Seconds() throws { try record(seconds: 20, lensName: "超广角") }
 
+    func testRAWRequiresExternalStorage() throws { try recordRAW(hq: false, expectMissingStorage: true) }
+    func testRAWHQRequiresExternalStorage() throws { try recordRAW(hq: true, expectMissingStorage: true) }
+    func testDeviceRAWRecording() throws { try recordRAW(hq: false) }
+    func testDeviceRAWHQRecording() throws { try recordRAW(hq: true) }
+
+    private func recordRAW(hq: Bool, expectMissingStorage: Bool = false) throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let toggle = app.buttons["recordToggle"]
+        let deadline = Date().addingTimeInterval(40)
+        while Date() < deadline && (!toggle.exists || !toggle.isEnabled) {
+            if springboard.alerts.firstMatch.exists {
+                let buttons = springboard.alerts.firstMatch.buttons
+                if buttons.count > 0 { buttons.element(boundBy: buttons.count - 1).tap() }
+            }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertTrue(toggle.isEnabled, app.debugDescription)
+        app.buttons["settingsButton"].tap()
+        let raw = app.buttons["ProRes RAW"].firstMatch
+        XCTAssertTrue(raw.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(raw.isEnabled, "RAW capability unavailable: \(app.debugDescription)")
+        raw.tap()
+        let quality = app.switches["HQ 高质量"]
+        XCTAssertTrue(quality.waitForExistence(timeout: 10), app.debugDescription)
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: quality)
+        waitForExpectations(timeout: 30)
+        if hq {
+            let control = quality.switches.firstMatch
+            if control.exists { control.tap() } else { quality.tap() }
+            XCTAssertEqual(quality.value as? String, "1", app.debugDescription)
+        }
+        app.buttons["完成"].tap()
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: toggle)
+        waitForExpectations(timeout: 30)
+        XCTAssertTrue(app.staticTexts[hq ? "ProRes RAW HQ" : "ProRes RAW"].exists, app.debugDescription)
+        toggle.tap()
+        if expectMissingStorage {
+            let warning = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "请连接后重试")).firstMatch
+            XCTAssertTrue(warning.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertTrue(app.buttons["settingsButton"].isEnabled)
+            if !hq {
+                app.buttons["settingsButton"].tap()
+                app.buttons["HEVC"].firstMatch.tap()
+                app.buttons["完成"].tap()
+                expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: toggle)
+                waitForExpectations(timeout: 30)
+                toggle.tap()
+                expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Recording"), evaluatedWith: app.staticTexts["recordingState"])
+                waitForExpectations(timeout: 15)
+                Thread.sleep(forTimeInterval: 5)
+                toggle.tap()
+                expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Completed"), evaluatedWith: app.staticTexts["recordingState"])
+                waitForExpectations(timeout: 45)
+            }
+            return
+        }
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Recording"), evaluatedWith: app.staticTexts["recordingState"])
+        waitForExpectations(timeout: 20)
+        Thread.sleep(forTimeInterval: 5)
+        toggle.tap()
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Completed"), evaluatedWith: app.staticTexts["recordingState"])
+        waitForExpectations(timeout: 60)
+    }
+
     func testDeviceCappedExposureRecording() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

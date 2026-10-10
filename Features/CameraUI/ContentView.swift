@@ -62,7 +62,7 @@ struct ContentView: View {
                         Text("RawMotion").font(.headline).foregroundStyle(RecorderTheme.brandGradient)
                     }
                     Spacer()
-                    Text("HEVC · 4K30").font(.subheadline.weight(.semibold))
+                    Text(model.selectedCodec.label).font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 12).frame(height: 44)
                         .background(.black.opacity(0.35), in: Capsule())
                     Button { showingSettings = true } label: {
@@ -124,6 +124,12 @@ struct ContentView: View {
             .onChange(of: model.audioEnabled) { _, enabled in
                 if !busy { model.reconfigure() }
             }
+            .onChange(of: model.codecMode) { _, _ in
+                if !busy { model.reconfigure() }
+            }
+            .onChange(of: model.rawHQ) { _, _ in
+                if !busy { model.reconfigure() }
+            }
             .onChange(of: model.shutter) { _, _ in
                 if !busy { model.reconfigure() }
             }
@@ -140,7 +146,17 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("录制") {
-                    LabeledContent("视频格式", value: "HEVC · 4K / 30 fps")
+                    Picker("视频编码", selection: $model.codecMode) {
+                        Text("HEVC").tag(RecordingCodec.hevc)
+                        Text("ProRes RAW").tag(RecordingCodec.proResRAW).disabled(!model.supportsRAW)
+                    }.pickerStyle(.segmented).disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                    if model.codecMode.isRAW {
+                        Toggle("HQ 高质量", isOn: $model.rawHQ)
+                            .disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
+                        Text("RAW / RAW HQ 需要外接 SSD，HQ 文件更大。录制后复制回手机素材文件夹，SSD 上的原片保留。白平衡锁定。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    LabeledContent("视频格式", value: model.videoLabel)
                     LabeledContent("镜头", value: (model.selectedLens.map { "\($0.name) \($0.label) · 录制中固定" } ?? "无可用镜头"))
                     Toggle("录制音频", isOn: $model.audioEnabled)
                         .disabled(model.state == .recording || model.state == .finalizing || model.state == .configuring)
@@ -162,7 +178,7 @@ struct SettingsView: View {
                     LabeledContent("剩余存储", value: model.freeSpaceLabel)
                 }.listRowBackground(RecorderTheme.surface)
                 Section {
-                    Text("工程需离线同步，镜头畸变尚未校准。ProRes RAW 在 M1 验收后开放。")
+                    Text("工程需离线同步，镜头畸变尚未校准。RAW 为真机试验阶段。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }.listRowBackground(RecorderTheme.surface)
             }.scrollContentBackground(.hidden).background(RecorderTheme.background)

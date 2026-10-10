@@ -26,6 +26,7 @@
 		ACA75716DCA459CFADE7FCE6 /* CameraCapabilityScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C33D85848E73CD1B4DCE883 /* CameraCapabilityScanner.swift */; };
 		AECCCA58E7FE775F8AE707AA /* RecorderIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4492C3148BEA96424F78E05C /* RecorderIdentity.swift */; };
 		B8B10F0430A8B5B54B77238F /* gyroflow.proto in Resources */ = {isa = PBXBuildFile; fileRef = FA2EE098AA671DD1C0E448EC /* gyroflow.proto */; };
+		E0C5AE47FD2C492417F3320F /* RecordingCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B88AC8D39CB9DCB2FE57C49 /* RecordingCodec.swift */; };
 		EAB4C48549953B154F0EF30A /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */; };
 		EB59D332219801C318CB1C68 /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7791383521674BC09C46030C /* CaptureCoordinator.swift */; };
 		F44A0875FD28BE856F62C438 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94B371ECD632716FCEF57C7 /* ContentView.swift */; };
@@ -53,6 +54,7 @@
 		0C33D85848E73CD1B4DCE883 /* CameraCapabilityScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCapabilityScanner.swift; sourceTree = "<group>"; };
 		10215CADB2C07FEE614B1A5A /* GyroflowJSONLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowJSONLWriter.swift; sourceTree = "<group>"; };
 		168BAF1A4ADE5C6202038FB4 /* GyroTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroTimeline.swift; sourceTree = "<group>"; };
+		1B88AC8D39CB9DCB2FE57C49 /* RecordingCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCodec.swift; sourceTree = "<group>"; };
 		2A215EB74A2030189C5DCC93 /* RecordedClockMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedClockMap.swift; sourceTree = "<group>"; };
 		359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDiagnostics.swift; sourceTree = "<group>"; };
 		41311EC17C908447AD8313E5 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 			children = (
 				0C33D85848E73CD1B4DCE883 /* CameraCapabilityScanner.swift */,
 				7791383521674BC09C46030C /* CaptureCoordinator.swift */,
+				1B88AC8D39CB9DCB2FE57C49 /* RecordingCodec.swift */,
 				46A8DEA159E61DE2BAD81702 /* ShutterSetting.swift */,
 			);
 			path = Capture;
@@ -365,6 +368,7 @@
 				AECCCA58E7FE775F8AE707AA /* RecorderIdentity.swift in Sources */,
 				0D88B07F93CF897633139175 /* RecorderTheme.swift in Sources */,
 				967DE8E675A7A20BACE429EC /* RecorderViewModel.swift in Sources */,
+				E0C5AE47FD2C492417F3320F /* RecordingCodec.swift in Sources */,
 				A24CD42A1ECB934E46711E36 /* RecordingDiagnostics.swift in Sources */,
 				4332C8A8181DB72BEFB54D48 /* RecordingFinalizer.swift in Sources */,
 				070142D24D17EC330BEC1818 /* RecordingState.swift in Sources */,

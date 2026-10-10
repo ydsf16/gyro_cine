@@ -16,6 +16,7 @@ enum LegacyGyroflowExporter {
             let values = matrices.map { $0[column] }.sorted()
             return (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
         }
+        let codecLabel = video.codecFourCC == "aprn" ? "ProRes RAW" : video.codecFourCC == "aprh" ? "ProRes RAW HQ" : "HEVC"
         let profile: [String: Any] = [
             "name": "RawMotion \(lens?.label ?? "fixed lens") API intrinsics - distortion UNCALIBRATED",
             "note": "Median output-image API K. Zero distortion is an uncalibrated approximation. Offline sync and axis validation required.",
@@ -23,7 +24,7 @@ enum LegacyGyroflowExporter {
             "lens_model": lens.map { "\($0.name) \($0.label) (\($0.deviceType))" } ?? "Unknown physical lens",
             "calibrated_by": "Apple API intrinsics / RawMotionRecorder (not calibrated)",
             "date": String(ISO8601DateFormatter().string(from: Date()).prefix(10)),
-            "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") HEVC 4K30",
+            "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") \(codecLabel) \(video.width)x\(video.height) 30fps",
             "calibrator_version": "RawMotion-API-K-unvalidated-v1", "official": false,
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height], "fps": fps,

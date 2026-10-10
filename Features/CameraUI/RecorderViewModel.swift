@@ -7,6 +7,14 @@ final class RecorderViewModel: ObservableObject {
     @Published var state: RecordingState = .idle
     @Published var message: String?
     @Published var audioEnabled = true
+    @Published var codecMode: RecordingCodec = .hevc
+    @Published var rawHQ = false
+    var selectedCodec: RecordingCodec { codecMode == .hevc ? .hevc : rawHQ ? .proResRAWHQ : .proResRAW }
+    var videoLabel: String { "\(selectedCodec.label) · \(modes.first?.label ?? "不可用")" }
+    var supportsRAW: Bool {
+        guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) else { return false }
+        return !CameraCapabilityScanner.modes(device: device, codec: .proResRAW).isEmpty
+    }
     @Published var shutter: ShutterSetting = .auto
     @Published var exposureReadout = "等待相机读数"
     @Published var recordings: [URL] = []
@@ -25,14 +33,14 @@ final class RecorderViewModel: ObservableObject {
     var previewSession: AVCaptureSession { coordinator.session }
     var modes: [CameraMode] {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) ?? CameraCapabilityScanner.mainCamera() else { return [] }
-        return CameraCapabilityScanner.hevcModes(device: device)
+        return CameraCapabilityScanner.modes(device: device, codec: selectedCodec)
     }
     var supportedShutters: [ShutterSetting] {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }),
               let mode = modes.first else { return [.auto] }
         return ShutterSetting.allCases.filter { $0.isSupported(by: device, mode: mode) }
     }
-    var capabilityLabel: String { modes.isEmpty ? "4K30 unavailable or camera inaccessible" : "HEVC 4K30 candidate; recording requires verification" }
+    var capabilityLabel: String { modes.isEmpty ? "当前镜头不支持所选编码" : "\(videoLabel) · 编码器按实际会话验证" }
     var canToggle: Bool { state == .ready || state == .recording || state == .completed }
     var thermalLabel: String {
         switch ProcessInfo.processInfo.thermalState {
@@ -63,6 +71,9 @@ final class RecorderViewModel: ObservableObject {
                     self?.refreshRecordings()
                 }
             }
+        }
+        coordinator.onCaptureFinished = { [weak self] in
+            Task { @MainActor in self?.motion.stop() }
         }
         coordinator.onCompleted = { [weak self] url, clock, frames, error in
             Task { @MainActor in self?.finish(url: url, clock: clock, frames: frames, error: error) }
@@ -95,11 +106,29 @@ final class RecorderViewModel: ObservableObject {
     func reconfigure() {
         guard state != .recording, state != .finalizing, state != .configuring else { return }
         state = .configuring
-        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter)
+        coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter, codec: selectedCodec)
     }
 
     func start() {
         guard state == .ready || state == .completed else { return }
+        if selectedCodec.isRAW {
+            guard AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.contains(where: { $0.isConnected }) == true else {
+                state = .failed
+                message = "ProRes RAW / RAW HQ 需要外接 SSD；请连接后重试。HEVC 可保存到手机。"
+                return
+            }
+            if AVExternalStorageDevice.authorizationStatus != .authorized {
+                state = .configuring
+                AVExternalStorageDevice.requestAccess { [weak self] allowed in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.state = allowed ? .ready : .failed
+                        if allowed { self.start() } else { self.message = "请允许访问外接存储后重试" }
+                    }
+                }
+                return
+            }
+        }
         state = .configuring // Disable lens changes immediately, including before the first video sample.
 
         do {
@@ -107,7 +136,7 @@ final class RecorderViewModel: ObservableObject {
             let freeBytes = (try? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage) ?? 0
             guard freeBytes >= 2_000_000_000 else {
-                throw RecorderError.unavailable("At least 2 GB available storage is required for this HEVC recording")
+                throw RecorderError.unavailable("At least 2 GB available storage is required for recording")
             }
             let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             let date = DateFormatter()
@@ -115,7 +144,7 @@ final class RecorderViewModel: ObservableObject {
             let folder = documents.appendingPathComponent("recording_\(date.string(from: Date()))")
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             currentFolder = folder
-            DiagnosticsCollector.record("start requested codec=HEVC video=3840x2160@30 audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
+            DiagnosticsCollector.record("start requested codec=\(selectedCodec.label) video=\(modes.first?.label ?? "unknown") audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
             DiagnosticsCollector.record("IMU pre-roll started; waiting for 100ms of gyro samples", folder: folder)
             primingTask = Task { @MainActor [weak self] in
@@ -177,8 +206,8 @@ final class RecorderViewModel: ObservableObject {
     private func recordFailure(_ reason: String) {
         guard let folder = currentFolder else { return }
         var diagnostics = RecordingDiagnostics(deviceModel: RecorderIdentity.cameraModel,
-            systemVersion: UIDevice.current.systemVersion, configuredCodec: "HEVC",
-            audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
+            systemVersion: UIDevice.current.systemVersion, configuredCodec: selectedCodec.label,
+            audioEnabled: audioEnabled, requestedVideo: modes.first?.label ?? "unknown",
             submittedFrameCount: 0, motionEventCount: motion.count,
             clock: nil, captureError: reason, status: "failed")
         diagnostics.selectedLens = selectedLens
@@ -197,7 +226,7 @@ final class RecorderViewModel: ObservableObject {
         var diagnostics = RecordingDiagnostics(
             deviceModel: RecorderIdentity.cameraModel,
             systemVersion: UIDevice.current.systemVersion,
-            configuredCodec: "HEVC", audioEnabled: audioEnabled, requestedVideo: "3840x2160@30",
+            configuredCodec: selectedCodec.label, audioEnabled: audioEnabled, requestedVideo: modes.first?.label ?? "unknown",
             submittedFrameCount: frames, motionEventCount: motion.count,
             clock: clock, captureError: error ?? motion.error,
             status: error == nil && motion.error == nil ? "finalizing" : "failed")

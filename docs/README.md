@@ -1,3 +1,5 @@
+ProRes RAW 设置与外接存储要求：[M2_REPORT.md](M2_REPORT.md)
+
 最新自动曝光上限与同步补偿：[EXPOSURE_COMPENSATION_REPORT.md](EXPOSURE_COMPENSATION_REPORT.md)
 
 > Latest correction: [clock origins, RoamShot comparison and cropping](TIMING_AND_CROP_REPORT.md). GCSV projects now restore the first-sample origin; earlier empty-offset statements describe the previous implementation.

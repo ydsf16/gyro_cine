@@ -59,9 +59,6 @@ enum RecordingFinalizer {
             throw RecorderError.unavailable("Video PTS and host uptime could not be reconciled; raw files retained")
         }
         let video = try inspectVideo(folder.appendingPathComponent("clip.mov"))
-        guard video.codecFourCC == "hvc1" || video.codecFourCC == "hev1" else {
-            throw RecorderError.unavailable("Actual video codec is \(video.codecFourCC), expected HEVC")
-        }
         let events = try readMotion(folder.appendingPathComponent("imu_raw.jsonl"))
         guard events.contains(where: { $0.kind == .gyro }), events.contains(where: { $0.kind == .accel }) else {
             throw RecorderError.unavailable("Missing gyro or accelerometer samples")
@@ -74,6 +71,10 @@ enum RecordingFinalizer {
         }
         let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
         var diagnostics = try JSONDecoder().decode(RecordingDiagnostics.self, from: Data(contentsOf: diagnosticsURL))
+        let expectedCodec: String = diagnostics.configuredCodec == "ProRes RAW HQ" ? "aprh" : diagnostics.configuredCodec == "ProRes RAW" ? "aprn" : "hvc1"
+        guard video.codecFourCC == expectedCodec || (expectedCodec == "hvc1" && video.codecFourCC == "hev1") else {
+            throw RecorderError.unavailable("Actual codec \(video.codecFourCC) differs from requested \(expectedCodec)")
+        }
         let hasAudio = !AVURLAsset(url: folder.appendingPathComponent("clip.mov")).tracks(withMediaType: .audio).isEmpty
         guard !diagnostics.audioEnabled || hasAudio else {
             throw RecorderError.unavailable("Audio was enabled but final MOV has no audio track")

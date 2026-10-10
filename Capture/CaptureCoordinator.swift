@@ -17,17 +17,21 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var appendError: String?
     private var device: AVCaptureDevice?
     private var mode: CameraMode?
+    private var codec: RecordingCodec = .hevc
+    private var captureVideoOutput: AVCaptureVideoDataOutput?
     private var audioEnabled = true
     private var fileURL: URL?
+    private var externalMovieURL: URL?
     private var frameEvidenceHandle: FileHandle?
     private let evidenceEncoder = JSONEncoder()
     private var previewFrameCount = 0
 
     var onState: ((RecordingState, String?) -> Void)?
     var onCompleted: ((URL, ClockEvidence?, Int, String?) -> Void)?
+    var onCaptureFinished: (() -> Void)?
     var onExposureReading: ((Double, Float) -> Void)?
 
-    func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto) {
+    func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto, codec: RecordingCodec = .hevc) {
         sessionQueue.async {
             self.onState?(.configuring, nil)
             do {
@@ -35,7 +39,11 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 guard cameraGranted else { throw RecorderError.cameraPermission }
                 if audio && !awaitPermission(.audio) { throw RecorderError.microphonePermission }
                 guard let device = cameraID.flatMap({ CameraCapabilityScanner.device(id: $0) }) ?? (cameraID == nil ? CameraCapabilityScanner.mainCamera() : nil) else { throw RecorderError.noCamera }
-                guard let mode = CameraCapabilityScanner.hevcModes(device: device).first else { throw RecorderError.unsupported4K30 }
+                guard let mode = CameraCapabilityScanner.modes(device: device, codec: codec).first,
+                      let targetCodec = codec.avCodec else {
+                    throw RecorderError.unavailable("This lens/system has no \(codec.label) 30fps mode")
+                }
+                self.codec = codec
                 self.device = device
                 self.mode = mode
                 self.audioEnabled = audio
@@ -43,6 +51,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 var configurationOpen = true
                 defer { if configurationOpen { self.session.commitConfiguration() } }
                 self.session.sessionPreset = .inputPriority
+                self.session.automaticallyConfiguresCaptureDeviceForWideColor = false
                 self.session.inputs.forEach(self.session.removeInput)
                 self.session.outputs.forEach(self.session.removeOutput)
                 try device.lockForConfiguration()
@@ -50,6 +59,15 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 device.videoZoomFactor = 1.0
                 device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
                 device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+                if codec.isRAW {
+                    guard device.isWhiteBalanceModeSupported(.locked) else {
+                        device.unlockForConfiguration()
+                        throw RecorderError.unavailable("RAW requires locked white balance")
+                    }
+                    device.setWhiteBalanceModeLocked(with: device.deviceWhiteBalanceGains, completionHandler: nil)
+                } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                    device.whiteBalanceMode = .continuousAutoWhiteBalance
+                }
                 device.unlockForConfiguration()
                 let cameraInput = try AVCaptureDeviceInput(device: device)
                 guard self.session.canAddInput(cameraInput) else { throw RecorderError.unavailable("Cannot add camera input") }
@@ -59,6 +77,11 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 video.setSampleBufferDelegate(self, queue: self.sampleQueue)
                 guard self.session.canAddOutput(video) else { throw RecorderError.unavailable("Cannot add video output") }
                 self.session.addOutput(video)
+                self.captureVideoOutput = video
+                if codec.isRAW { video.videoSettings = [:] }
+                if #available(iOS 26.0, *), video.isDeferredStartSupported {
+                    video.isDeferredStartEnabled = false
+                }
                 if let connection = video.connection(with: .video) {
                     if connection.isVideoStabilizationSupported { connection.preferredVideoStabilizationMode = .off }
                     if connection.isVideoRotationAngleSupported(0) { connection.videoRotationAngle = 0 }
@@ -77,6 +100,18 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.session.commitConfiguration()
                 configurationOpen = false
                 self.session.startRunning()
+                let available = video.availableVideoCodecTypesForAssetWriter(writingTo: .mov)
+                let capability: [String: Any] = ["camera": device.uniqueID, "formatIndex": mode.formatIndex,
+                    "width": mode.width, "height": mode.height, "fps": mode.fps,
+                    "requestedCodec": targetCodec.rawValue, "availableWriterCodecs": available.map(\.rawValue),
+                    "availablePixelFormats": video.availableVideoPixelFormatTypes,
+                    "storage": codec.isRAW ? "external storage required" : "internal Documents", "deferredStartEnabled": false]
+                let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                try JSONSerialization.data(withJSONObject: capability, options: [.prettyPrinted, .sortedKeys])
+                    .write(to: root.appendingPathComponent("capture_capabilities_\(targetCodec.rawValue).json"))
+                guard available.contains(targetCodec) else {
+                    throw RecorderError.unavailable("\(codec.label) encoder unavailable for active format; available: \(available.map(\.rawValue))")
+                }
                 guard shutter.isSupported(by: device, mode: mode) else {
                     throw RecorderError.unavailable("Selected exposure limit is unsupported for this camera at 4K30")
                 }
@@ -96,7 +131,20 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         sampleQueue.async {
             do {
                 guard let mode = self.mode else { throw RecorderError.unavailable("Camera not configured") }
-                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                var outputURL = url
+                if self.codec.isRAW {
+                    guard AVExternalStorageDevice.authorizationStatus == .authorized,
+                          let storage = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.first(where: { $0.isConnected }),
+                          storage.freeSize >= 2_000_000_000,
+                          let external = try storage.nextAvailableURLs(withPathExtensions: ["mov"]).first,
+                          external.startAccessingSecurityScopedResource() else {
+                        throw RecorderError.unavailable("ProRes RAW 需要已授权且至少有 2 GB 空间的外接 SSD")
+                    }
+                    outputURL = external
+                    self.externalMovieURL = external
+                    DiagnosticsCollector.record("RAW external movie=\(external.path); copying to clip.mov after capture", folder: url.deletingLastPathComponent())
+                }
+                let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
                 writer.metadata = [
                     (AVMetadataIdentifier.quickTimeMetadataMake, "Apple"),
                     (.quickTimeMetadataModel, RecorderIdentity.cameraModel),
@@ -108,12 +156,26 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     item.value = value as NSString
                     return item
                 }
-                let outputSettings: [String: Any] = [
+                var outputSettings: [String: Any] = [
                     AVVideoCodecKey: AVVideoCodecType.hevc,
                     AVVideoWidthKey: mode.width, AVVideoHeightKey: mode.height,
                     AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 40_000_000]
                 ]
-                guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else { throw RecorderError.noHEVC }
+                if self.codec.isRAW {
+                    guard #available(iOS 26.0, *), let output = self.captureVideoOutput,
+                          let codec = self.codec.avCodec,
+                          let settings = output.recommendedVideoSettings(forVideoCodecType: codec, assetWriterOutputFileType: .mov, outputFileURL: outputURL) else {
+                        throw RecorderError.unavailable("No recommended ProRes RAW settings for external storage")
+                    }
+                    outputSettings = settings
+                    guard let metadata = output.recommendedMovieMetadata(forVideoCodecType: codec, assetWriterOutputFileType: .mov) else {
+                        throw RecorderError.unavailable("Missing required RAW movie metadata")
+                    }
+                    writer.metadata += metadata
+                }
+                guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else {
+                    throw RecorderError.unavailable("AssetWriter rejected \(self.codec.label) settings")
+                }
                 let video = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
                 video.expectsMediaDataInRealTime = true
                 guard writer.canAdd(video) else { throw RecorderError.noHEVC }
@@ -145,7 +207,11 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.appendError = nil
                 self.recordingActive = true
                 self.onState?(.recording, nil)
-            } catch { self.onState?(.failed, error.localizedDescription) }
+            } catch {
+                self.externalMovieURL?.stopAccessingSecurityScopedResource()
+                self.externalMovieURL = nil
+                self.onState?(.failed, error.localizedDescription)
+            }
         }
     }
 
@@ -162,7 +228,17 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             self.videoInput?.markAsFinished()
             self.audioInput?.markAsFinished()
             writer.finishWriting {
-                let error = self.appendError ?? writer.error?.localizedDescription
+                self.onCaptureFinished?()
+                var error = self.appendError ?? writer.error?.localizedDescription
+                if let external = self.externalMovieURL {
+                    defer { external.stopAccessingSecurityScopedResource(); self.externalMovieURL = nil }
+                    if error == nil {
+                        do { try FileManager.default.copyItem(at: external, to: url) }
+                        catch let copyError {
+                            error = "RAW 已保存在 SSD，复制回手机失败: \(copyError.localizedDescription). SSD: \(external.path)"
+                        }
+                    }
+                }
                 self.sampleQueue.async {
                     self.onCompleted?(url, self.clockEvidence, self.frameCount, error)
                     self.writer = nil
