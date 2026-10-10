@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		070142D24D17EC330BEC1818 /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */; };
+		0F36D76DB70A84EA1FFB2A0D /* DeviceRecordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3EAF700FDB46C748700C84 /* DeviceRecordingTests.swift */; };
 		1A493D64F3860F3BD678AD7A /* MotionRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05436145E23FF3640F81E85 /* MotionRecorder.swift */; };
+		23B209C65070C152AB43A486 /* writer3frames.mov in Resources */ = {isa = PBXBuildFile; fileRef = CEA307E7546A091B2BE4E026 /* writer3frames.mov */; };
 		4332C8A8181DB72BEFB54D48 /* RecordingFinalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA2D0C6872EC9C41717967B /* RecordingFinalizer.swift */; };
 		51A38E0CBB92ACABDFC6F2AA /* RecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C772CA08E640F9864485B406 /* RecorderTests.swift */; };
 		89A28A8AD1D3806872CAF261 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2585E92CAD16FF11732C5A /* ClockAligner.swift */; };
@@ -24,6 +26,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0896C01FE529DFE1EF8487CB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C50A1D75AECF419BAC98891 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A66CBF5335C07E1894D68F7C;
+			remoteInfo = RawMotionRecorder;
+		};
 		C9A91130E96CE7C2A2F93B42 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4C50A1D75AECF419BAC98891 /* Project object */;
@@ -38,6 +47,7 @@
 		10215CADB2C07FEE614B1A5A /* GyroflowJSONLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowJSONLWriter.swift; sourceTree = "<group>"; };
 		359D9E86BA735F1B5CB9D2C4 /* RecordingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDiagnostics.swift; sourceTree = "<group>"; };
 		4748A03F62D86E045EC0072E /* RecorderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderViewModel.swift; sourceTree = "<group>"; };
+		49AAFD24C0C559A91A760D79 /* RawMotionRecorderUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawMotionRecorderUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		6D2585E92CAD16FF11732C5A /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
 		6EA2D0C6872EC9C41717967B /* RecordingFinalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFinalizer.swift; sourceTree = "<group>"; };
@@ -47,6 +57,8 @@
 		C05436145E23FF3640F81E85 /* MotionRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionRecorder.swift; sourceTree = "<group>"; };
 		C69872594EA34DC72D6A97B1 /* DiagnosticsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsCollector.swift; sourceTree = "<group>"; };
 		C772CA08E640F9864485B406 /* RecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderTests.swift; sourceTree = "<group>"; };
+		CEA307E7546A091B2BE4E026 /* writer3frames.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = writer3frames.mov; sourceTree = "<group>"; };
+		CF3EAF700FDB46C748700C84 /* DeviceRecordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingTests.swift; sourceTree = "<group>"; };
 		E18C0EF83144A57B88B64DE4 /* RawMotionRecorderTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RawMotionRecorderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F94B371ECD632716FCEF57C7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		FA2EE098AA671DD1C0E448EC /* gyroflow.proto */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.protobuf; path = gyroflow.proto; sourceTree = "<group>"; };
@@ -58,6 +70,7 @@
 			children = (
 				A50AE575B191E0C35A291710 /* RawMotionRecorder.app */,
 				E18C0EF83144A57B88B64DE4 /* RawMotionRecorderTests.xctest */,
+				49AAFD24C0C559A91A760D79 /* RawMotionRecorderUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +93,14 @@
 				60DE9D26D3AC6ECD1913B5B1 /* RecordingState.swift */,
 			);
 			path = Recording;
+			sourceTree = "<group>";
+		};
+		6B3A0DE1BE6BB467574BA729 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				CEA307E7546A091B2BE4E026 /* writer3frames.mov */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		6F2BEBE57655D00CF102AEC6 /* Features */ = {
@@ -106,10 +127,19 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		AD9D21CB4A9A5E4E9B830613 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				CF3EAF700FDB46C748700C84 /* DeviceRecordingTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		C4CFA495F6A45CBAD2E03130 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
 				C772CA08E640F9864485B406 /* RecorderTests.swift */,
+				6B3A0DE1BE6BB467574BA729 /* Fixtures */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -133,6 +163,7 @@
 				1BF0F86A33BDE348C46B629C /* Recording */,
 				EE80C3EA19A3B93FDFC396B6 /* Telemetry */,
 				C4CFA495F6A45CBAD2E03130 /* Tests */,
+				AD9D21CB4A9A5E4E9B830613 /* UITests */,
 				06A1B271B3BE374CB961C7E3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -163,6 +194,7 @@
 			buildConfigurationList = 27EE064A8478C51CB8A5D6F5 /* Build configuration list for PBXNativeTarget "RawMotionRecorderTests" */;
 			buildPhases = (
 				3925CD41B1086E0A027AF196 /* Sources */,
+				9306B91C2F9BE7224CB7CB2E /* Resources */,
 			);
 			buildRules = (
 			);
@@ -175,6 +207,24 @@
 			productName = RawMotionRecorderTests;
 			productReference = E18C0EF83144A57B88B64DE4 /* RawMotionRecorderTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		636C680FB8D34E1469761077 /* RawMotionRecorderUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8189599DA05C25801A59B9B6 /* Build configuration list for PBXNativeTarget "RawMotionRecorderUITests" */;
+			buildPhases = (
+				8A44D357E5E1308F4350CC2A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				51CA28BFB585FB7D590D78DA /* PBXTargetDependency */,
+			);
+			name = RawMotionRecorderUITests;
+			packageProductDependencies = (
+			);
+			productName = RawMotionRecorderUITests;
+			productReference = 49AAFD24C0C559A91A760D79 /* RawMotionRecorderUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		A66CBF5335C07E1894D68F7C /* RawMotionRecorder */ = {
 			isa = PBXNativeTarget;
@@ -203,6 +253,19 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					53C63A864915AB7B5AA79B9C = {
+						DevelopmentTeam = F2LVFHW3ZH;
+						ProvisioningStyle = Automatic;
+					};
+					636C680FB8D34E1469761077 = {
+						DevelopmentTeam = F2LVFHW3ZH;
+						ProvisioningStyle = Automatic;
+						TestTargetID = A66CBF5335C07E1894D68F7C;
+					};
+					A66CBF5335C07E1894D68F7C = {
+						DevelopmentTeam = F2LVFHW3ZH;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = D10112BA84AE0D046342A7FE /* Build configuration list for PBXProject "RawMotionRecorder" */;
@@ -221,11 +284,20 @@
 			targets = (
 				A66CBF5335C07E1894D68F7C /* RawMotionRecorder */,
 				53C63A864915AB7B5AA79B9C /* RawMotionRecorderTests */,
+				636C680FB8D34E1469761077 /* RawMotionRecorderUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		9306B91C2F9BE7224CB7CB2E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				23B209C65070C152AB43A486 /* writer3frames.mov in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FA267A0A2CD6D640AB58578D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -242,6 +314,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				51A38E0CBB92ACABDFC6F2AA /* RecorderTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A44D357E5E1308F4350CC2A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F36D76DB70A84EA1FFB2A0D /* DeviceRecordingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,6 +352,11 @@
 			target = A66CBF5335C07E1894D68F7C /* RawMotionRecorder */;
 			targetProxy = C9A91130E96CE7C2A2F93B42 /* PBXContainerItemProxy */;
 		};
+		51CA28BFB585FB7D590D78DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A66CBF5335C07E1894D68F7C /* RawMotionRecorder */;
+			targetProxy = 0896C01FE529DFE1EF8487CB /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -290,6 +375,22 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		0CA8D2EB46A2B7E87271777B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorderUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RawMotionRecorder;
+			};
+			name = Debug;
 		};
 		0E8891729C65673A1AFDC753 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -340,9 +441,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -361,7 +463,7 @@
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -370,6 +472,22 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.1;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		57F838263A3A46CFC22CDCFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorderUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RawMotionRecorder;
 			};
 			name = Release;
 		};
@@ -422,9 +540,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -449,7 +568,7 @@
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -495,6 +614,15 @@
 			buildConfigurations = (
 				59200DBD4942A91161D016DD /* Debug */,
 				0886FD5186A9A94D623DEA0D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8189599DA05C25801A59B9B6 /* Build configuration list for PBXNativeTarget "RawMotionRecorderUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0CA8D2EB46A2B7E87271777B /* Debug */,
+				57F838263A3A46CFC22CDCFE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

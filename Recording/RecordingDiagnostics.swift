@@ -9,7 +9,7 @@ struct RecordingDiagnostics: Codable {
     let submittedFrameCount: Int
     let motionEventCount: Int
     let clock: ClockEvidence?
-    let captureError: String?
+    var captureError: String?
     var status: String
     var actualCodecFourCC: String? = nil
     var actualWidth: Int? = nil

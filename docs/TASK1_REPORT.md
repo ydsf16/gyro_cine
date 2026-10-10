@@ -1,8 +1,8 @@
-# Task 1 report — 2026-10-10
+# Task 1 — 2026-10-10
 
-**Code candidate complete; device acceptance PENDING.** Implemented HEVC 4K30 fixed-wide camera writer, optional AAC, separate raw gyro/accelerometer persistence, failure retention and diagnostics. The device mode is chosen from `AVCaptureDevice.formats`; no silent resolution fallback.
-
-- Generic iOS target build: `BUILD SUCCEEDED` at 19:16 CST with Xcode 26.3, signing disabled. This is a compile check, not an installed-device run.
-- Simulator XCTest: 3/3 passed at 19:18 CST. Simulator cannot validate camera or CoreMotion sampling.
-- iPhone 16 recording: not run; `devicectl` lists the device as unavailable.
-- 60 s, 3 min, 5 min, audio, storage, thermal, background and lock tests: pending. See `M1_REPORT.md` for exact operation and evidence requirements.
+- HEVC 4K30 AVAssetWriter、AAC 音频、独立原始 CoreMotion gyro/accel 同录和诊断已实现。
+- iPhone 16 / iOS 18.2.1 短录制、60 秒、20 秒运动录制及播放轨道检查通过。具体时长/帧数/频率见 M1_REPORT.md。
+- 20 秒片段实际 22.4983 秒，675 帧，gyro 2260 / accel 2261，各约 99.73Hz、重复时间戳 0、最大间隔约 10.03ms。
+- 最终真机构建及 XCTest 4/4 通过，20 秒 UI 自动化通过。
+- 用户将后续测试缩短为 20 秒；长期性能、热保护、锁屏、低磁盘等未验证。
+- 物理曝光与 IMU 同步未经测量，不声明采样时间完全同步。

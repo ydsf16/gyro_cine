@@ -4,7 +4,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: 5.10
-    IPHONEOS_DEPLOYMENT_TARGET: 26.0
+    IPHONEOS_DEPLOYMENT_TARGET: 18.2
     TARGETED_DEVICE_FAMILY: 1
     GENERATE_INFOPLIST_FILE: YES
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -14,7 +14,8 @@ settings:
     INFOPLIST_KEY_UIFileSharingEnabled: YES
     INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
     INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: F2LVFHW3ZH
 targets:
   RawMotionRecorder:
     type: application
@@ -39,3 +40,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tinygrape.RawMotionRecorderTests
+  RawMotionRecorderUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: RawMotionRecorder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinygrape.RawMotionRecorderUITests
+        TEST_TARGET_NAME: RawMotionRecorder

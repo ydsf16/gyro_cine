@@ -34,8 +34,13 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 Text("\(model.state.rawValue.capitalized) · HEVC · 4K30 · \(model.thermalLabel)")
                     .font(.caption)
+                    .accessibilityIdentifier("recordingState")
                 Text("Free: \(model.freeSpaceLabel) · IMU: \(model.imuRateLabel)")
                     .font(.caption)
+                if model.state == .recording {
+                    Text(String(format: "%02d:%02d", model.elapsedSeconds / 60, model.elapsedSeconds % 60))
+                        .monospacedDigit()
+                }
                 if let message = model.message { Text(message).foregroundStyle(.red).font(.caption) }
                 Button(model.state == .recording ? "Stop" : "Record") {
                     model.state == .recording ? model.stop() : model.start()
@@ -43,6 +48,7 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .disabled(!model.canToggle)
+                .accessibilityIdentifier("recordToggle")
                 if model.state == .failed {
                     Button("Retry camera") { model.retry() }
                 }

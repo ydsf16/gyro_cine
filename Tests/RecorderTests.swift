@@ -2,6 +2,13 @@ import XCTest
 @testable import RawMotionRecorder
 
 final class RecorderTests: XCTestCase {
+    func testAssetReaderCountsEncodedFramesNotControlBuffers() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
+        let video = try RecordingFinalizer.inspectVideo(url)
+        XCTAssertEqual(video.frames.count, 3)
+        XCTAssertEqual(video.frames.map(\.pts), [0, 1.0 / 30, 2.0 / 30])
+    }
+
     func testRadiansToDegrees() {
         XCTAssertEqual(ClockAligner.degreesPerSecond(.pi), 180, accuracy: 1e-10)
     }

@@ -1,7 +1,10 @@
-# Task 2 report — 2026-10-10
+# Task 2 — 2026-10-10
 
-**Code candidate complete; Gyroflow acceptance PENDING.** Final MOV is parsed with `AVAssetReader`; actual encoded frame samples drive 1..N sidecar messages. Fixed schema is `gyroflow.proto` commit `8bd825db33700c4d4472fae61eada27a65aea7a8`. Unknown readout, OIS, lens and axis-calibration fields are omitted. Irregular frame spacing fails finalization and preserves raw files.
+**格式验证通过，Gyroflow 端到端验收未通过。**
 
-- Simulator XCTest: 3/3 passed at 19:18 CST.
-- Desktop validator tests: 3/3 passed at 19:18 CST using a synthetic HEVC MOV; covered valid protobuf/MOV count, quoted numeric rejection and bad frame sequence rejection.
-- Real iPhone JSONL, telemetry-parser conversion, Gyroflow auto-load, motion sync and stabilized export: pending. No PASS claim. See `M1_REPORT.md`.
+- 使用固定官方 gyroflow.proto，commit 8bd825db33700c4d4472fae61eada27a65aea7a8；实际 encoded sample / PTS 驱动逐帧 JSONL，数字类型和 1..N 帧序。
+- 真机 MOV/JSONL validator 通过；官方 JSONL → Protobuf → JSONL 往返保留 675 帧和 4521 IMU 事件。
+- 真机 XCTest 4/4、桌面 validator 自动化 3/3 通过。
+- 未知硬件 readout、OIS、镜头和轴标定字段未编造。
+- Gyroflow 1.6.3 手动 JSONL 导入报 Unsupported file format。最新 parser 存在缺失硬件时间字段默认 0 的时间语义限制。
+- 官方开发版 1.6.3 (gh2733) 自动关联及运动数据读取通过；parsed metadata 实证错误的 per-frame offsets（从 0 递减至 −22.465 秒）。有效运动时间轴、离线同步和实际增稳导出均待验收；不能据格式解析成功标记 M1 通过。详见 M1_REPORT.md。

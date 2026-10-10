@@ -9,10 +9,12 @@ final class RecorderViewModel: ObservableObject {
     @Published var audioEnabled = true
     @Published var recordings: [URL] = []
     @Published var imuRateLabel = "pending"
+    @Published var elapsedSeconds = 0
     let coordinator = CaptureCoordinator()
     private let motion = MotionRecorder()
     private var currentFolder: URL?
     private var started = false
+    private var recordingTimer: Timer?
 
     var previewSession: AVCaptureSession { coordinator.session }
     var modes: [CameraMode] {
@@ -41,6 +43,8 @@ final class RecorderViewModel: ObservableObject {
             Task { @MainActor in
                 self?.state = state
                 self?.message = message
+                if state == .recording { self?.startStatusTimer() }
+                else { self?.recordingTimer?.invalidate(); self?.recordingTimer = nil }
                 DiagnosticsCollector.record("state=\(state.rawValue) message=\(message ?? "none")", folder: self?.currentFolder)
                 if state == .failed {
                     self?.motion.stop()
@@ -86,6 +90,18 @@ final class RecorderViewModel: ObservableObject {
 
     func stop() { coordinator.stop() }
 
+    private func startStatusTimer() {
+        elapsedSeconds = 0
+        recordingTimer?.invalidate()
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.elapsedSeconds += 1
+                self.imuRateLabel = "\(self.motion.count) events"
+            }
+        }
+    }
+
     func retry() {
         currentFolder = nil
         coordinator.configure(audio: audioEnabled)
@@ -124,6 +140,13 @@ final class RecorderViewModel: ObservableObject {
         } catch {
             state = .failed
             message = "Recording retained for diagnosis: \(error.localizedDescription)"
+            let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
+            if let data = try? Data(contentsOf: diagnosticsURL),
+               var failed = try? JSONDecoder().decode(RecordingDiagnostics.self, from: data) {
+                failed.status = "failed"
+                failed.captureError = error.localizedDescription
+                try? JSONEncoder.pretty.encode(failed).write(to: diagnosticsURL)
+            }
             DiagnosticsCollector.record("finalization failed reason=\(error.localizedDescription)", folder: folder)
         }
         imuRateLabel = "\(motion.count) events"

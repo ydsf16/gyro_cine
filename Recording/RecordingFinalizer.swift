@@ -24,9 +24,17 @@ enum RecordingFinalizer {
         guard reader.startReading() else { throw reader.error ?? RecorderError.unavailable("MOV reader failed") }
         var frames: [ActualVideoFrame] = []
         while let sample = output.copyNextSampleBuffer() {
-            let pts = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample))
-            guard pts.isFinite else { throw RecorderError.unavailable("Non-finite video PTS") }
-            frames.append(ActualVideoFrame(pts: pts))
+            // AVAssetReader also emits zero-sample edit/control buffers, including invalid PTS.
+            // They are not encoded video frames.
+            for index in 0..<CMSampleBufferGetNumSamples(sample) {
+                var timing = CMSampleTimingInfo()
+                guard CMSampleBufferGetSampleTimingInfo(sample, at: index, timingInfoOut: &timing) == noErr else {
+                    throw RecorderError.unavailable("Cannot read encoded sample timing")
+                }
+                let pts = CMTimeGetSeconds(timing.presentationTimeStamp)
+                guard pts.isFinite else { throw RecorderError.unavailable("Non-finite encoded video PTS") }
+                frames.append(ActualVideoFrame(pts: pts))
+            }
         }
         guard reader.status == .completed, !frames.isEmpty else {
             throw reader.error ?? RecorderError.unavailable("MOV has no readable video frames")

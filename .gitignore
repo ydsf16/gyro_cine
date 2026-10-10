@@ -1,4 +1,6 @@
 .build/
+.build-device/
+artifacts/
 .venv/
 *.xcuserstate
 xcuserdata/

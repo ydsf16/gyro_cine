@@ -36,7 +36,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.mode = mode
                 self.audioEnabled = audio
                 self.session.beginConfiguration()
-                defer { self.session.commitConfiguration() }
+                var configurationOpen = true
+                defer { if configurationOpen { self.session.commitConfiguration() } }
                 self.session.sessionPreset = .inputPriority
                 self.session.inputs.forEach(self.session.removeInput)
                 self.session.outputs.forEach(self.session.removeOutput)
@@ -66,6 +67,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     guard self.session.canAddOutput(output) else { throw RecorderError.unavailable("Cannot add audio output") }
                     self.session.addOutput(output)
                 }
+                self.session.commitConfiguration()
+                configurationOpen = false
                 self.session.startRunning()
                 self.onState?(.ready, nil)
             } catch { self.onState?(.failed, error.localizedDescription) }
