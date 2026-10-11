@@ -29,17 +29,20 @@ enum SSDStorageError: LocalizedError {
 final class RecorderViewModel: ObservableObject {
     @Published var state: RecordingState = .idle
     @Published var message: String?
-    @Published var audioEnabled = true
-    @Published var codecMode: RecordingCodec = .hevc
+    private let preferences: UserDefaults
+    private var preferencesLoaded = false
+    @Published var startNotice: String?
+    @Published var audioEnabled = true { didSet { savePreferences() } }
+    @Published var codecMode: RecordingCodec = .hevc { didSet { savePreferences() } }
     @Published private(set) var availableWriterCodecTags = Set<String>()
-    @Published var controls = CameraControls()
-    @Published var colorSpace: RecordingColorSpace = .rec709
+    @Published var controls = CameraControls() { didSet { savePreferences() } }
+    @Published var colorSpace: RecordingColorSpace = .rec709 { didSet { savePreferences() } }
     @Published private(set) var storageLocation: RecordingStorage = .files
     @Published private(set) var selectedSSDFolderName: String?
     private var selectedSSDFolder: URL?
     private var ssdAccessURL: URL?
-    @Published var outputMode: RecordingOutputMode = RecordingOutputMode(rawValue: UserDefaults.standard.string(forKey: "recordingOutputMode") ?? "") ?? .sonyMOV {
-        didSet { UserDefaults.standard.set(outputMode.rawValue, forKey: "recordingOutputMode") }
+    @Published var outputMode: RecordingOutputMode = .sonyMOV {
+        didSet { preferences.set(outputMode.rawValue, forKey: "recordingOutputMode") }
     }
     private var recordingOutputMode: RecordingOutputMode = .sonyMOV
     var selectedCodec: RecordingCodec { codecMode }
@@ -64,9 +67,9 @@ final class RecorderViewModel: ObservableObject {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) else { return false }
         return !CameraCapabilityScanner.modes(device: device, codec: .proResRAW).isEmpty
     }
-    @Published var shutter: ShutterSetting = .oneFiveHundredth
-    @Published var debugFilesEnabled = UserDefaults.standard.bool(forKey: "debugFilesEnabled") {
-        didSet { UserDefaults.standard.set(debugFilesEnabled, forKey: "debugFilesEnabled") }
+    @Published var shutter: ShutterSetting = .oneFiveHundredth { didSet { savePreferences() } }
+    @Published var debugFilesEnabled = false {
+        didSet { preferences.set(debugFilesEnabled, forKey: "debugFilesEnabled") }
     }
     @Published var actualISO: Float = 100
     @Published var actualExposure: Double = 1.0 / 60
@@ -77,7 +80,9 @@ final class RecorderViewModel: ObservableObject {
     @Published var imuRateLabel = "pending"
     @Published var elapsedSeconds = 0
     @Published private(set) var lenses: [CameraLens] = []
-    @Published private(set) var selectedLens: CameraLens?
+    @Published private(set) var selectedLens: CameraLens? { didSet {
+        if preferencesLoaded, let lens = selectedLens { preferences.set(lens.id, forKey: "captureLensID") }
+    } }
     var canSelectLens: Bool { state == .ready || state == .completed || state == .failed }
     let coordinator = CaptureCoordinator()
     private let motion = MotionRecorder()
@@ -96,7 +101,25 @@ final class RecorderViewModel: ObservableObject {
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) ?? CameraCapabilityScanner.mainCamera() else { return [] }
         return CameraCapabilityScanner.modes(device: device, codec: selectedCodec, color: selectedCodec.isRAW ? nil : colorSpace)
     }
-    @Published private(set) var selectedMode: CameraMode?
+    @Published private(set) var selectedMode: CameraMode? { didSet {
+        guard preferencesLoaded, let mode = selectedMode, let lens = selectedLens else { return }
+        preferences.set([mode.width, mode.height, mode.fps], forKey: modePreferenceKey(lens.id))
+    } }
+    private func modePreferenceKey(_ lensID: String) -> String { "captureMode.\(lensID).\(selectedCodec.rawValue)" }
+    private func restoredMode() -> CameraMode? {
+        guard let lens = selectedLens, let values = preferences.array(forKey: modePreferenceKey(lens.id)) as? [Int], values.count == 3 else { return nil }
+        // Resolve dimensions/FPS against current capabilities; never persist a format index.
+        return modes.first { $0.width == values[0] && $0.height == values[1] && $0.fps == values[2] }
+    }
+    private func savePreferences() {
+        guard preferencesLoaded else { return }
+        preferences.set(audioEnabled, forKey: "captureAudio")
+        preferences.set(codecMode.rawValue, forKey: "captureCodec")
+        preferences.set(shutter.rawValue, forKey: "captureShutter")
+        preferences.set(controls.automaticWhiteBalance, forKey: "captureAutoWB")
+        preferences.set(controls.temperature, forKey: "captureTemperature")
+        preferences.set(controls.tint, forKey: "captureTint")
+    }
     var resolutionOptions: [CameraMode] {
         var seen = Set<String>()
         return modes.filter { seen.insert("\($0.width)x\($0.height)").inserted }
@@ -188,7 +211,22 @@ final class RecorderViewModel: ObservableObject {
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 
-    init() {
+    init(preferences: UserDefaults = .standard) {
+        self.preferences = preferences
+        outputMode = RecordingOutputMode(rawValue: preferences.string(forKey: "recordingOutputMode") ?? "") ?? .sonyMOV
+        debugFilesEnabled = preferences.bool(forKey: "debugFilesEnabled")
+        audioEnabled = preferences.object(forKey: "captureAudio") as? Bool ?? true
+        codecMode = RecordingCodec(rawValue: preferences.string(forKey: "captureCodec") ?? "") ?? .hevc
+        if !RecordingCodec.selectableCases.contains(codecMode) { codecMode = .hevc }
+        shutter = (preferences.object(forKey: "captureShutter") as? Int).flatMap(ShutterSetting.init(rawValue:)) ?? .oneFiveHundredth
+        controls.automaticWhiteBalance = preferences.object(forKey: "captureAutoWB") as? Bool ?? true
+        if let value = preferences.object(forKey: "captureTemperature") as? NSNumber, value.floatValue.isFinite {
+            controls.temperature = min(10000, max(2000, value.floatValue))
+        }
+        if let value = preferences.object(forKey: "captureTint") as? NSNumber, value.floatValue.isFinite {
+            controls.tint = min(150, max(-150, value.floatValue))
+        }
+        preferencesLoaded = true
         restoreStorageLocation()
         coordinator.onInternalRAWSupport = { [weak self] supported, status in
             Task { @MainActor in
@@ -202,6 +240,12 @@ final class RecorderViewModel: ObservableObject {
         }
         coordinator.onState = { [weak self] state, message in
             Task { @MainActor in
+                if state == .ready, let self, self.pendingReconfiguration {
+                    self.pendingReconfiguration = false
+                    self.state = .ready
+                    self.reconfigure()
+                    return
+                }
                 self?.state = state
                 self?.message = message
                 if state == .recording { self?.startStatusTimer() }
@@ -250,9 +294,12 @@ final class RecorderViewModel: ObservableObject {
         }
         refreshRecordings()
         lenses = CameraCapabilityScanner.lenses()
-        selectedLens = lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInUltraWideCamera.rawValue }
+        selectedLens = lenses.first { $0.id == preferences.string(forKey: "captureLensID") }
+            ?? lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInUltraWideCamera.rawValue }
             ?? lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue }
             ?? lenses.first
+        if modes.isEmpty { codecMode = .hevc }
+        selectedMode = restoredMode()
         reconfigure()
     }
 
@@ -265,7 +312,7 @@ final class RecorderViewModel: ObservableObject {
         ssdAccessURL = nil
         selectedSSDFolder = nil
         selectedSSDFolderName = nil
-        UserDefaults.standard.set(RecordingStorage.files.rawValue, forKey: "recordingStorageLocation")
+        preferences.set(RecordingStorage.files.rawValue, forKey: "recordingStorageLocation")
         refreshRecordings()
     }
 
@@ -288,7 +335,7 @@ final class RecorderViewModel: ObservableObject {
             try verifySSDDirectory(folder)
             selectedSSDFolderName = disk.displayName
             storageLocation = .ssd
-            UserDefaults.standard.set(RecordingStorage.ssd.rawValue, forKey: "recordingStorageLocation")
+            preferences.set(RecordingStorage.ssd.rawValue, forKey: "recordingStorageLocation")
             refreshRecordings()
             return true
         } catch {
@@ -314,8 +361,8 @@ final class RecorderViewModel: ObservableObject {
             selectedSSDFolder = url
             selectedSSDFolderName = url.lastPathComponent
             storageLocation = .ssd
-            UserDefaults.standard.set(bookmark, forKey: "recordingSSDFolderBookmark")
-            UserDefaults.standard.set(RecordingStorage.ssd.rawValue, forKey: "recordingStorageLocation")
+            preferences.set(bookmark, forKey: "recordingSSDFolderBookmark")
+            preferences.set(RecordingStorage.ssd.rawValue, forKey: "recordingStorageLocation")
             refreshRecordings()
         } catch {
             url.stopAccessingSecurityScopedResource()
@@ -331,7 +378,7 @@ final class RecorderViewModel: ObservableObject {
     }
 
     private func loadSSDBookmark() {
-        guard let bookmark = UserDefaults.standard.data(forKey: "recordingSSDFolderBookmark") else { return }
+        guard let bookmark = preferences.data(forKey: "recordingSSDFolderBookmark") else { return }
         var stale = false
         guard let url = try? URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale),
               !stale, url.startAccessingSecurityScopedResource() else { return }
@@ -341,9 +388,9 @@ final class RecorderViewModel: ObservableObject {
     }
 
     private func restoreStorageLocation() {
-        guard UserDefaults.standard.string(forKey: "recordingStorageLocation") == RecordingStorage.ssd.rawValue else { return }
+        guard preferences.string(forKey: "recordingStorageLocation") == RecordingStorage.ssd.rawValue else { return }
         loadSSDBookmark()
-        if selectedSSDFolder != nil { storageLocation = .ssd }
+        storageLocation = .ssd // Keep the user choice even when the saved disk is temporarily absent.
     }
 
     private func selectedRecordingRoot() throws -> URL {
@@ -387,14 +434,24 @@ final class RecorderViewModel: ObservableObject {
         let previous = selectedMode
         selectedMode = nil // Never expose the old lens's format index with the new device.
         selectedLens = lens
-        selectedMode = CameraMode.preferred(in: modes, previous: previous)
+        selectedMode = restoredMode() ?? CameraMode.preferred(in: modes, previous: previous)
         reconfigure()
     }
+
+    private var pendingReconfiguration = false
+    func requestReconfigure() {
+        guard state != .recording, state != .finalizing else { return }
+        if state == .configuring { pendingReconfiguration = true; return }
+        reconfigure()
+    }
+    private var configuredCodec: RecordingCodec?
 
     func reconfigure() {
         guard state != .recording, state != .finalizing, state != .configuring else { return }
         if !colorOptions.contains(colorSpace) { colorSpace = .rec709 }
         let available = modes
+        if configuredCodec != selectedCodec { selectedMode = restoredMode() ?? selectedMode }
+        configuredCodec = selectedCodec
         selectedMode = CameraMode.preferred(in: available, previous: selectedMode)
         if !supportedShutters.contains(shutter) { shutter = supportedShutters.contains(.oneFiveHundredth) ? .oneFiveHundredth : (supportedShutters.first ?? .auto) }
         internalRAWSupported = nil
@@ -404,7 +461,12 @@ final class RecorderViewModel: ObservableObject {
     }
 
     func start() {
-        guard state == .ready || state == .completed else { return }
+        guard state == .ready || state == .completed else {
+            startNotice = state == .configuring ? "相机正在准备，请稍后再试" : "当前无法开始录制，请先等待保存完成或重试相机"
+            return
+        }
+        startNotice = nil
+        message = nil
         if selectedCodec.isRAW && storageLocation == .ssd {
             do { _ = try selectedRecordingRoot() }
             catch {
@@ -429,14 +491,10 @@ final class RecorderViewModel: ObservableObject {
                 return
             }
         }
-        guard let gravity = motion.recordingGravity,
-              let physicalOrientation = gravity.direction(at: ProcessInfo.processInfo.systemUptime) else {
-            message = "正在读取手机方向，请将手机稍微立起后重试"
-            return
-        }
-        state = .configuring // Disable lens changes immediately, including before the first video sample.
-        recordingOrientation = physicalOrientation
-        recordingGravity = gravity
+        let direction = motion.recordingDirection
+        state = .configuring // Freeze direction and disable repeated REC/lens changes immediately.
+        recordingOrientation = direction.orientation
+        recordingGravity = direction.gravity
         recordingColorSpace = colorSpace
         recordingDebugFiles = debugFilesEnabled
 
@@ -467,7 +525,7 @@ final class RecorderViewModel: ObservableObject {
             recordingOutputMode = outputMode
             DiagnosticsCollector.record("storage capacity location=\(storageLocation.rawValue) selected=\(freeBytes) external=\(String(describing: externalBytes)) ordinary=\(String(describing: capacity?.volumeAvailableCapacity)) important=\(String(describing: capacity?.volumeAvailableCapacityForImportantUsage))", folder: folder)
             DiagnosticsCollector.record("start requested codec=\(selectedCodec.label) video=\(selectedMode?.label ?? "unknown") audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
-            DiagnosticsCollector.record("recording direction frozen degrees=\(recordingOrientation.degrees) gravity=\(gravity.x),\(gravity.y),\(gravity.z) sampleTimestamp=\(gravity.timestamp)", folder: folder)
+            DiagnosticsCollector.record("recording direction frozen degrees=\(recordingOrientation.degrees) source=\(direction.source) gravity=\(String(describing: direction.gravity))", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
             DiagnosticsCollector.record("IMU pre-roll started; waiting for 100ms of gyro samples", folder: folder)
             primingTask = Task { @MainActor [weak self] in

@@ -3,6 +3,30 @@ import AVFoundation
 @testable import GyroCine
 
 final class CameraControlsTests: XCTestCase {
+    func testSlightTiltUsesDominantGravityAxis() {
+        XCTAssertEqual(RecordingOrientation.fromGravity(x: 0.03, y: -0.08, z: -0.996), .portrait)
+        XCTAssertEqual(RecordingOrientation.fromGravity(x: -0.04, y: 0.03, z: -0.999), .landscapeRight)
+        XCTAssertEqual(RecordingOrientation.fromGravity(x: 0.015, y: 0.011, z: 0.999), .landscapeLeft)
+        XCTAssertNil(RecordingOrientation.fromGravity(x: 0.002, y: -0.003, z: -1))
+    }
+
+    func testFlatRecordingUsesLastGravityDirectionOrDefault() {
+        var tracker = RecordingDirectionTracker()
+        let flat = RecordingGravity(timestamp: 10, x: 0, y: 0, z: -1)
+        XCTAssertEqual(tracker.resolve(flat, at: 10).orientation, .landscapeRight)
+        XCTAssertEqual(tracker.resolve(nil, at: 10).source, "defaultLandscape")
+        for (x, y, expected) in [(0.0, -1.0, RecordingOrientation.portrait),
+                                  (1.0, 0.0, .landscapeLeft), (0.0, 1.0, .portraitUpsideDown)] {
+            let upright = RecordingGravity(timestamp: 10, x: x, y: y, z: 0)
+            XCTAssertEqual(tracker.resolve(upright, at: 10).orientation, expected)
+            XCTAssertEqual(tracker.resolve(flat, at: 10).orientation, expected)
+            XCTAssertEqual(tracker.resolve(nil, at: 11).orientation, expected)
+            XCTAssertEqual(tracker.resolve(flat, at: 11).source, "lastUnambiguousGravity")
+        }
+        let stale = RecordingGravity(timestamp: 1, x: -1, y: 0, z: 0)
+        XCTAssertEqual(tracker.resolve(stale, at: 10).orientation, .portraitUpsideDown)
+    }
+
     func testGravityRejectsStaleFlatAndAmbiguousReadings() {
         let valid = RecordingGravity(timestamp: 10, x: -1, y: 0, z: 0)
         XCTAssertEqual(valid.direction(at: 10.05), .landscapeRight)

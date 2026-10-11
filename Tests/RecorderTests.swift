@@ -4,6 +4,60 @@ import simd
 @testable import GyroCine
 
 final class RecorderTests: XCTestCase {
+    @MainActor
+    func testCapturePreferencesSurviveViewModelRecreation() throws {
+        let name = "GyroCineTests.preferences.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let first = RecorderViewModel(preferences: defaults)
+        XCTAssertEqual(first.codecMode, .hevc)
+        XCTAssertEqual(first.shutter, .oneFiveHundredth)
+        first.codecMode = .proResRAW
+        first.shutter = .oneHundredth
+        first.audioEnabled = false
+        first.controls.automaticWhiteBalance = false
+        first.controls.temperature = 4300
+        first.controls.tint = 12
+        first.outputMode = .gcsv
+        first.debugFilesEnabled = true
+        let restored = RecorderViewModel(preferences: defaults)
+        XCTAssertEqual(restored.codecMode, .proResRAW)
+        XCTAssertEqual(restored.shutter, .oneHundredth)
+        XCTAssertFalse(restored.audioEnabled)
+        XCTAssertFalse(restored.controls.automaticWhiteBalance)
+        XCTAssertEqual(restored.controls.temperature, 4300)
+        XCTAssertEqual(restored.controls.tint, 12)
+        XCTAssertEqual(restored.outputMode, .gcsv)
+        XCTAssertTrue(restored.debugFilesEnabled)
+    }
+
+    @MainActor
+    func testBusyStartReportsReasonWithoutStartingAnotherRecording() throws {
+        let name = "GyroCineTests.start.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let model = RecorderViewModel(preferences: defaults)
+        model.state = .configuring
+        model.startNotice = nil
+        model.start()
+        XCTAssertNotNil(model.startNotice)
+        XCTAssertEqual(model.state, .configuring)
+    }
+
+    @MainActor
+    func testMissingSSDPreservesStoragePreferenceAndInvalidPreferencesFallback() throws {
+        let name = "GyroCineTests.invalid.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set("ssd", forKey: "recordingStorageLocation")
+        defaults.set("retired-codec", forKey: "captureCodec")
+        defaults.set(99999, forKey: "captureShutter")
+        let model = RecorderViewModel(preferences: defaults)
+        XCTAssertEqual(model.storageLocation, .ssd)
+        XCTAssertEqual(model.codecMode, .hevc)
+        XCTAssertEqual(model.shutter, .oneFiveHundredth)
+    }
+
     func testModeSelectionPrefersAvailable4K60AndPreservesUserChoice() {
         let hd = CameraMode(width: 1920, height: 1080, fps: 30, formatIndex: 3)
         let uhd60 = CameraMode(width: 3840, height: 2160, fps: 60, formatIndex: 8)

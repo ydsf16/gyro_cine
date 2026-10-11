@@ -135,3 +135,56 @@ UIDeviceFamily=[1]. Upload succeeded at 21:38:46, Apple processing pending.
 Evidence: artifacts/testflight-beta1-iphone-upload.log. Beta description and review
 notes saved; reviewer contact reused with user's explicit approval. No public
 App Store release was submitted.
+
+### RAW main-camera continuous-only comparison (21:59)
+
+User reports improved acquisition but slow refocus, sometimes speeding up after
+shaking the phone. The extra main-camera single-shot recovery was app-added; it
+is a possible confound, not an established root cause. Removed both configuration
+and subject-change single-shot requests, KVO completion switching and the 3-second
+timeout. RAW/HQ main-camera now stays in continuous AF when supported, with the
+previous face-priority disablement retained. Subject changes are logged only,
+without setting focus mode or focus point again. Other cameras keep their behavior.
+
+Build passed: artifacts/raw-continuous-focus-build.log. Existing unit regression
+passed: artifacts/raw-continuous-focus-tests.log. Installed on iPhone 17 Pro,
+sequence 15692. Optical speed/accuracy acceptance is pending user retest.
+Test RAW and HQ 1x: change a central textured target between 30–50 cm and >1 m
+without shaking; repeat after lens switching and during recording. Verify mode=2
+and subject-area-change-observed in focus_trace.json; compare actual sharpness,
+not merely stable mode readback. TestFlight 1.0(1) does not contain this change.
+
+### Build 2: preferences, REC feedback and gravity fallback
+
+- Persist codec, physical lens ID, audio, maximum exposure and automatic/manual WB
+  temperature/tint; persist dimensions/FPS independently for each lens and codec.
+  On launch resolve against current capabilities, never reuse a saved format index.
+  Existing output/debug preferences and SSD bookmark remain; a missing SSD no
+  longer silently changes the saved location to Files. ISO remains automatic.
+- Fix a definite silent REC rejection: the original gravity gate returned while
+  its message was only rendered for failed states. Recording direction now uses
+  the dominant gravity X/Y component, reducing the old 0.55g/0.1g gates to a 0.01g
+  near-flat noise floor and numerical tie check. Flat/ambiguous/missing data uses
+  the last unambiguous gravity direction, or landscapeRight when none exists.
+  Direction freezes at REC and never consults the UI orientation/rotation lock.
+- Separate serial orientation monitoring remembers gravity while previewing; raw
+  IMU logging is unchanged. Record start diagnostics identify the direction source.
+- REC shows a spinner during preparation/finalization; explicit rejected-start
+  notices are visible. Configuration requests arriving during setup are queued.
+- 53 unit tests passed: artifacts/preferences-flat-final-tests.log. Includes
+  preference reload, missing SSD/invalid stored settings, small tilts and flat
+  gravity fallback. Signed Release archive succeeded: artifacts/GyroCine-Beta2.xcarchive.
+- iPhone 17 Pro UI tests passed: frame-rate change -> terminate -> launch retains
+  selection (artifacts/preferences-device-test.log); HEVC start/stop/save passed
+  (artifacts/record-button-device-test.log). Original storage was Files and remains
+  Files; original RAW codec restored after the HEVC test. Latest app launched.
+- Saved GyroCine_20261011_221410.mov: HEVC 3840x2160, 255 frames, 4.251667s,
+  90-degree presentation transform, AAC and embedded Sony RTMD. Copy and ffprobe
+  evidence: artifacts/preferences-start-device.mov and *-probe.json. This test
+  does not establish physical flat-phone orientation; that behavior has unit
+  coverage and still needs user optical acceptance.
+- RAW/SSD capture and continuous-only RAW 1x focus speed remain separate pending
+  physical checks. Earlier 22:08 RAW/Files failures explicitly report Apple's
+  external-storage requirement (artifacts/start-rejected-220803.log).
+- TestFlight 1.0(1) added to existing internal group (2 testers), verified Testing.
+  Build 1.0(2) upload succeeded 22:15:36; processing/internal assignment pending.

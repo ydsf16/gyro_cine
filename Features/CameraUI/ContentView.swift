@@ -93,12 +93,15 @@ struct ContentView: View {
                 Button("打开录制设置") { model.rawStoragePrompt = nil; showingSettings = true }
                 Button("取消", role: .cancel) { model.rawStoragePrompt = nil }
             } message: { Text(model.rawStoragePrompt ?? "") }
+            .alert("未开始录制", isPresented: Binding(get: { model.startNotice != nil }, set: { if !$0 { model.startNotice = nil } })) {
+                Button("知道了", role: .cancel) { model.startNotice = nil }
+            } message: { Text(model.startNotice ?? "") }
             .sheet(isPresented: $showingSettings) { SettingsView(model: model) }
             .sheet(isPresented: $showingLibrary) { RecordingLibraryView(model: model) }
             .task { model.prepare() }
-            .onChange(of: model.audioEnabled) { _, _ in if !busy { model.reconfigure() } }
-            .onChange(of: model.codecMode) { _, _ in if !busy { model.reconfigure() } }
-            .onChange(of: model.colorSpace) { _, _ in if !busy { model.reconfigure() } }
+            .onChange(of: model.audioEnabled) { _, _ in model.requestReconfigure() }
+            .onChange(of: model.codecMode) { _, _ in model.requestReconfigure() }
+            .onChange(of: model.colorSpace) { _, _ in model.requestReconfigure() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active && (recording || model.state == .configuring) { model.stop() }
             }
@@ -263,7 +266,9 @@ struct ContentView: View {
         } label: {
             ZStack {
                 Circle().strokeBorder(.white, lineWidth: 2).frame(width: 70, height: 70)
-                if recording { RoundedRectangle(cornerRadius: 5).fill(.red).frame(width: 29, height: 29) }
+                if model.state == .configuring || model.state == .finalizing {
+                    ProgressView().tint(.white).accessibilityLabel(model.state == .finalizing ? "正在保存" : "正在准备录制")
+                } else if recording { RoundedRectangle(cornerRadius: 5).fill(.red).frame(width: 29, height: 29) }
                 else { Circle().fill(Color(red: 0.65, green: 0.025, blue: 0.025)).frame(width: 49, height: 49) }
             }
         }.buttonStyle(.plain).disabled(!model.canToggle).opacity(model.canToggle ? 1 : 0.45)

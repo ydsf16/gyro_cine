@@ -9,7 +9,7 @@ enum RecordingOrientation: Int, Codable {
 
     var isPortrait: Bool { self == .portrait || self == .portraitUpsideDown }
     static func fromGravity(x: Double, y: Double, z: Double) -> Self? {
-        guard x.isFinite, y.isFinite, z.isFinite, max(abs(x), abs(y)) > 0.55, abs(abs(x) - abs(y)) > 0.1 else { return nil }
+        guard x.isFinite, y.isFinite, z.isFinite, max(abs(x), abs(y)) > 0.01, abs(abs(x) - abs(y)) > 0.000001 else { return nil }
         if abs(x) > abs(y) { return x < 0 ? .landscapeRight : .landscapeLeft }
         return y < 0 ? .portrait : .portraitUpsideDown
     }
@@ -57,5 +57,24 @@ extension RecordingOrientation {
         return zip([actual.a, actual.b, actual.c, actual.d, actual.tx, actual.ty],
                    [expected.a, expected.b, expected.c, expected.d, expected.tx, expected.ty])
             .allSatisfy { $0.isFinite && abs($0 - $1) < 0.01 }
+    }
+}
+
+/// Gravity cannot determine in-plane rotation when the phone lies flat. Preserve
+/// the last unambiguous physical direction; never consult interface rotation lock.
+struct RecordingDirectionTracker {
+    private(set) var lastDirection: RecordingOrientation?
+    struct Decision {
+        let orientation: RecordingOrientation
+        let gravity: RecordingGravity?
+        let source: String
+    }
+    mutating func resolve(_ gravity: RecordingGravity?, at uptime: Double) -> Decision {
+        if let gravity, let direction = gravity.direction(at: uptime) {
+            lastDirection = direction
+            return Decision(orientation: direction, gravity: gravity, source: "currentGravity")
+        }
+        return Decision(orientation: lastDirection ?? .landscapeRight, gravity: gravity,
+                        source: lastDirection == nil ? "defaultLandscape" : "lastUnambiguousGravity")
     }
 }

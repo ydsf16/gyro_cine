@@ -1,6 +1,73 @@
 import XCTest
 
 final class DeviceRecordingTests: XCTestCase {
+    func testHEVCStartStopWithoutOrientationPrecondition() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        let toggle = app.buttons["recordToggle"]
+        func waitReady() {
+            let ready = NSPredicate { _, _ in toggle.exists && toggle.isEnabled }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: nil)], timeout: 30), .completed, app.debugDescription)
+        }
+        waitReady()
+        app.buttons["settingsButton"].tap()
+        let originalCodec = app.buttons["codecPicker"].label
+        let originalStorage = app.buttons["storageLocationPicker"].label
+        app.buttons["codecPicker"].tap()
+        app.buttons["H.265 / HEVC"].firstMatch.tap()
+        let settingsReady = NSPredicate { _, _ in app.buttons["storageLocationPicker"].isEnabled }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settingsReady, object: nil)], timeout: 30), .completed)
+        app.buttons["storageLocationPicker"].tap()
+        app.buttons["文件"].firstMatch.tap()
+        app.buttons["完成"].tap()
+        waitReady()
+        toggle.tap()
+        let recording = NSPredicate { _, _ in toggle.value as? String == "recording" }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: recording, object: nil)], timeout: 15), .completed, app.debugDescription)
+        Thread.sleep(forTimeInterval: 3)
+        toggle.tap()
+        let complete = NSPredicate { _, _ in toggle.value as? String == "completed" }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: complete, object: nil)], timeout: 45), .completed, app.debugDescription)
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.lifetime = .keepAlways; add(screenshot)
+        // Restore RAW choice; SSD grant requires user interaction, so leave Files
+        // when this test had to use it and disclose that in the test report.
+        if originalCodec.contains("ProRes RAW") {
+            app.buttons["settingsButton"].tap()
+            app.buttons["codecPicker"].tap()
+            app.buttons[originalCodec.contains("HQ") ? "ProRes RAW HQ" : "ProRes RAW"].firstMatch.tap()
+            app.buttons["完成"].tap()
+        }
+        print("Storage before test: \(originalStorage); after test: Files")
+    }
+
+    func testFrameRatePersistsAfterRelaunch() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        func waitReady() {
+            let ready = NSPredicate { _, _ in app.buttons["recordToggle"].value as? String == "ready" }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: nil)], timeout: 30), .completed, app.debugDescription)
+        }
+        waitReady()
+        let original = app.buttons["control_帧率"].label
+        app.buttons["control_帧率"].tap()
+        let thirty = app.buttons["30"].firstMatch
+        XCTAssertTrue(thirty.waitForExistence(timeout: 5), app.debugDescription)
+        thirty.tap()
+        waitReady()
+        XCTAssertTrue(app.buttons["control_帧率"].label.contains("30Hz"))
+        app.terminate()
+        app.launch()
+        waitReady()
+        XCTAssertTrue(app.buttons["control_帧率"].label.contains("30Hz"), app.debugDescription)
+        if original.contains("60Hz") {
+            app.buttons["control_帧率"].tap()
+            app.buttons["60"].firstMatch.tap()
+            waitReady()
+        }
+    }
+
     func testRepeatedPhysicalLensSwitch() {
         let app = XCUIApplication()
         app.launch()

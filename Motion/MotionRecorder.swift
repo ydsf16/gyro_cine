@@ -13,6 +13,14 @@ struct MotionEvent: Codable {
 final class MotionRecorder {
     private let manager = CMMotionManager()
     private let queue = OperationQueue()
+    private let orientationQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "motion.orientation"
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
+    private let orientationLock = NSLock()
+    private var directionTracker = RecordingDirectionTracker()
     private let lock = NSLock()
     private var handle: StagedRecordingLog?
     private var eventCount = 0
@@ -23,16 +31,26 @@ final class MotionRecorder {
     func startOrientationMonitoring() {
         guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
         manager.deviceMotionUpdateInterval = 0.05
-        // Poll the latest fused sample at REC, avoiding queued UI callbacks and stale direction caching.
-        manager.startDeviceMotionUpdates()
+        manager.startDeviceMotionUpdates(to: orientationQueue) { [weak self] sample, _ in
+            guard let self, let sample else { return }
+            let gravity = RecordingGravity(timestamp: sample.timestamp,
+                x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z)
+            self.orientationLock.lock()
+            _ = self.directionTracker.resolve(gravity, at: ProcessInfo.processInfo.systemUptime)
+            self.orientationLock.unlock()
+        }
     }
 
-    var recordingGravity: RecordingGravity? {
-        guard let sample = manager.deviceMotion else { return nil }
-        let reading = RecordingGravity(timestamp: sample.timestamp,
-            x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z)
-        guard reading.direction(at: ProcessInfo.processInfo.systemUptime) != nil else { return nil }
-        return reading
+    var recordingDirection: RecordingDirectionTracker.Decision {
+        // Poll the newest sample at REC, while retaining the last clear direction
+        // collected in preview for flat/ambiguous/stale readings.
+        let gravity = manager.deviceMotion.map { sample in
+            RecordingGravity(timestamp: sample.timestamp,
+                x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z)
+        }
+        orientationLock.lock()
+        defer { orientationLock.unlock() }
+        return directionTracker.resolve(gravity, at: ProcessInfo.processInfo.systemUptime)
     }
 
     var isAvailable: Bool { manager.isGyroAvailable && manager.isAccelerometerAvailable }
