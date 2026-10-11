@@ -194,6 +194,22 @@ internal group; App Store Connect verifies "正在测试", 2 testers, both invit
 Build-specific test notes saved. External Beta Review remains on 1.0(1);
 no new App Store Connect users or broader permissions were added.
 
+### TestFlight 1.0(3) — 2026-10-12
+
+Archived Release from commit `e657966` as an iPhone-only 1.0(3) build and
+verified its bundle ID and code signature. Xcode reported upload success at
+01:45:39 China time (`artifacts/testflight-beta3-upload.log`). App Store
+Connect completed processing and export compliance. The build-specific test
+notes state that 1× RAW continuous autofocus remains under verification;
+they do not claim the focus issue is fixed.
+
+App Store Connect shows 1.0(3) in the existing internal group “内部测试” (2
+testers) and external group “熟人测试” (1 tester). The old 1.0(1) external Beta
+Review request was withdrawn so 1.0(3) could be submitted. The new external
+build is **waiting for Beta App Review**; external testers cannot download it
+until Apple approves. No testers or public links were added, and no App Store
+release was submitted.
+
 ## Continuous AF audit: RAW 1× and 4×
 
 Apple's installed iOS SDK AVCaptureDevice.h documents that continuousAutoFocus
