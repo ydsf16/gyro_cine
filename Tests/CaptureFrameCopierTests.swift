@@ -14,6 +14,14 @@ final class CaptureFrameCopierTests: XCTestCase {
         XCTAssertEqual(written, [1]); XCTAssertEqual(queue.count, 2)
         try queue.drain(ready: { true }, write: { written.append($0) })
         XCTAssertEqual(written, [1, 2, 3]); XCTAssertEqual(queue.count, 0)
+        try queue.enqueue(4); try queue.enqueue(5)
+        XCTAssertThrowsError(try queue.drain(ready: { true }) { frame in
+            written.append(frame)
+            throw NSError(domain: "evidence write", code: 1)
+        })
+        XCTAssertEqual(queue.count, 1)
+        try queue.drain(ready: { true }, write: { written.append($0) })
+        XCTAssertEqual(written, [1, 2, 3, 4, 5])
     }
 
     func testBiPlanarCopiesAndPoolLimit() throws {
@@ -39,7 +47,18 @@ final class CaptureFrameCopierTests: XCTestCase {
         var held: [CMSampleBuffer] = []
         for _ in 0..<48 { held.append(try copier.copy(original)) }
         XCTAssertThrowsError(try copier.copy(original))
+        let frameBytes = (0..<2).reduce(0) { total, plane in
+            total + CVPixelBufferGetBytesPerRowOfPlane(source, plane) * CVPixelBufferGetHeightOfPlane(source, plane)
+        }
+        let bounded = CaptureFrameCopier(maxFrames: 8,
+            byteBudget: max(frameBytes, CVPixelBufferGetDataSize(source)) * 2)
+        let first = try bounded.copy(original)
+        let second = try bounded.copy(original)
+        XCTAssertThrowsError(try bounded.copy(original))
+        XCTAssertNotNil(CMSampleBufferGetImageBuffer(first))
+        XCTAssertNotNil(CMSampleBufferGetImageBuffer(second))
         let pixels = try XCTUnwrap(CMSampleBufferGetImageBuffer(held[0]))
+        XCTAssertLessThan(CVPixelBufferGetDataSize(pixels), CVPixelBufferGetDataSize(source) * 2)
         CVPixelBufferLockBaseAddress(pixels, .readOnly)
         for plane in 0..<2 {
             let ptr = try XCTUnwrap(CVPixelBufferGetBaseAddressOfPlane(pixels, plane)).assumingMemoryBound(to: UInt8.self)

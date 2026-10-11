@@ -193,3 +193,44 @@ Build 1.0(2) processing and export compliance completed. Assigned to the existin
 internal group; App Store Connect verifies "正在测试", 2 testers, both invited.
 Build-specific test notes saved. External Beta Review remains on 1.0(1);
 no new App Store Connect users or broader permissions were added.
+
+## Continuous AF audit: RAW 1× and 4×
+
+Apple's installed iOS SDK AVCaptureDevice.h documents that continuousAutoFocus
+is continuous AF, smooth AF is slower (default NO), and face-driven settings
+must be changed under the configuration lock before assigning focusMode.
+References:
+- https://developer.apple.com/documentation/avfoundation/avcapturedevice/issmoothautofocusenabled
+- https://developer.apple.com/documentation/avfoundation/avcapturedevice/focusmode-swift.enum/continuousautofocus
+- https://developer.apple.com/documentation/avfoundation/avcapturedevice/autofocusrangerestriction-swift.property
+
+Audit found no exposure or white-balance path assigning locked focus. All
+continuous-capable cameras already select continuousAutoFocus and unrestricted
+focus range. However, RAW telephoto still used automatic face priority and its
+subject-area callback reassigned the focus point and mode. RAW main did neither.
+
+Changes: disable smooth AF explicitly when supported (its previous actual value
+was not recorded, so this is not a confirmed cause); disable face priority on all
+RAW lenses; make subject-area notifications diagnostic only for all lenses to
+avoid interfering with a running continuous scan. Log smooth AF, range restriction,
+exposure and ISO with each focus snapshot.
+
+Validation: signed iOS device build succeeded; 53 simulator unit tests passed.
+Device was unavailable at this audit. Near/far autofocus speed, clarity and RAW/HQ
+1×/4× physical acceptance remain pending. Blackmagic's private configuration has
+not been inspected and parity is not established.
+
+### Full-frame focus region trial
+
+The iOS 26 SDK exposes focusRectOfInterest. Its documentation explicitly defines
+CGRect(0, 0, 1, 1) as using the entire field of view to determine focus. Merely
+omitting focusPointOfInterest does not enable this: its default is the center.
+This trial was removed before acceptance: a full-frame region can prefer a distant
+high-contrast background over the user's central near subject, and no optical
+device test was available. The app retains its centered focus point, continuous
+AF and RAW face-priority workaround. Focus diagnostics still record the actual
+point and rectangle so later device tests can compare them.
+Reference: https://developer.apple.com/documentation/avfoundation/avcapturedevice/focusrectofinterest
+
+The full-frame trial compiled, but was never optically verified or accepted
+for delivery.

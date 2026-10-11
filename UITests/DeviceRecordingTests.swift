@@ -25,7 +25,7 @@ final class DeviceRecordingTests: XCTestCase {
         toggle.tap()
         let recording = NSPredicate { _, _ in toggle.value as? String == "recording" }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: recording, object: nil)], timeout: 15), .completed, app.debugDescription)
-        Thread.sleep(forTimeInterval: 3)
+        Thread.sleep(forTimeInterval: 8)
         toggle.tap()
         let complete = NSPredicate { _, _ in toggle.value as? String == "completed" }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: complete, object: nil)], timeout: 45), .completed, app.debugDescription)

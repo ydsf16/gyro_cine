@@ -6,37 +6,88 @@ final class CaptureFrameCopier {
     private(set) var capacityDescription = "not allocated"
     private var pool: CVPixelBufferPool?
     private var signature: [Int] = []
+    private var destinationFrameBytes: Int?
+    private var previousSourceFormat: CMFormatDescription?
+    private var previousCopiedFormat: CMFormatDescription?
+    private(set) var sourceFormatChanges = 0
+    private(set) var copiedFormatChanges = 0
+    private let maxFrames: Int
+    private let byteBudget: Int
+
+    init(maxFrames: Int = 48, byteBudget: Int = 768_000_000) {
+        self.maxFrames = maxFrames
+        self.byteBudget = byteBudget
+    }
+
     func copy(_ source: CMSampleBuffer) throws -> CMSampleBuffer {
         guard let image = CMSampleBufferGetImageBuffer(source),
               let format = CMSampleBufferGetFormatDescription(source) else { throw failure("missing image") }
+        if let previousSourceFormat,
+           !CMFormatDescriptionEqual(previousSourceFormat, otherFormatDescription: format) {
+            sourceFormatChanges += 1
+        }
+        previousSourceFormat = format
         let width = CVPixelBufferGetWidth(image), height = CVPixelBufferGetHeight(image)
         let pixelFormat = CVPixelBufferGetPixelFormatType(image)
         let key = [width, height, Int(pixelFormat)]
         if signature != key || pool == nil {
             let attrs: [String: Any] = [kCVPixelBufferWidthKey as String: width,
                 kCVPixelBufferHeightKey as String: height,
-                kCVPixelBufferBytesPerRowAlignmentKey as String: CVPixelBufferGetBytesPerRow(image),
                 kCVPixelBufferPixelFormatTypeKey as String: pixelFormat,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [:]]
             guard CVPixelBufferPoolCreate(nil, nil, attrs as CFDictionary, &pool) == kCVReturnSuccess else {
                 throw failure("cannot allocate frame pool")
             }
             signature = key
+            destinationFrameBytes = nil
         }
         guard let pool else { throw failure("missing pool") }
-        // Bound encoder-owned copies to 48 frames and approximately 768 MB.
-        let count = max(1, min(48, 768_000_000 / max(1, CVPixelBufferGetDataSize(image))))
-        capacityDescription = "frameBytes=\(CVPixelBufferGetDataSize(image)) maxFrames=\(count) budgetBytes=768000000"
+        // Planar IOSurfaces can report a zero data size. Use their plane strides
+        // so the byte budget still bounds real 4K frame allocations.
+        let planes = CVPixelBufferGetPlaneCount(image)
+        let layoutBytes: Int
+        if planes == 0 {
+            layoutBytes = CVPixelBufferGetBytesPerRow(image) * height
+        } else {
+            layoutBytes = (0..<planes).reduce(0) { total, plane in
+                total + CVPixelBufferGetBytesPerRowOfPlane(image, plane) * CVPixelBufferGetHeightOfPlane(image, plane)
+            }
+        }
+        let frameBytes = max(1, CVPixelBufferGetDataSize(image), layoutBytes)
+        let count = max(1, min(maxFrames, byteBudget / max(frameBytes, destinationFrameBytes ?? 0)))
+        capacityDescription = "frameBytes=\(frameBytes) maxFrames=\(count) budgetBytes=\(byteBudget)"
         var copied: CVPixelBuffer?
         let status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool,
             [kCVPixelBufferPoolAllocationThresholdKey as String: count] as CFDictionary, &copied)
         guard status == kCVReturnSuccess, let copied else { throw failure("pool exhausted (\(status)); try lower frame rate") }
+        guard planes == CVPixelBufferGetPlaneCount(copied) else { throw failure("plane layout") }
+        let sourceStrides = (0..<max(1, planes)).map { plane in
+            planes == 0 ? CVPixelBufferGetBytesPerRow(image) : CVPixelBufferGetBytesPerRowOfPlane(image, plane)
+        }
+        let destinationStrides = (0..<max(1, planes)).map { plane in
+            planes == 0 ? CVPixelBufferGetBytesPerRow(copied) : CVPixelBufferGetBytesPerRowOfPlane(copied, plane)
+        }
+        let destinationLayoutBytes: Int
+        if planes == 0 {
+            destinationLayoutBytes = destinationStrides[0] * height
+        } else {
+            destinationLayoutBytes = (0..<planes).reduce(0) { total, plane in
+                total + destinationStrides[plane] * CVPixelBufferGetHeightOfPlane(copied, plane)
+            }
+        }
+        let destinationBytes = max(CVPixelBufferGetDataSize(copied), destinationLayoutBytes)
+        guard destinationBytes <= byteBudget, destinationBytes <= frameBytes * 4 else {
+            self.pool = nil
+            signature = []
+            destinationFrameBytes = nil
+            throw failure("copied frame unexpectedly large (source=\(frameBytes), destination=\(destinationBytes))")
+        }
+        destinationFrameBytes = destinationBytes
+        capacityDescription = "frameBytes=\(frameBytes) maxFrames=\(count) budgetBytes=\(byteBudget) sourceStrides=\(sourceStrides) destinationStrides=\(destinationStrides) destinationDataSize=\(destinationBytes)"
         guard CVPixelBufferLockBaseAddress(image, .readOnly) == kCVReturnSuccess else { throw failure("source lock") }
         defer { CVPixelBufferUnlockBaseAddress(image, .readOnly) }
         guard CVPixelBufferLockBaseAddress(copied, []) == kCVReturnSuccess else { throw failure("copy lock") }
         defer { CVPixelBufferUnlockBaseAddress(copied, []) }
-        let planes = CVPixelBufferGetPlaneCount(image)
-        guard planes == CVPixelBufferGetPlaneCount(copied) else { throw failure("plane layout") }
         for plane in 0..<max(1, planes) {
             let src = planes == 0 ? CVPixelBufferGetBaseAddress(image) : CVPixelBufferGetBaseAddressOfPlane(image, plane)
             let dst = planes == 0 ? CVPixelBufferGetBaseAddress(copied) : CVPixelBufferGetBaseAddressOfPlane(copied, plane)
@@ -67,6 +118,11 @@ final class CaptureFrameCopier {
             CMVideoFormatDescriptionMatchesImageBuffer(mergedFormat, imageBuffer: copied) else {
             throw failure("metadata/layout mismatch")
         }
+        if let previousCopiedFormat,
+           !CMFormatDescriptionEqual(previousCopiedFormat, otherFormatDescription: mergedFormat) {
+            copiedFormatChanges += 1
+        }
+        previousCopiedFormat = mergedFormat
         var result: CMSampleBuffer?
         guard CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: copied,
             formatDescription: mergedFormat, sampleTiming: &timing, sampleBufferOut: &result) == noErr,
@@ -94,8 +150,10 @@ struct PendingVideoQueue<Element> {
     }
     mutating func drain(ready: () -> Bool, write: (Element) throws -> Void) throws {
         while !elements.isEmpty && ready() {
-            try write(elements[0])
-            elements.removeFirst()
+            // The writer may accept a frame before logging its timing throws.
+            // Never retry the same presentation timestamp after that failure.
+            let element = elements.removeFirst()
+            try write(element)
         }
     }
     mutating func removeAll() { elements.removeAll() }
