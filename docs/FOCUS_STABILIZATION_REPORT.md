@@ -188,3 +188,8 @@ not merely stable mode readback. TestFlight 1.0(1) does not contain this change.
   external-storage requirement (artifacts/start-rejected-220803.log).
 - TestFlight 1.0(1) added to existing internal group (2 testers), verified Testing.
   Build 1.0(2) upload succeeded 22:15:36; processing/internal assignment pending.
+
+Build 1.0(2) processing and export compliance completed. Assigned to the existing
+internal group; App Store Connect verifies "正在测试", 2 testers, both invited.
+Build-specific test notes saved. External Beta Review remains on 1.0(1);
+no new App Store Connect users or broader permissions were added.
