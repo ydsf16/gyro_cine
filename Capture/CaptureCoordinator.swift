@@ -18,6 +18,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private let focusDiagnosticsQueue = DispatchQueue(label: "capture.focus.diagnostics", qos: .utility)
     private var focusDiagnostics: [[String: Any]] = [] // accessed only on focusDiagnosticsQueue
     private var focusObserver: NSObjectProtocol?
+    private var focusAdjustmentObservation: NSKeyValueObservation?
+    private var focusRecoveryID: UUID?
+    private var focusRecoverySawAdjustment = false
     private var device: AVCaptureDevice?
     private var mode: CameraMode?
     private var codec: RecordingCodec = .hevc
@@ -77,6 +80,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 // Stop delivery and drain old callbacks before replacing device/mode state.
                 // Sample callbacks read that state and must never see the next lens mid-switch.
                 if let observer = self.focusObserver { NotificationCenter.default.removeObserver(observer); self.focusObserver = nil }
+                self.focusAdjustmentObservation = nil
+                self.focusRecoveryID = nil
                 self.session.stopRunning()
                 self.captureVideoOutput?.setSampleBufferDelegate(nil, queue: nil)
                 self.sampleQueue.sync {}
@@ -200,12 +205,16 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     guard let self, let device else { return }
                     self.sessionQueue.async {
                         guard self.device === device, self.session.isRunning else { return }
-                        // Continuous AF handles scene changes itself. Reassigning the point
-                        // can restart an ongoing scan, so notifications are diagnostic only.
                         self.recordFocusState(device, event: "subject-area-change-observed")
+                        if self.codec.isRAW && device.deviceType == .builtInWideAngleCamera {
+                            self.reacquireRAWFocus(device, reason: "subject-area-change")
+                        }
                     }
                 }
                 self.recordFocusState(device, event: "configured")
+                if codec.isRAW && device.deviceType == .builtInWideAngleCamera {
+                    self.reacquireRAWFocus(device, reason: "raw-configuration")
+                }
                 var configuredCapability = capability
                 configuredCapability["focusMode"] = device.focusMode.rawValue
                 configuredCapability["smoothAutoFocusSupported"] = device.isSmoothAutoFocusSupported
@@ -214,7 +223,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 configuredCapability["autoFocusSupported"] = device.isFocusModeSupported(.autoFocus)
                 configuredCapability["autoFocusSystem"] = device.activeFormat.autoFocusSystem.rawValue
                 configuredCapability["minimumFocusDistanceMillimeters"] = device.minimumFocusDistance
-                configuredCapability["rawMainCameraFocusRecovery"] = false
+                configuredCapability["rawMainCameraFocusRecovery"] = codec.isRAW && device.deviceType == .builtInWideAngleCamera
                 configuredCapability["continuousAutoFocusSupported"] = device.isFocusModeSupported(.continuousAutoFocus)
                 configuredCapability["activeVideoStabilizationMode"] = video.connection(with: .video)?.activeVideoStabilizationMode.rawValue
                 configuredCapability["configuredMinFrameDurationSeconds"] = actualMin
@@ -262,6 +271,62 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     .write(to: root.appendingPathComponent("focus_trace.json"), options: .atomic)
             } catch { NSLog("GyroCine focus diagnostics write failed: %@", error.localizedDescription) }
         }
+    }
+
+    /// Keep a RAW main-camera single-shot acquisition active until it finishes,
+    /// then restore continuous AF. Tokens keep old timeouts off a new camera.
+    private func reacquireRAWFocus(_ device: AVCaptureDevice, reason: String) {
+        guard self.device === device, codec.isRAW, device.deviceType == .builtInWideAngleCamera,
+              session.isRunning, focusRecoveryID == nil,
+              device.isFocusModeSupported(.autoFocus),
+              device.isFocusModeSupported(.continuousAutoFocus) else { return }
+        let id = UUID()
+        focusRecoveryID = id
+        focusRecoverySawAdjustment = false
+        focusAdjustmentObservation = device.observe(\.isAdjustingFocus, options: [.new]) { [weak self, weak device] _, change in
+            guard let self, let device, let adjusting = change.newValue else { return }
+            self.sessionQueue.async {
+                guard self.device === device, self.focusRecoveryID == id else { return }
+                self.recordFocusState(device, event: "adjusting-\(adjusting)")
+                if adjusting { self.focusRecoverySawAdjustment = true }
+                else if self.focusRecoverySawAdjustment {
+                    self.finishRAWFocusRecovery(device, id: id, reason: "scan-ended")
+                }
+            }
+        }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if device.isAutoFocusRangeRestrictionSupported { device.autoFocusRangeRestriction = .none }
+            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5) }
+            device.focusMode = .autoFocus
+            recordFocusState(device, event: "single-start-\(reason)")
+            NSLog("GyroCine RAW AF start reason=%@ camera=%@ position=%.4f", reason, device.uniqueID, device.lensPosition)
+        } catch {
+            focusAdjustmentObservation = nil
+            focusRecoveryID = nil
+            NSLog("GyroCine RAW AF start failed: %@", error.localizedDescription)
+            return
+        }
+        sessionQueue.asyncAfter(deadline: .now() + 3) { [weak self, weak device] in
+            guard let self, let device else { return }
+            self.finishRAWFocusRecovery(device, id: id, reason: "timeout")
+        }
+    }
+
+    private func finishRAWFocusRecovery(_ device: AVCaptureDevice, id: UUID, reason: String) {
+        guard self.device === device, focusRecoveryID == id else { return }
+        focusAdjustmentObservation = nil
+        focusRecoveryID = nil
+        guard session.isRunning else { return }
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            device.focusMode = .continuousAutoFocus
+            device.isSubjectAreaChangeMonitoringEnabled = true
+            recordFocusState(device, event: "continuous-\(reason)")
+            NSLog("GyroCine RAW AF continuous reason=%@ camera=%@ observedScan=%d position=%.4f", reason, device.uniqueID, focusRecoverySawAdjustment ? 1 : 0, device.lensPosition)
+        } catch { NSLog("GyroCine RAW AF restore failed: %@", error.localizedDescription) }
     }
 
     /// Changes sensor controls on the session queue without rebuilding inputs or the writer.

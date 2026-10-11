@@ -234,3 +234,102 @@ Reference: https://developer.apple.com/documentation/avfoundation/avcapturedevic
 
 The full-frame trial compiled, but was never optically verified or accepted
 for delivery.
+
+## 2026-10-12 — RAW main-camera focus trigger diagnosis
+
+On iPhone 17 Pro, the installed continuous-only build 1.0(2) recorded 240 RAW HQ
+1× focus observations over 72 seconds. It received 95 subject-area notifications,
+but `isAdjustingFocus` was always false and `lensPosition` stayed at 0.372549.
+The selected 4224×2240/60 format used contrast AF and supported both single and
+continuous focus. RAW frame delivery continued at about 60 fps. These readings
+establish that the app requested continuous AF without an observed lens scan;
+they do not identify Apple's internal reason for the idle state.
+
+The prior user-accepted build had also initiated single-shot acquisitions, so
+its success did not establish that continuous AF alone worked. Restored the
+single-shot acquisition for RAW/RAW HQ physical main cameras when configured
+and when the subject-area notification arrives. It returns to continuous AF
+after the scan, with a timeout and a generation token for lens changes. The
+implementation checks AF mode support and does not branch on iPhone model.
+
+Signed device build succeeded; installed on iPhone 17 Pro as sequence 15748.
+The first new trace observed three acquisitions and three returns to continuous
+AF, with lens position changing from 0 to about 0.72. That trial selected an
+Open Gate 4224×3024/60 format, whereas the stalled trace used 4224×2240/60;
+the format difference limits a strict A/B claim. The user reports that visual
+refocus still requires shaking the phone. The subsequent trace shows scans
+when subject-area changes are delivered, but notifications do not reliably
+arrive for the intended near/far change. An apparent 30 fps improvement was
+not sufficient; the last device capability snapshot was 24 fps. Exposure was
+about 1/500 second throughout, with ISO sometimes above 5000. The next
+controlled check is a longer maximum exposure at 60 fps.
+
+Existing 53 unit tests passed. Simulator UI tests that require a real camera
+were inadvertently included in an initial broad test run and failed to reach
+the ready camera state; the unit-only rerun passed. Optical focus acceptance
+remains open.
+
+### Controlled follow-up on iPhone 17 Pro / iOS 26.0.1
+
+The controlled trials selected the same physical 1× RAW sensor format
+(4224×2240 at 60 fps, format index 65), kept the application-triggered
+reacquire path off, and requested `continuousAutoFocus`. With native full-size
+Bayer output, a 87.5-second steady-state trace recorded 36 subject-area
+notifications, changing exposure and ISO, but no focus adjustment and a fixed
+`lensPosition` of 0.705882. With a single preview-sized 2112×1120 proxy output
+on the same sensor format, a 38.2-second trace recorded 57 notifications and
+again no lens movement. The user could not obtain reliable near focus without
+moving the phone. The selected 1× RAW format and an alternate 4224×2240/60 RAW
+format both failed the visual near/far check. Changing maximum exposure did not
+restore the expected refocus behavior. This separates the autofocus stall from
+frame delivery and automatic exposure, which both continued to operate.
+An Open Gate 4224×3024/60 continuous-only trace likewise held the lens at
+0.7451 for 34.9 seconds through ten subject-area notifications. The behavior
+is not confined to format index 65.
+In a same-trial RAW HQ comparison, the 4× camera showed 19 distinct lens
+positions over 21.5 seconds, whereas the following 1× segment stayed at
+0.705882 for 10.95 seconds despite 59 subject-area notifications and ISO
+changing from 87 to 412. This supports a main-camera RAW-specific failure
+mode; it does not establish the behavior of every iPhone model or iOS version.
+
+The 1× camera enumerated three RAW-capable formats: 4224×2240 up to 60 fps,
+4224×2240 up to 120 fps, and 4224×3024 up to 60 fps. All report
+`AVCaptureAutoFocusSystemContrastDetection` (value 1). A HEVC 3840×2160/60
+format reports phase detection (value 2). `autoFocusSystem` is a read-only
+format property; the application cannot directly select an AF algorithm.
+
+A single-shot `autoFocus` request on the original RAW format caused a real
+lens scan at configuration, so the lens can move in that format. That trace
+did not test whether a later near target would be acquired. The previous optically
+successful build also used application-triggered single-shot AF; it was not
+evidence that continuous AF alone worked. Subject-area notifications do not
+reliably coincide with the user's static near/far changes, so that fallback
+does not yet satisfy automatic near/far refocus. Do not describe the issue as
+resolved. Frequent subject-area notifications can also cause repeated
+single-shot scans; the visual check so far reported no visible pumping, but
+recording-time stability and power cost remain unmeasured. A narrower center
+focus rectangle was tried, but the focus-mode
+setter reset its API readback, so that trial does not conclusively evaluate
+hardware ROI behavior.
+
+An independent [iPhone 17 Pro ProRes RAW 60 fps report](https://www.youtube.com/watch?v=7jNgXcbJPDQ)
+published on 2025-09-22 describes difficult autofocus at 24 mm, matching
+the camera, codec and frame rate here. The video description is corroborating
+user evidence, not an Apple acknowledgment. Apple's published
+[iOS 26 update notes](https://support.apple.com/en-us/123075) do not identify
+this autofocus issue or a fix. The evidence points to the iOS 26 RAW
+continuous-AF path on this configuration, but does not isolate a specific
+internal defect or establish behavior on later iOS versions.
+
+A diagnostic second, preview-sized output was accepted concurrently with the
+full RAW output at 60 fps. Its recording reliability, energy cost and focus
+trigger quality were not validated; it is not a release-ready fallback.
+The diagnostic launch flags, extra output and writer-capability bypass were
+removed before restoring the app on the device.
+
+The cleaned build was installed on the iPhone 17 Pro as sequence 15836 and
+launched without diagnostic arguments. Its capability snapshot retained both
+RAW writer codecs, and its startup trace showed a single-shot scan followed
+by restoration of continuous AF. The signed device build and all 53 simulator
+unit tests passed. Static near/far optical acceptance and recording-time
+focus stability remain open.
