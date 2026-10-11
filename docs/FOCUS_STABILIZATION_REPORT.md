@@ -298,6 +298,16 @@ The 1× camera enumerated three RAW-capable formats: 4224×2240 up to 60 fps,
 format reports phase detection (value 2). `autoFocusSystem` is a read-only
 format property; the application cannot directly select an AF algorithm.
 
+The mode scanner de-duplicates formats by resolution and frame rate, keeping
+the first format. This hides format 66 behind format 65 at 4224×2240/60.
+The policy is a future-device selection risk, but does not explain this
+reproduction: both formats report contrast AF, and a forced format-66 preview
+still failed the user's static near/far check. Format 66 also offered only
+`aprn` as a MOV writer codec in this test, whereas format 65 offered both
+`aprn` and `aprh`. Any later format ranking must preserve codec eligibility
+before preferring an AF system. Simply exposing the duplicate would not
+change the current automatic selection.
+
 A single-shot `autoFocus` request on the original RAW format caused a real
 lens scan at configuration, so the lens can move in that format. That trace
 did not test whether a later near target would be acquired. The previous optically
@@ -311,6 +321,9 @@ recording-time stability and power cost remain unmeasured. A narrower center
 focus rectangle was tried, but the focus-mode
 setter reset its API readback, so that trial does not conclusively evaluate
 hardware ROI behavior.
+The available HEVC focus trace does not cover the same 1× lens, and the old
+face-driven comparison also changed the application's single-shot policy;
+neither supplies an isolated same-format A/B result.
 
 An independent [iPhone 17 Pro ProRes RAW 60 fps report](https://www.youtube.com/watch?v=7jNgXcbJPDQ)
 published on 2025-09-22 describes difficult autofocus at 24 mm, matching
