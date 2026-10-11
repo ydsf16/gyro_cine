@@ -122,3 +122,16 @@ formats/lighting or a separate RAW HQ run. Face-priority interaction is implicat
 by this controlled change; no claim is made about Apple's internal root cause.
 The latest 48 unit tests pass (artifacts/raw-scene-focus-tests.log).
 Rebuilt Release archive artifacts/GyroCine-Beta1.xcarchive for TestFlight upload.
+
+### TestFlight build 1 upload
+
+Added MARKETING_VERSION=1.0 and CURRENT_PROJECT_VERSION=1 to project build settings
+and project.yml; the generated Info.plist previously omitted them despite literal
+values in source Info.plist. Set the app target's device family to iPhone (1),
+matching the existing product scope; XcodeGen's target override had included iPad,
+which failed multitasking orientation validation. Retained test target families.
+Archive artifacts/GyroCine-Beta1-iPhone.xcarchive verifies version 1.0, build 1,
+UIDeviceFamily=[1]. Upload succeeded at 21:38:46, Apple processing pending.
+Evidence: artifacts/testflight-beta1-iphone-upload.log. Beta description and review
+notes saved; reviewer contact reused with user's explicit approval. No public
+App Store release was submitted.
