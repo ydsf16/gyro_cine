@@ -54,11 +54,12 @@ enum RecordingFinalizer {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
-    static func finalize(folder: URL, clock: ClockEvidence?, outputMode: RecordingOutputMode = .gcsv) throws {
+    static func finalize(folder: URL, clock: ClockEvidence?, outputMode: RecordingOutputMode = .gcsv,
+                         retainDebugFiles: Bool = false) throws {
         guard let clock, abs(clock.callbackMinusPTSSeconds) < 2.0 else {
             throw RecorderError.unavailable("Video PTS and host uptime could not be reconciled; raw files retained")
         }
-        let video = try inspectVideo(folder.appendingPathComponent("clip.mov"))
+        let video = try inspectVideo(folder.recordingFile("mov"))
         let events = try readMotion(folder.appendingPathComponent("imu_raw.jsonl"))
         guard events.contains(where: { $0.kind == .gyro }), events.contains(where: { $0.kind == .accel }) else {
             throw RecorderError.unavailable("Missing gyro or accelerometer samples")
@@ -66,6 +67,12 @@ enum RecordingFinalizer {
         let diagnosticsURL = folder.appendingPathComponent("diagnostics.json")
         var diagnostics = try JSONDecoder().decode(RecordingDiagnostics.self, from: Data(contentsOf: diagnosticsURL))
         diagnostics.outputMode = outputMode
+        if let expected = diagnostics.recordingRotationDegrees {
+            let track = AVURLAsset(url: folder.recordingFile("mov")).tracks(withMediaType: .video).first
+            guard let transform = track?.preferredTransform else { throw RecorderError.unavailable("Missing video orientation") }
+            let actual = (Int((atan2(transform.b, transform.a) * 180 / .pi).rounded()) + 360) % 360
+            guard actual == expected else { throw RecorderError.unavailable("MOV orientation \(actual) differs from captured \(expected)") }
+        }
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
         let requestedFPS = Double(diagnostics.requestedFrameRate ?? 30)
         let fps = video.frames.count > 1 ? Double(video.frames.count - 1) / (video.frames.last!.pts - video.frames.first!.pts) : 30
@@ -79,11 +86,13 @@ enum RecordingFinalizer {
                 "视频帧时间异常：目标%.0ffps，实际约%.1ffps，最大帧间隔%.1fms。视频和原始IMU已保留，Gyroflow导出暂停。",
                 requestedFPS, observedFPS, maximumGapMs))
         }
-        let expectedCodec: String = diagnostics.configuredCodec == "ProRes RAW HQ" ? "aprh" : diagnostics.configuredCodec == "ProRes RAW" ? "aprn" : "hvc1"
+        let expectedCodec: String = ["ProRes RAW HQ": "aprh", "ProRes RAW": "aprn",
+                                     "ProRes 422 HQ": "apch", "ProRes 422": "apcn",
+                                     "H.264": "avc1"].first(where: { $0.key == diagnostics.configuredCodec })?.value ?? "hvc1"
         guard video.codecFourCC == expectedCodec || (expectedCodec == "hvc1" && video.codecFourCC == "hev1") else {
             throw RecorderError.unavailable("Actual codec \(video.codecFourCC) differs from requested \(expectedCodec)")
         }
-        let hasAudio = !AVURLAsset(url: folder.appendingPathComponent("clip.mov")).tracks(withMediaType: .audio).isEmpty
+        let hasAudio = !AVURLAsset(url: folder.recordingFile("mov")).tracks(withMediaType: .audio).isEmpty
         guard !diagnostics.audioEnabled || hasAudio else {
             throw RecorderError.unavailable("Audio was enabled but final MOV has no audio track")
         }
@@ -138,7 +147,8 @@ enum RecordingFinalizer {
             if !isos.isEmpty { diagnostics.medianDeviceISOAtCallback = isos[isos.count / 2] }
         }
         diagnostics.gcsvAlignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
-                                         sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap)
+                                         sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap,
+                                         rotationDegrees: diagnostics.recordingRotationDegrees ?? 0)
         diagnostics.outputMode = outputMode
         if outputMode != .gcsv {
             try EmbeddedTelemetryExporter.write(mode: outputMode, folder: folder, video: video,
@@ -146,11 +156,17 @@ enum RecordingFinalizer {
                 sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps)
             diagnostics.embeddedTelemetryStatus = "embedded; optical sync and RAW color export unverified"
             // Remove legacy delivery sidecars only after a verified, atomic MOV replacement.
-            for filename in ["clip.gcsv", "clip.gyroflow", "lens_profile.json"] {
+            for filename in [folder.recordingFile("gcsv").lastPathComponent, folder.recordingFile("gyroflow").lastPathComponent, "lens_profile.json"] {
                 try FileManager.default.removeItem(at: folder.appendingPathComponent(filename))
             }
         }
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
+        if outputMode != .gcsv && !retainDebugFiles {
+            for name in ["imu_raw.jsonl", "video_samples.jsonl", "diagnostics.json", "events.log", "embedded_metadata.json"] {
+                let item = folder.appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: item.path) { try FileManager.default.removeItem(at: item) }
+            }
+        }
     }
 }

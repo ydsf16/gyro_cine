@@ -3,6 +3,16 @@ import Foundation
 /// Append a metadata track without remuxing or decoding existing media.
 /// Existing chunk offsets and sample descriptions remain byte-for-byte intact.
 enum MOVTelemetryMuxer {
+    static func checkCopyCapacity(ordinary: Int64?, important: Int64?, required: Int64) throws {
+        guard let available = [ordinary, important].compactMap({ $0 }).first(where: { $0 >= 0 }) else {
+            throw RecorderError.unavailable("无法读取录制位置的剩余空间。原片和原始 IMU 已保留，请重新连接存储后重试。")
+        }
+        guard available >= required else {
+            let need = ByteCountFormatter.string(fromByteCount: required, countStyle: .file)
+            let free = ByteCountFormatter.string(fromByteCount: available, countStyle: .file)
+            throw RecorderError.unavailable("内嵌元数据需在原视频所在磁盘临时复制视频：需要 \(need)，可用 \(free)。原片和原始 IMU 已保留。")
+        }
+    }
     struct Atom { let offset: Int; let size: Int; let header: Int; let type: String }
     static func atoms(_ data: Data) throws -> [Atom] {
         var result: [Atom] = [], offset = 0
@@ -98,10 +108,14 @@ enum MOVTelemetryMuxer {
         updated += box("udta", note) + track
         let temporary = url.deletingLastPathComponent().appendingPathComponent(".telemetry-\(UUID().uuidString).mov")
         defer { try? FileManager.default.removeItem(at: temporary) }
-        if let available = try url.deletingLastPathComponent().resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage,
-           available < Int64(length + payloadLength + 64_000_000) {
-            throw RecorderError.unavailable("内嵌元数据需要临时复制视频，手机空间不足。原片和原始 IMU 已保留。")
-        }
+        let volume = try url.deletingLastPathComponent().resourceValues(forKeys: [
+            .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey
+        ])
+        // Read the same volume where the sibling temporary file will be created.
+        // Important-usage capacity can be zero on external disks with ample free space.
+        try checkCopyCapacity(ordinary: volume.volumeAvailableCapacity.map(Int64.init),
+            important: volume.volumeAvailableCapacityForImportantUsage,
+            required: Int64(length + payloadLength + UInt64(updated.count) + 64_000_000))
         try FileManager.default.copyItem(at: url, to: temporary)
         let output = try FileHandle(forWritingTo: temporary)
         do {

@@ -14,12 +14,33 @@ final class MotionRecorder {
     private let manager = CMMotionManager()
     private let queue = OperationQueue()
     private let lock = NSLock()
-    private var handle: FileHandle?
+    private var handle: StagedRecordingLog?
     private var eventCount = 0
     private var firstGyroTimestamp: TimeInterval?
     private var latestGyroTimestamp: TimeInterval?
     private var writeFailure: String?
     private let encoder = JSONEncoder()
+    private var gravityOrientation: RecordingOrientation?
+    private var gravityTimestamp: TimeInterval = 0
+
+    func startOrientationMonitoring() {
+        guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
+        manager.deviceMotionUpdateInterval = 0.1
+        manager.startDeviceMotionUpdates(to: .main) { [weak self] sample, _ in
+            guard let self, let sample else { return }
+            self.lock.lock(); defer { self.lock.unlock() }
+            self.gravityTimestamp = sample.timestamp
+            if let orientation = RecordingOrientation.fromGravity(x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z) {
+                self.gravityOrientation = orientation
+            }
+        }
+    }
+
+    var recordingDirection: RecordingOrientation? {
+        lock.lock(); defer { lock.unlock() }
+        guard ProcessInfo.processInfo.systemUptime - gravityTimestamp < 1 else { return nil }
+        return gravityOrientation
+    }
 
     var isAvailable: Bool { manager.isGyroAvailable && manager.isAccelerometerAvailable }
     var count: Int { lock.lock(); defer { lock.unlock() }; return eventCount }
@@ -38,10 +59,7 @@ final class MotionRecorder {
         latestGyroTimestamp = nil
         writeFailure = nil
         lock.unlock()
-        guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
-            throw RecorderError.unavailable("Cannot create raw IMU file")
-        }
-        handle = try FileHandle(forWritingTo: url)
+        handle = try StagedRecordingLog(destination: url)
         queue.maxConcurrentOperationCount = 1
         manager.gyroUpdateInterval = 1.0 / 100.0
         manager.accelerometerUpdateInterval = 1.0 / 100.0
@@ -81,8 +99,8 @@ final class MotionRecorder {
         manager.stopAccelerometerUpdates()
         queue.waitUntilAllOperationsAreFinished()
         lock.lock(); defer { lock.unlock() }
-        try? handle?.synchronize()
-        try? handle?.close()
+        do { try handle?.publish() }
+        catch { writeFailure = error.localizedDescription }
         handle = nil
     }
 }

@@ -1,13 +1,16 @@
 import XCTest
 import AVFoundation
 import simd
-@testable import RawMotionRecorder
+@testable import GyroCine
 
 final class RecorderTests: XCTestCase {
-    func testModeSelectionUsesAvailableFormatAndDefaultsTo1080p30() {
+    func testModeSelectionPrefersAvailable4K60AndPreservesUserChoice() {
         let hd = CameraMode(width: 1920, height: 1080, fps: 30, formatIndex: 3)
+        let uhd60 = CameraMode(width: 3840, height: 2160, fps: 60, formatIndex: 8)
         let raw24 = CameraMode(width: 4224, height: 2240, fps: 24, formatIndex: 9)
         let raw30 = CameraMode(width: 4224, height: 2240, fps: 30, formatIndex: 9)
+        XCTAssertEqual(CameraMode.preferred(in: [hd, uhd60], previous: nil), uhd60)
+        XCTAssertEqual(CameraMode.preferred(in: [hd, uhd60], previous: hd), hd)
         XCTAssertEqual(CameraMode.preferred(in: [raw24, hd], previous: nil), hd)
         XCTAssertEqual(CameraMode.preferred(in: [raw24, raw30], previous: hd), raw30)
         let old = CameraMode(width: 4224, height: 2240, fps: 24, formatIndex: 1)

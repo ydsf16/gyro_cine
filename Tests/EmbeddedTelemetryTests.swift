@@ -1,8 +1,16 @@
 import XCTest
 import AVFoundation
-@testable import RawMotionRecorder
+@testable import GyroCine
 
 final class EmbeddedTelemetryTests: XCTestCase {
+    func testCopyCapacityUsesDestinationFreeBytesWhenImportantUsageIsZero() throws {
+        XCTAssertNoThrow(try MOVTelemetryMuxer.checkCopyCapacity(ordinary: 813_038_567_424,
+            important: 0, required: 700_000_000))
+        XCTAssertThrowsError(try MOVTelemetryMuxer.checkCopyCapacity(ordinary: 100,
+            important: 813_038_567_424, required: 700_000_000))
+        XCTAssertThrowsError(try MOVTelemetryMuxer.checkCopyCapacity(ordinary: nil,
+            important: nil, required: 700_000_000))
+    }
     func testMetadataAppendPreservesEncodedMediaAndVideoTimeline() throws {
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -81,7 +89,48 @@ final class EmbeddedTelemetryTests: XCTestCase {
         let packet = try EmbeddedTelemetryExporter.sonyPacket(good, matrix: matrix, width: 1920, height: 1080)
         XCTAssertEqual(Array(packet.prefix(2)), [0, 28])
         XCTAssertTrue(packet.range(of: Data([0xe4, 0x3b, 0, 14])) != nil)
-        let bad = EmbeddedTelemetryExporter.Sample(time: 0, gyro: [1000, 0, 0], accel: good.accel)
+        let bad = EmbeddedTelemetryExporter.Sample(time: 0, gyro: [.nan, 0, 0], accel: good.accel)
         XCTAssertThrowsError(try EmbeddedTelemetryExporter.sonyPacket(bad, matrix: matrix, width: 1920, height: 1080))
+    }
+
+    func testSonyScalePreservesFastMotionWithoutClipping() throws {
+        for speed in [1.0, 327.67, 328, 720, 2000, 10000] {
+            let sample = EmbeddedTelemetryExporter.Sample(time: 0,
+                gyro: [speed, -speed, speed / 3].map { $0 * .pi / 180 }, accel: [400, -400, 0])
+            let packet = try EmbeddedTelemetryExporter.sonyPacket(sample,
+                matrix: [100, 0, 50, 0, 100, 50, 0, 0, 1], width: 1920, height: 1080)
+            for (scaleTag, vectorTag, expected) in [
+                (Data([0xe4, 0x39, 0, 4]), Data([0xe4, 0x3b, 0, 14]), [speed, -speed, speed / 3]),
+                (Data([0xe4, 0x49, 0, 4]), Data([0xe4, 0x4b, 0, 14]), [-400 / 9.80665, 400 / 9.80665, 0])
+            ] {
+                let scaleStart = try XCTUnwrap(packet.range(of: scaleTag)).upperBound
+                let scale = Double(Float(bitPattern: UInt32(packet.uint(scaleStart, 4))))
+                let start = try XCTUnwrap(packet.range(of: vectorTag)).upperBound + 8
+                for axis in 0..<3 {
+                    let raw = Int16(bitPattern: UInt16(packet.uint(start + axis * 2, 2)))
+                    XCTAssertEqual(Double(raw) / scale, expected[axis], accuracy: 0.5001 / scale)
+                }
+            }
+        }
+    }
+
+    func testPortraitTelemetryKeepsSensorAxesAndDeclaresDisplayRotation() throws {
+        let video = ActualVideoInfo(frames: [ActualVideoFrame(pts: 0)], width: 1920, height: 1080,
+                                    duration: 1, codecFourCC: "hvc1")
+        let header = EmbeddedTelemetryExporter.protobufHeader(video: video, fps: 30,
+            camera: "iPhone", lens: "Wide", profile: Data(), note: Data(), rotationDegrees: 90)
+        XCTAssertNotNil(header.range(of: ProtoWire.string(13, "XYZ")))
+        XCTAssertNotNil(header.range(of: ProtoWire.integer(7, 90)))
+        let sample = EmbeddedTelemetryExporter.Sample(time: 0, gyro: [.pi / 180, 0, 0],
+            accel: [0.980665, 1.96133, 2.941995])
+        let matrix: [Double] = [100, 0, 50, 0, 100, 50, 0, 0, 1]
+        let packet = try EmbeddedTelemetryExporter.sonyPacket(sample, matrix: matrix,
+            width: 1920, height: 1080, orientation: .portrait)
+        let gyroTag = try XCTUnwrap(packet.range(of: Data([0xe4, 0x3b, 0, 14])))
+        let g = (0..<3).map { Int16(bitPattern: UInt16(packet.uint(gyroTag.upperBound + 8 + $0 * 2, 2))) }
+        XCTAssertEqual(g, [100, 0, 0])
+        let accelTag = try XCTUnwrap(packet.range(of: Data([0xe4, 0x4b, 0, 14])))
+        let a = (0..<3).map { Int16(bitPattern: UInt16(packet.uint(accelTag.upperBound + 8 + $0 * 2, 2))) }
+        XCTAssertEqual(a, [-100, -200, -300])
     }
 }

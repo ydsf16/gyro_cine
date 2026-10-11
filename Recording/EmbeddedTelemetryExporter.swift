@@ -46,6 +46,9 @@ enum EmbeddedTelemetryExporter {
             "acceleration_export_convention": "negative CoreMotion XYZ; raw log unchanged",
             "timing": "Empirical positive mean half exposure; PTS-based estimate; optical sync unverified",
             "raw_color_export": "Gyroflow RAW export color conversion unverified"]
+        let orientation = RecordingOrientation(rawValue: diagnostics.recordingRotationDegrees ?? 0) ?? .landscapeRight
+        noteObject["recording_rotation_degrees"] = orientation.degrees
+        noteObject["imu_orientation"] = orientation.imuOrientation
         if mode == .sonyMOV {
             noteObject["virtual_sensor_geometry"] = true
             noteObject["principal_point_approximation"] = "image center"
@@ -58,7 +61,7 @@ enum EmbeddedTelemetryExporter {
             for index in 0..<count {
                 let time = Double(index) * duration / Double(count)
                 let sample = Sample(time: time, gyro: try interpolate(gyro, at: time), accel: try interpolate(accel, at: time))
-                packets.append(try sonyPacket(sample, matrix: matrix, width: video.width, height: video.height))
+                packets.append(try sonyPacket(sample, matrix: matrix, width: video.width, height: video.height, orientation: orientation))
                 let ticks = Int64((Double(index + 1) * duration / Double(count) * 1e6).rounded())
                     - Int64((time * 1e6).rounded())
                 guard ticks > 0, ticks <= UInt32.max else { throw MOVTelemetryMuxer.invalid() }
@@ -81,7 +84,8 @@ enum EmbeddedTelemetryExporter {
                 }
                 packets.append(try protobufPacket(index: index, pts: start, evidence: evidence[index], samples: imu,
                     header: index == 0 ? protobufHeader(video: video, fps: fps, camera: diagnostics.deviceModel,
-                        lens: diagnostics.selectedLens?.name ?? "Fixed physical lens", profile: profile, note: note) : nil))
+                        lens: diagnostics.selectedLens?.name ?? "Fixed physical lens", profile: profile, note: note,
+                        rotationDegrees: diagnostics.recordingRotationDegrees ?? 0) : nil))
                 let ticks = Int64((end * 1e6).rounded()) - Int64((start * 1e6).rounded())
                 guard ticks > 0, ticks <= UInt32.max else { throw MOVTelemetryMuxer.invalid() }
                 durations.append(UInt32(ticks))
@@ -89,15 +93,16 @@ enum EmbeddedTelemetryExporter {
         }
         var atoms = MOVTelemetryMuxer.box("rmin", note)
         if mode == .sonyMOV {
-            let xml = "<Compatibility manufacturer=\"Sony\" modelName=\"RawMotion \(diagnostics.deviceModel) compatibility\"><Lens modelName=\"Apple API K approximation\"/></Compatibility>"
+            let xml = "<Compatibility manufacturer=\"Sony\" modelName=\"GyroCine \(diagnostics.deviceModel) compatibility\"><Lens modelName=\"Apple API K approximation\"/></Compatibility>"
             atoms += MOVTelemetryMuxer.box("xml ", Data(xml.utf8))
         }
-        try MOVTelemetryMuxer.append(to: folder.appendingPathComponent("clip.mov"), kind: mode == .sonyMOV ? "rtmd" : "gyrf",
+        try MOVTelemetryMuxer.append(to: folder.recordingFile("mov"), kind: mode == .sonyMOV ? "rtmd" : "gyrf",
                                      packets: packets, durations: durations, note: atoms)
         try note.write(to: folder.appendingPathComponent("embedded_metadata.json"), options: .atomic)
     }
 
-    static func sonyPacket(_ sample: Sample, matrix: [Double], width: Int, height: Int) throws -> Data {
+    static func sonyPacket(_ sample: Sample, matrix: [Double], width: Int, height: Int,
+                           orientation: RecordingOrientation = .landscapeRight) throws -> Data {
         guard matrix.count == 9, width > 0, height > 0, width * 10 <= UInt16.max, height * 10 <= UInt16.max else { throw MOVTelemetryMuxer.invalid() }
         func tag(_ id: UInt64, _ data: Data) -> Data { Data.be(id, 2) + Data.be(UInt64(data.count), 2) + data }
         // Virtual unit conversion for Sony's lens fallback. Never claim this is measured sensor geometry.
@@ -109,8 +114,21 @@ enum EmbeddedTelemetryExporter {
         guard focal.isFinite, focal > 0, focal <= Double(UInt32.max) else { throw MOVTelemetryMuxer.invalid() }
         p += tag(0xe421, Data.be(UInt64(focal.rounded()), 4) + Data.be(0, 4) + Data([0]) + Data.be(UInt64(Float(1).bitPattern), 4) + Data.be(0, 4) + Data.be(2, 4))
         p += tag(0xe420, Data([0]))
-        for (start, values, scale) in [(UInt64(0xe435), sample.gyro.map { $0 * 180 / .pi }, Float(100)),
-                                        (UInt64(0xe445), sample.accel.map { ClockAligner.exportedAcceleration($0) / 9.80665 }, Float(1000))] {
+        for (start, values, preferredScale) in [(UInt64(0xe435), orientation.remap(sample.gyro).map { $0 * 180 / .pi }, Float(100)),
+                                        (UInt64(0xe445), orientation.remap(sample.accel).map { ClockAligner.exportedAcceleration($0) / 9.80665 }, Float(1000))] {
+            guard values.count == 3, values.allSatisfy(\.isFinite) else {
+                throw RecorderError.unavailable("Sony 元数据包含无效 IMU 数值；原始记录已保留")
+            }
+            // RTMD carries a float scale per sample/group. Reduce precision only as
+            // needed to preserve peaks instead of clipping valid fast motion.
+            let peak = values.map { abs($0) }.max() ?? 0
+            var scale = preferredScale
+            while peak * Double(scale) > Double(Int16.max) {
+                scale /= 2
+                guard scale.isFinite, scale > 0 else {
+                    throw RecorderError.unavailable("Sony IMU 数值超出可编码范围；原始记录已保留")
+                }
+            }
             var vector = Data()
             for value in values {
                 let integer = (value * Double(scale)).rounded()
@@ -125,13 +143,15 @@ enum EmbeddedTelemetryExporter {
         return Data([0, 0x1c]) + Data(repeating: 0, count: 26) + p
     }
 
-    static func protobufHeader(video: ActualVideoInfo, fps: Double, camera: String, lens: String, profile: Data, note: Data) -> Data {
+    static func protobufHeader(video: ActualVideoInfo, fps: Double, camera: String, lens: String, profile: Data, note: Data, rotationDegrees: Int = 0) -> Data {
         var c = ProtoWire.string(1, "Apple") + ProtoWire.string(2, camera) + ProtoWire.string(5, "Apple")
-        c += ProtoWire.string(6, lens) + ProtoWire.bytes(12, profile) + ProtoWire.string(13, "XYZ") + ProtoWire.bytes(16, note)
+        let orientation = RecordingOrientation(rawValue: rotationDegrees) ?? .landscapeRight
+        c += ProtoWire.string(6, lens) + ProtoWire.bytes(12, profile) + ProtoWire.string(13, orientation.imuOrientation) + ProtoWire.bytes(16, note)
         // Unknown sensor size/pixel pitch/readout fields are omitted, never fabricated.
         var clip = ProtoWire.integer(1, UInt64(video.width)) + ProtoWire.integer(2, UInt64(video.height))
         clip += ProtoWire.double(3, video.duration * 1e6) + ProtoWire.float(4, Float(fps))
             + ProtoWire.float(5, Float(fps)) + ProtoWire.float(6, Float(fps))
+            + ProtoWire.integer(7, UInt64(rotationDegrees))
             + ProtoWire.integer(8, 100) + ProtoWire.float(10, 1)
         return ProtoWire.bytes(1, c) + ProtoWire.bytes(2, clip)
     }

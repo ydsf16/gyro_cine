@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct RawMotionRecorderApp: App {
+struct GyroCineApp: App {
     @StateObject private var model = RecorderViewModel()
 
     var body: some Scene {
