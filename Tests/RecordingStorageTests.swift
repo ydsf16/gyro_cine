@@ -1,7 +1,32 @@
 import XCTest
+import AVFoundation
 @testable import GyroCine
 
 final class RecordingStorageTests: XCTestCase {
+    func testRAWSettingsExceptionBecomesSwiftError() throws {
+        let output = AVCaptureVideoDataOutput()
+        let invalidCodec = AVVideoCodecType(rawValue: "invalid-test-codec")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("probe.mov")
+        XCTAssertThrowsError(try RAWSettingsProbe.settings(output: output, codec: invalidCodec, url: url)) { error in
+            XCTAssertEqual((error as NSError).domain, "GyroCine.RAWSettingsProbe")
+        }
+        if #available(iOS 26.0, *) {
+            XCTAssertThrowsError(try RAWSettingsProbe.metadata(output: output, codec: invalidCodec)) { error in
+                XCTAssertEqual((error as NSError).domain, "GyroCine.RAWSettingsProbe")
+            }
+        }
+    }
+
+    func testInternalRawProbeWithoutNewSystemSelectorIsSafe() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        if !writer.responds(to: NSSelectorFromString("isProVideoStorageSupported")) &&
+           !writer.responds(to: NSSelectorFromString("proVideoStorageSupported")) {
+            XCTAssertFalse(RAWInternalStorage.enableProStorageIfSupported(on: writer))
+        }
+        XCTAssertEqual(writer.status, .unknown)
+    }
+
     func testRecordingNamesAndLegacyCompatibility() {
         let new = URL(fileURLWithPath: "/tmp/GyroCine_20261011_130000", isDirectory: true)
         for ext in ["mov", "gcsv", "gyroflow"] {

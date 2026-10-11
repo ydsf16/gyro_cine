@@ -46,6 +46,15 @@ enum EmbeddedTelemetryExporter {
             "acceleration_export_convention": "negative CoreMotion XYZ; raw log unchanged",
             "timing": "Empirical positive mean half exposure; PTS-based estimate; optical sync unverified",
             "raw_color_export": "Gyroflow RAW export color conversion unverified"]
+        let focusPositions = evidence.compactMap(\.deviceLensPositionAtCallback)
+        noteObject["focus_observation"] = [
+            "observed_frames": evidence.compactMap(\.deviceFocusModeAtCallback).count,
+            "modes": Array(Set(evidence.compactMap(\.deviceFocusModeAtCallback))).sorted(),
+            "adjusting_frames": evidence.filter { $0.deviceIsAdjustingFocusAtCallback == true }.count,
+            "lens_position_min": focusPositions.min().map { Double($0) } as Any? ?? NSNull(),
+            "lens_position_max": focusPositions.max().map { Double($0) } as Any? ?? NSNull(),
+            "meaning": "callback device state; does not certify image sharpness"
+        ] as [String: Any]
         let orientation = RecordingOrientation(rawValue: diagnostics.recordingRotationDegrees ?? 0) ?? .landscapeRight
         noteObject["recording_rotation_degrees"] = orientation.degrees
         noteObject["imu_orientation"] = orientation.imuOrientation

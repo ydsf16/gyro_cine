@@ -1,6 +1,43 @@
 import XCTest
 
 final class DeviceRecordingTests: XCTestCase {
+    func testRepeatedPhysicalLensSwitch() {
+        let app = XCUIApplication()
+        app.launch()
+        let wide = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "主摄 ")).firstMatch
+        let ultra = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "超广角 ")).firstMatch
+        XCTAssertTrue(wide.waitForExistence(timeout: 15))
+        XCTAssertTrue(ultra.exists)
+        for _ in 0..<6 {
+            for button in [ultra, wide] {
+                let ready = NSPredicate { _, _ in button.exists && button.isEnabled && button.isHittable }
+                XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: nil)], timeout: 15), .completed)
+                button.tap()
+                let configured = NSPredicate { _, _ in app.buttons["recordToggle"].value as? String == "ready" }
+                XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: configured, object: nil)], timeout: 15), .completed, app.debugDescription)
+            }
+        }
+    }
+
+    func testRAWSelectionWithoutSSDDoesNotCrash() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 15))
+        app.buttons["settingsButton"].tap()
+        for label in ["ProRes RAW", "ProRes RAW HQ", "H.265 / HEVC"] {
+            let picker = app.buttons["codecPicker"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 10))
+            let enabled = NSPredicate { _, _ in picker.isEnabled }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: enabled, object: nil)], timeout: 15), .completed)
+            picker.tap()
+            let choice = app.buttons[label].firstMatch
+            XCTAssertTrue(choice.waitForExistence(timeout: 5), app.debugDescription)
+            choice.tap()
+            let ready = NSPredicate { _, _ in app.state == .runningForeground && picker.isEnabled }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: nil)], timeout: 20), .completed, app.debugDescription)
+        }
+    }
+
     func testSSDWarningAppearsWithoutLeavingSettings() {
         let app = XCUIApplication()
         app.launch()

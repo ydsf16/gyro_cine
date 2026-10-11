@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 enum RecordingStorage: String, CaseIterable, Identifiable {
     case files
@@ -71,4 +72,19 @@ final class StagedRecordingLog {
 extension URL {
     var recordingBaseName: String { (lastPathComponent.hasPrefix("GyroCine_") || lastPathComponent.hasPrefix("SteadyCine_")) ? lastPathComponent : "clip" }
     func recordingFile(_ suffix: String) -> URL { appendingPathComponent(recordingBaseName + "." + suffix) }
+}
+
+/// Public iOS 27 selectors, runtime-gated while building with the iOS 26 SDK.
+/// Never infer support from a model name or OS version alone.
+enum RAWInternalStorage {
+    static func enableProStorageIfSupported(on writer: AVAssetWriter) -> Bool {
+        let supported = NSSelectorFromString("isProVideoStorageSupported")
+        let alternate = NSSelectorFromString("proVideoStorageSupported")
+        let setter = NSSelectorFromString("setUsesProVideoStorage:")
+        guard writer.responds(to: supported) || writer.responds(to: alternate),
+              writer.responds(to: setter),
+              (writer.value(forKey: "proVideoStorageSupported") as? NSNumber)?.boolValue == true else { return false }
+        writer.setValue(true, forKey: "usesProVideoStorage")
+        return (writer.value(forKey: "usesProVideoStorage") as? NSNumber)?.boolValue == true
+    }
 }

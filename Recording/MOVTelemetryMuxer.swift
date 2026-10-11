@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Append a metadata track without remuxing or decoding existing media.
 /// Existing chunk offsets and sample descriptions remain byte-for-byte intact.
@@ -10,8 +11,60 @@ enum MOVTelemetryMuxer {
         guard available >= required else {
             let need = ByteCountFormatter.string(fromByteCount: required, countStyle: .file)
             let free = ByteCountFormatter.string(fromByteCount: available, countStyle: .file)
-            throw RecorderError.unavailable("内嵌元数据需在原视频所在磁盘临时复制视频：需要 \(need)，可用 \(free)。原片和原始 IMU 已保留。")
+            throw RecorderError.unavailable("内嵌元数据需在原视频所在磁盘追加运动元数据：需要 \(need)，可用 \(free)。原片和原始 IMU 已保留。")
         }
+    }
+    /// Foundation may reject its synchronization operation on an external filesystem.
+    /// Fall back only for an unsupported operation; POSIX fsync must still succeed.
+    static func synchronize(_ file: FileHandle) throws {
+        try synchronize(primary: { try file.synchronize() }, fallback: {
+            if Darwin.fsync(file.fileDescriptor) == 0 { return 0 }
+            return errno
+        })
+    }
+
+    static func synchronize(primary: () throws -> Void, fallback: () -> Int32) throws {
+        do { try primary(); return }
+        catch {
+            let original = error
+            var current: NSError? = error as NSError
+            var unsupported = false
+            for _ in 0..<8 {
+                guard let value = current else { break }
+                if value.domain == NSPOSIXErrorDomain,
+                   [Int(EINVAL), Int(ENOTSUP), Int(ENOSYS)].contains(value.code) {
+                    unsupported = true
+                }
+                current = value.userInfo[NSUnderlyingErrorKey] as? NSError
+            }
+            guard unsupported else { throw original }
+            var result: Int32
+            repeat { result = fallback() } while result == EINTR
+            guard result == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(result), userInfo: [
+                    NSLocalizedDescriptionKey: "POSIX fsync failed: \(String(cString: strerror(result)))",
+                    NSUnderlyingErrorKey: original
+                ])
+            }
+            NSLog("GyroCine MOV sync: Foundation unsupported; POSIX fsync succeeded")
+        }
+    }
+    struct Recovery: Codable { let originalLength: UInt64; let moovOffset: UInt64 }
+    static func recoveryURL(_ url: URL) -> URL { url.appendingPathExtension("metadata-recovery.json") }
+    static func recoverIfNeeded(_ url: URL) throws {
+        let journal = recoveryURL(url)
+        guard FileManager.default.fileExists(atPath: journal.path) else { return }
+        let state = try JSONDecoder().decode(Recovery.self, from: Data(contentsOf: journal))
+        let file = try FileHandle(forUpdating: url)
+        defer { try? file.close() }
+        guard state.moovOffset + 8 <= state.originalLength,
+              try file.seekToEnd() >= state.originalLength else { throw invalid() }
+        // Even a torn four-byte commit is repaired from the durable journal.
+        try file.seek(toOffset: state.moovOffset + 4)
+        try file.write(contentsOf: Data("moov".utf8))
+        try file.truncate(atOffset: state.originalLength)
+        try synchronize(file)
+        try FileManager.default.removeItem(at: journal)
     }
     struct Atom { let offset: Int; let size: Int; let header: Int; let type: String }
     static func atoms(_ data: Data) throws -> [Atom] {
@@ -41,8 +94,29 @@ enum MOVTelemetryMuxer {
     static func words(_ values: UInt64...) -> Data { values.reduce(into: Data()) { $0 += Data.be($1, 4) } }
 
     static func append(to url: URL, kind: String, packets: [Data], durations: [UInt32], note: Data) throws {
+        var stage = "检查 MOV"
+        do {
+            try appendChecked(to: url, kind: kind, packets: packets, durations: durations, note: note, stage: &stage)
+        } catch {
+            throw RecorderError.unavailable("MOV 元数据写入失败（\(stage)）：\(errorChain(error))")
+        }
+    }
+
+    static func errorChain(_ error: Error) -> String {
+        var current: NSError? = error as NSError
+        var parts: [String] = []
+        for _ in 0..<8 {
+            guard let value = current else { break }
+            parts.append("\(value.domain):\(value.code) \(value.localizedDescription)")
+            current = value.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        return parts.joined(separator: " → ")
+    }
+
+    private static func appendChecked(to url: URL, kind: String, packets: [Data], durations: [UInt32], note: Data, stage: inout String) throws {
         guard !packets.isEmpty, packets.count == durations.count, durations.allSatisfy({ $0 > 0 }),
               ["rtmd", "gyrf"].contains(kind), packets.allSatisfy({ $0.count <= Int(UInt32.max) }) else { throw invalid() }
+        try recoverIfNeeded(url)
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         let length = try input.seekToEnd()
@@ -106,32 +180,55 @@ enum MOVTelemetryMuxer {
             updated += child.type == "mvhd" ? mv : Data(moov[child.offset..<(child.offset + child.size)])
         }
         updated += box("udta", note) + track
-        let temporary = url.deletingLastPathComponent().appendingPathComponent(".telemetry-\(UUID().uuidString).mov")
-        defer { try? FileManager.default.removeItem(at: temporary) }
+        stage = "读取磁盘容量"
         let volume = try url.deletingLastPathComponent().resourceValues(forKeys: [
-            .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey
+            .volumeAvailableCapacityKey
         ])
-        // Read the same volume where the sibling temporary file will be created.
-        // Important-usage capacity can be zero on external disks with ample free space.
         try checkCopyCapacity(ordinary: volume.volumeAvailableCapacity.map(Int64.init),
-            important: volume.volumeAvailableCapacityForImportantUsage,
-            required: Int64(length + payloadLength + UInt64(updated.count) + 64_000_000))
-        try FileManager.default.copyItem(at: url, to: temporary)
-        let output = try FileHandle(forWritingTo: temporary)
+            important: nil,
+            required: Int64(payloadLength + UInt64(updated.count) + 64_000_000))
+        let recovery = Recovery(originalLength: length, moovOffset: moovOffset)
+        let journal = recoveryURL(url)
+        stage = "创建恢复日志"
+        try JSONEncoder().encode(recovery).write(to: journal, options: .atomic)
+        let journalHandle = try FileHandle(forWritingTo: journal)
+        stage = "同步恢复日志到磁盘"
+        defer { try? journalHandle.close() }
+        try synchronize(journalHandle); try journalHandle.close()
+        stage = "以读写方式打开 MOV"
+        let output = try FileHandle(forUpdating: url)
         do {
-            try output.seek(toOffset: moovOffset + 4); try output.write(contentsOf: Data("free".utf8))
-            try output.seekToEnd()
+            // Original moov stays valid until all added data is durable and verified.
+            stage = "追加元数据"
+            try output.seek(toOffset: length)
             try output.write(contentsOf: words(1) + Data("mdat".utf8) + Data.be(payloadLength + 16, 8))
             for packet in packets { try output.write(contentsOf: packet) }
-            try output.write(contentsOf: box("moov", updated))
-            try output.synchronize(); try output.close()
-        } catch { try? output.close(); throw error }
-        // Verify before replacing the source. No video re-encoding occurs here.
-        let original = try RecordingFinalizer.inspectVideo(url)
-        let embedded = try RecordingFinalizer.inspectVideo(temporary)
-        guard original.codecFourCC == embedded.codecFourCC, original.width == embedded.width,
-              original.height == embedded.height, original.frames.map(\.pts) == embedded.frames.map(\.pts) else { throw invalid() }
-        _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+            let newMoov = box("moov", updated)
+            try output.write(contentsOf: newMoov)
+            stage = "同步追加内容到磁盘"
+            try synchronize(output)
+            stage = "读回验证追加内容"
+            guard try output.seekToEnd() == length + 16 + payloadLength + UInt64(newMoov.count) else { throw invalid() }
+            try output.seek(toOffset: length + 16 + payloadLength)
+            guard try output.read(upToCount: newMoov.count) == newMoov else { throw invalid() }
+            // Commit only the old atom's four-byte type; encoded video/audio are untouched.
+            stage = "提交 MOV 索引"
+            try output.seek(toOffset: moovOffset + 4)
+            try output.write(contentsOf: Data("free".utf8))
+            stage = "同步 MOV 索引到磁盘"
+            try synchronize(output); try output.close()
+            stage = "移除恢复日志"
+            try FileManager.default.removeItem(at: journal)
+        } catch {
+            try? output.close()
+            let original = error
+            do { try recoverIfNeeded(url) }
+            catch {
+                throw RecorderError.unavailable("原错误：\(errorChain(original))；恢复未完成：\(errorChain(error))。请保留 MOV 和恢复日志。")
+            }
+            throw original
+        }
+
     }
 }
 

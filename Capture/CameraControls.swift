@@ -10,6 +10,11 @@ struct CameraControls: Equatable {
     static func clamped(_ value: Float, minimum: Float, maximum: Float) -> Float {
         min(maximum, max(minimum, value.isFinite ? value : minimum))
     }
+    static func validWhiteBalanceGains(_ gains: AVCaptureDevice.WhiteBalanceGains, maximum: Float) -> AVCaptureDevice.WhiteBalanceGains {
+        .init(redGain: clamped(gains.redGain, minimum: 1, maximum: maximum),
+              greenGain: clamped(gains.greenGain, minimum: 1, maximum: maximum),
+              blueGain: clamped(gains.blueGain, minimum: 1, maximum: maximum))
+    }
     func apply(to device: AVCaptureDevice, fps: Int, shutter: ShutterSetting, raw: Bool) throws {
         if manualExposure {
             guard device.isExposureModeSupported(.custom) else { throw RecorderError.unavailable("此镜头不支持手动曝光") }
@@ -18,6 +23,9 @@ struct CameraControls: Equatable {
             device.setExposureModeCustom(duration: CMTime(seconds: duration, preferredTimescale: 1_000_000),
                 iso: Self.clamped(iso, minimum: device.activeFormat.minISO, maximum: device.activeFormat.maxISO), completionHandler: nil)
         } else {
+            guard device.isExposureModeSupported(.continuousAutoExposure) else {
+                throw RecorderError.unavailable("此镜头当前模式不支持自动曝光")
+            }
             device.exposureMode = .continuousAutoExposure
             device.activeMaxExposureDuration = shutter.durationSeconds.map { CMTime(seconds: $0, preferredTimescale: 1_000_000) } ?? .invalid
         }
@@ -25,11 +33,8 @@ struct CameraControls: Equatable {
             device.whiteBalanceMode = .continuousAutoWhiteBalance
         } else {
             guard device.isWhiteBalanceModeSupported(.locked) else { throw RecorderError.unavailable("此镜头不支持锁定白平衡") }
-            var gains = automaticWhiteBalance ? device.deviceWhiteBalanceGains : device.deviceWhiteBalanceGains(for: .init(temperature: temperature, tint: tint))
-            gains.redGain = Self.clamped(gains.redGain, minimum: 1, maximum: device.maxWhiteBalanceGain)
-            gains.greenGain = Self.clamped(gains.greenGain, minimum: 1, maximum: device.maxWhiteBalanceGain)
-            gains.blueGain = Self.clamped(gains.blueGain, minimum: 1, maximum: device.maxWhiteBalanceGain)
-            device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+            let gains = automaticWhiteBalance ? device.deviceWhiteBalanceGains : device.deviceWhiteBalanceGains(for: .init(temperature: temperature, tint: tint))
+            device.setWhiteBalanceModeLocked(with: Self.validWhiteBalanceGains(gains, maximum: device.maxWhiteBalanceGain), completionHandler: nil)
         }
     }
 }

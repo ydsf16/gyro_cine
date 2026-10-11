@@ -15,6 +15,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var frameCount = 0
     private var recordingActive = false
     private var appendError: String?
+    private var focusObserver: NSObjectProtocol?
     private var device: AVCaptureDevice?
     private var mode: CameraMode?
     private var codec: RecordingCodec = .hevc
@@ -27,6 +28,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var externalDestination = false
     private var frameEvidenceHandle: StagedRecordingLog?
     private let evidenceEncoder = JSONEncoder()
+    private var frameCopier = CaptureFrameCopier()
+    private struct PendingFrame {
+        let sample: CMSampleBuffer
+        let pts: CMTime
+        let evidence: CaptureFrameEvidence
+    }
+    private var pendingVideo = PendingVideoQueue<PendingFrame>(capacity: 48)
+    private var peakPendingVideo = 0
     private var previewFrameCount = 0
     private var droppedFrameCount = 0
     private var firstDroppedFrameReason: String?
@@ -36,10 +45,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     var onCaptureFinished: (() -> Void)?
     var onWhiteBalanceReading: ((Float, Float) -> Void)?
     var onExposureReading: ((Double, Float) -> Void)?
+    var onInternalRAWSupport: ((Bool?, String) -> Void)?
     var onAvailableWriterCodecs: (([AVVideoCodecType]) -> Void)?
+
+    deinit { if let observer = focusObserver { NotificationCenter.default.removeObserver(observer) } }
 
     func configure(audio: Bool, cameraID: String? = nil, shutter: ShutterSetting = .auto, codec: RecordingCodec = .hevc, requestedMode: CameraMode? = nil, controls: CameraControls = CameraControls(), color: RecordingColorSpace = .rec709) {
         sessionQueue.async {
+            self.onInternalRAWSupport?(nil, "点击录制时检测 RAW 内录能力")
             self.onState?(.configuring, nil)
             do {
                 let cameraGranted = awaitPermission(.video)
@@ -50,6 +63,12 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                       let targetCodec = codec.avCodec else {
                     throw RecorderError.unavailable("This lens/system has no \(codec.label) requested mode")
                 }
+                // Stop delivery and drain old callbacks before replacing device/mode state.
+                // Sample callbacks read that state and must never see the next lens mid-switch.
+                if let observer = self.focusObserver { NotificationCenter.default.removeObserver(observer); self.focusObserver = nil }
+                self.session.stopRunning()
+                self.captureVideoOutput?.setSampleBufferDelegate(nil, queue: nil)
+                self.sampleQueue.sync {}
                 self.codec = codec
                 self.color = color
                 self.device = device
@@ -73,7 +92,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                         device.unlockForConfiguration()
                         throw RecorderError.unavailable("RAW requires locked white balance")
                     }
-                    device.setWhiteBalanceModeLocked(with: device.deviceWhiteBalanceGains, completionHandler: nil)
+                    let gains = CameraControls.validWhiteBalanceGains(device.deviceWhiteBalanceGains,
+                        maximum: device.maxWhiteBalanceGain)
+                    device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
                 } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
                     device.whiteBalanceMode = .continuousAutoWhiteBalance
                 }
@@ -97,6 +118,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 if let connection = video.connection(with: .video) {
                     if connection.isVideoStabilizationSupported { connection.preferredVideoStabilizationMode = .off }
                     if connection.isVideoRotationAngleSupported(0) { connection.videoRotationAngle = 0 }
+                    connection.automaticallyAdjustsVideoMirroring = false
+                    if connection.isVideoMirroringSupported { connection.isVideoMirrored = false }
                     if connection.isCameraIntrinsicMatrixDeliverySupported { connection.isCameraIntrinsicMatrixDeliveryEnabled = true }
                 }
                 if audio {
@@ -118,7 +141,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     "width": mode.width, "height": mode.height, "fps": mode.fps,
                     "requestedCodec": targetCodec.rawValue, "availableWriterCodecs": available.map(\.rawValue),
                     "availablePixelFormats": video.availableVideoPixelFormatTypes,
-                    "storage": codec.isRAW ? "external storage required" : "internal Documents", "deferredStartEnabled": false]
+                    "storage": codec.isRAW ? "destination capability checked at runtime" : "internal Documents", "deferredStartEnabled": false]
                 let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("GyroCineDiagnostics", isDirectory: true)
                 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -133,6 +156,15 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 try device.lockForConfiguration()
                 do { try controls.apply(to: device, fps: mode.fps, shutter: shutter, raw: codec.isRAW) }
                 catch { device.unlockForConfiguration(); throw error }
+                // Configure focus explicitly after the input and active format are established.
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+                }
+                if device.isAutoFocusRangeRestrictionSupported { device.autoFocusRangeRestriction = .none }
+                // Enter continuous AF directly; do not immediately cancel a single-shot scan.
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+                else if device.isFocusModeSupported(.autoFocus) { device.focusMode = .autoFocus }
+                device.isSubjectAreaChangeMonitoringEnabled = true
                 // Adding inputs / configuring exposure can reset frame durations.
                 // Apply the requested cadence last, after the session is running.
                 let frameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
@@ -141,7 +173,25 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 let actualMin = device.activeVideoMinFrameDuration.seconds
                 let actualMax = device.activeVideoMaxFrameDuration.seconds
                 device.unlockForConfiguration()
+                self.focusObserver = NotificationCenter.default.addObserver(forName: AVCaptureDevice.subjectAreaDidChangeNotification,
+                    object: device, queue: nil) { [weak self, weak device] _ in
+                    guard let self, let device else { return }
+                    self.sessionQueue.async {
+                        guard self.device === device, self.session.isRunning else { return }
+                        do {
+                            try device.lockForConfiguration()
+                            defer { device.unlockForConfiguration() }
+                            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5) }
+                            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+                            else if device.isFocusModeSupported(.autoFocus) { device.focusMode = .autoFocus }
+                            NSLog("GyroCine AF subject changed camera=%@ mode=%ld adjusting=%d position=%.4f", device.uniqueID, device.focusMode.rawValue, device.isAdjustingFocus ? 1 : 0, device.lensPosition)
+                        } catch { NSLog("GyroCine AF reconfigure failed: %@", error.localizedDescription) }
+                    }
+                }
                 var configuredCapability = capability
+                configuredCapability["focusMode"] = device.focusMode.rawValue
+                configuredCapability["continuousAutoFocusSupported"] = device.isFocusModeSupported(.continuousAutoFocus)
+                configuredCapability["activeVideoStabilizationMode"] = video.connection(with: .video)?.activeVideoStabilizationMode.rawValue
                 configuredCapability["configuredMinFrameDurationSeconds"] = actualMin
                 configuredCapability["configuredMaxFrameDurationSeconds"] = actualMax
                 try JSONSerialization.data(withJSONObject: configuredCapability, options: [.prettyPrinted, .sortedKeys])
@@ -183,8 +233,15 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.recordingOrientation = orientation
                 self.externalDestination = externalDestination
                 guard let mode = self.mode else { throw RecorderError.unavailable("Camera not configured") }
+                guard let connection = self.captureVideoOutput?.connection(with: .video),
+                      connection.activeVideoStabilizationMode == .off else {
+                    throw RecorderError.unavailable("相机视频防抖未关闭，请重新配置相机")
+                }
+                guard connection.videoRotationAngle == 0, !connection.isVideoMirrored else {
+                    throw RecorderError.unavailable("录制连接方向异常，请重新配置相机")
+                }
                 var outputURL = url
-                if self.codec.isRAW {
+                if self.codec.isRAW && externalDestination {
                     guard AVExternalStorageDevice.authorizationStatus == .authorized,
                           let storage = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.first(where: { $0.isConnected }),
                           storage.freeSize >= 2_000_000_000,
@@ -197,6 +254,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     DiagnosticsCollector.record("RAW external movie=\(external.path); final destination=\(url.path)", folder: url.deletingLastPathComponent())
                 }
                 let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
+                if self.codec.isRAW && !externalDestination {
+                    _ = RAWInternalStorage.enableProStorageIfSupported(on: writer)
+                }
                 writer.metadata = [
                     (AVMetadataIdentifier.quickTimeMetadataMake, "Apple"),
                     (.quickTimeMetadataModel, RecorderIdentity.cameraModel),
@@ -226,14 +286,18 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 }
                 if self.codec.isRAW {
                     guard #available(iOS 26.0, *), let output = self.captureVideoOutput,
-                          let codec = self.codec.avCodec,
-                          let settings = output.recommendedVideoSettings(forVideoCodecType: codec, assetWriterOutputFileType: .mov, outputFileURL: outputURL) else {
-                        throw RecorderError.unavailable("No recommended ProRes RAW settings for external storage")
+                          let codec = self.codec.avCodec else {
+                        throw RecorderError.unavailable("当前录制位置没有可用的 ProRes RAW 编码设置，请检查专业视频存储设置或改用 SSD")
                     }
-                    outputSettings = settings
-                    guard let metadata = output.recommendedMovieMetadata(forVideoCodecType: codec, assetWriterOutputFileType: .mov) else {
-                        throw RecorderError.unavailable("Missing required RAW movie metadata")
+                    do {
+                        outputSettings = try RAWSettingsProbe.settings(output: output, codec: codec, url: outputURL)
+                    } catch {
+                        if !externalDestination {
+                            self.onInternalRAWSupport?(false, "当前模式无法在手机文件位置录制 RAW，请在设置中将录制位置切换为 SSD。系统信息：\(error.localizedDescription)")
+                        }
+                        throw error
                     }
+                    let metadata = try RAWSettingsProbe.metadata(output: output, codec: codec)
                     writer.metadata += metadata
                 }
                 guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else {
@@ -265,6 +329,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.firstPTS = nil
                 self.lastPTS = nil
                 self.clockEvidence = nil
+                self.frameCopier = CaptureFrameCopier()
+                self.pendingVideo.removeAll()
+                self.peakPendingVideo = 0
                 self.frameCount = 0
                 self.droppedFrameCount = 0
                 self.firstDroppedFrameReason = nil
@@ -279,12 +346,50 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
     }
 
+    func releaseExternalMovieAccess() {
+        sampleQueue.async {
+            self.externalMovieURL?.stopAccessingSecurityScopedResource()
+            self.externalMovieURL = nil
+        }
+    }
+
     func stop() {
         sampleQueue.async {
-            guard self.recordingActive, let writer = self.writer, let url = self.fileURL else { return }
+            guard self.recordingActive, self.writer != nil, let url = self.fileURL else { return }
             self.recordingActive = false
-            DiagnosticsCollector.record("capture dropped callbacks=\(self.droppedFrameCount) firstReason=\(self.firstDroppedFrameReason ?? "none")", folder: url.deletingLastPathComponent())
+            DiagnosticsCollector.record("buffer=\(self.frameCopier.capacityDescription) capture dropped callbacks=\(self.droppedFrameCount) firstReason=\(self.firstDroppedFrameReason ?? "none")", folder: url.deletingLastPathComponent())
             self.onState?(.finalizing, nil)
+            self.completeStopWhenDrained(deadline: ProcessInfo.processInfo.systemUptime + 5)
+        }
+    }
+
+    private func drainPendingVideo() throws {
+        guard let input = videoInput else { return }
+        try pendingVideo.drain(ready: { input.isReadyForMoreMediaData }) { frame in
+            guard input.append(frame.sample) else {
+                throw writer?.error ?? RecorderError.unavailable("Video append failed")
+            }
+            frameCount += 1
+            lastPTS = frame.pts
+            try frameEvidenceHandle?.write(contentsOf: evidenceEncoder.encode(frame.evidence) + Data([0x0A]))
+        }
+    }
+
+    private func completeStopWhenDrained(deadline: Double) {
+        guard let writer, let url = fileURL else { return }
+        do { try drainPendingVideo() }
+        catch { appendError = appendError ?? error.localizedDescription; pendingVideo.removeAll() }
+        if pendingVideo.count > 0 {
+            if writer.status == .writing && ProcessInfo.processInfo.systemUptime < deadline {
+                sampleQueue.asyncAfter(deadline: .now() + .milliseconds(10)) {
+                    self.completeStopWhenDrained(deadline: deadline)
+                }
+                return
+            }
+            appendError = appendError ?? "停止后视频队列仍未排空（\(pendingVideo.count) 帧），原片已保留"
+            pendingVideo.removeAll()
+        }
+        DiagnosticsCollector.record("video queue drained peak=\(peakPendingVideo)", folder: url.deletingLastPathComponent())
             do {
                 try self.frameEvidenceHandle?.close()
             } catch { self.appendError = "Video timing evidence close failed: \(error.localizedDescription)" }
@@ -292,13 +397,17 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             self.frameEvidenceHandle = nil
             self.videoInput?.markAsFinished()
             self.audioInput?.markAsFinished()
+            let finishStarted = ProcessInfo.processInfo.systemUptime
             writer.finishWriting {
+                DiagnosticsCollector.record(String(format: "writer finished elapsed=%.3fs status=%d",
+                    ProcessInfo.processInfo.systemUptime - finishStarted, writer.status.rawValue), folder: url.deletingLastPathComponent())
                 self.onCaptureFinished?()
                 var error = self.appendError ?? writer.error?.localizedDescription
                 do { try evidenceLog?.publish() }
                 catch let logError { error = error ?? logError.localizedDescription }
                 if let external = self.externalMovieURL {
-                    defer { external.stopAccessingSecurityScopedResource(); self.externalMovieURL = nil }
+                    // The RAW file retains its system-granted access through metadata finalization.
+                    // Moving it into an authorized directory must not shorten that lease.
                     if error == nil {
                         do {
                             if self.externalDestination { try FileManager.default.moveItem(at: external, to: url) }
@@ -309,6 +418,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                         }
                     }
                 }
+                DiagnosticsCollector.record(String(format: "writer archive/log publish finished elapsed=%.3fs",
+                    ProcessInfo.processInfo.systemUptime - finishStarted), folder: url.deletingLastPathComponent())
                 self.sampleQueue.async {
                     self.onCompleted?(url, self.clockEvidence, self.frameCount, error)
                     self.writer = nil
@@ -316,7 +427,6 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     self.audioInput = nil
                 }
             }
-        }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -347,6 +457,13 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         if output is AVCaptureVideoDataOutput {
+            guard connection.videoRotationAngle == 0, !connection.isVideoMirrored,
+                  let image = CMSampleBufferGetImageBuffer(sampleBuffer), let mode,
+                  CVPixelBufferGetWidth(image) == mode.width, CVPixelBufferGetHeight(image) == mode.height else {
+                appendError = "录制帧方向或尺寸发生变化，原始数据已保留"
+                stop()
+                return
+            }
             let hostPTS: Double
             do { hostPTS = try ClockAligner.hostTime(pts, clock: session.synchronizationClock) }
             catch {
@@ -360,27 +477,23 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     callbackHostTime: CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock())))
                 writer.startSession(atSourceTime: pts)
             }
-            guard let videoInput, videoInput.isReadyForMoreMediaData else {
-                appendError = "Video writer backpressure: frame dropped"
-                return
-            }
-            if videoInput.append(sampleBuffer) {
-                frameCount += 1
-                lastPTS = pts
+            let encoderSample: CMSampleBuffer
+            do { encoderSample = try frameCopier.copy(sampleBuffer) }
+            catch { appendError = error.localizedDescription; stop(); return }
                 let evidence = CaptureFrameEvidence(hostPTSSeconds: hostPTS, sourcePTSSeconds: CMTimeGetSeconds(pts),
                     cameraIntrinsicMatrix: CaptureFrameEvidence.intrinsicMatrix(sampleBuffer),
                     intrinsicSource: "kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix; native unrotated output buffer coordinates",
                     activeVideoStabilizationMode: connection.activeVideoStabilizationMode.rawValue,
                     deviceExposureDurationAtCallbackSeconds: device?.exposureDuration.seconds,
-                    deviceISOAtCallback: device?.iso)
-                if frameCount % 30 == 1, let exposure = evidence.deviceExposureDurationAtCallbackSeconds,
-                   let iso = evidence.deviceISOAtCallback {
-                    onExposureReading?(exposure, iso)
-                }
-                do { try frameEvidenceHandle?.write(contentsOf: evidenceEncoder.encode(evidence) + Data([0x0A])) }
-                catch { appendError = "Video timing evidence write failed: \(error.localizedDescription)" }
-            }
-            else { appendError = writer.error?.localizedDescription ?? "Video append failed" }
+                    deviceISOAtCallback: device?.iso,
+                    deviceFocusModeAtCallback: device?.focusMode.rawValue,
+                    deviceLensPositionAtCallback: device?.lensPosition,
+                    deviceIsAdjustingFocusAtCallback: device?.isAdjustingFocus)
+            do {
+                try pendingVideo.enqueue(PendingFrame(sample: encoderSample, pts: pts, evidence: evidence))
+                peakPendingVideo = max(peakPendingVideo, pendingVideo.count)
+                try drainPendingVideo()
+            } catch { appendError = error.localizedDescription; stop() }
         } else if firstPTS != nil, let audioInput, audioInput.isReadyForMoreMediaData {
             if !audioInput.append(sampleBuffer) { appendError = writer.error?.localizedDescription ?? "Audio append failed" }
         }

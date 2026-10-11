@@ -12,11 +12,37 @@ struct ActualVideoInfo {
 
 enum RecordingFinalizer {
     static func inspectVideo(_ url: URL) throws -> ActualVideoInfo {
+        try MOVTelemetryMuxer.recoverIfNeeded(url)
         let asset = AVURLAsset(url: url)
         guard let track = asset.tracks(withMediaType: .video).first,
               let format = track.formatDescriptions.first else {
             throw RecorderError.unavailable("Final MOV has no video track")
         }
+        let framesFromIndex: [ActualVideoFrame]
+        if let cursor = track.makeSampleCursorAtFirstSampleInDecodeOrder() {
+            var indexed: [ActualVideoFrame] = []
+            repeat {
+                let pts = cursor.presentationTimeStamp.seconds
+                guard pts.isFinite else { throw RecorderError.unavailable("Non-finite indexed video PTS") }
+                indexed.append(ActualVideoFrame(pts: pts))
+            } while cursor.stepInDecodeOrder(byCount: 1) == 1
+            guard !indexed.isEmpty else { throw RecorderError.unavailable("MOV has no indexed video frames") }
+            framesFromIndex = indexed
+        } else {
+            // Compatibility fallback for assets that cannot provide sample cursors.
+            framesFromIndex = try readFrames(asset: asset, track: track)
+        }
+        var frames = framesFromIndex
+        frames.sort { $0.pts < $1.pts }
+        let description = format as! CMFormatDescription
+        let dimensions = CMVideoFormatDescriptionGetDimensions(description)
+        let subtype = CMFormatDescriptionGetMediaSubType(description)
+        let bytes = (0..<4).map { Character(UnicodeScalar(UInt8((subtype >> (24 - 8 * $0)) & 0xFF))) }
+        return ActualVideoInfo(frames: frames, width: Int(dimensions.width), height: Int(dimensions.height),
+                               duration: CMTimeGetSeconds(asset.duration), codecFourCC: String(bytes))
+    }
+
+    static func readFrames(asset: AVAsset, track: AVAssetTrack) throws -> [ActualVideoFrame] {
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
         guard reader.canAdd(output) else { throw RecorderError.unavailable("Cannot inspect MOV frames") }
@@ -39,13 +65,7 @@ enum RecordingFinalizer {
         guard reader.status == .completed, !frames.isEmpty else {
             throw reader.error ?? RecorderError.unavailable("MOV has no readable video frames")
         }
-        frames.sort { $0.pts < $1.pts }
-        let description = format as! CMFormatDescription
-        let dimensions = CMVideoFormatDescriptionGetDimensions(description)
-        let subtype = CMFormatDescriptionGetMediaSubType(description)
-        let bytes = (0..<4).map { Character(UnicodeScalar(UInt8((subtype >> (24 - 8 * $0)) & 0xFF))) }
-        return ActualVideoInfo(frames: frames, width: Int(dimensions.width), height: Int(dimensions.height),
-                               duration: CMTimeGetSeconds(asset.duration), codecFourCC: String(bytes))
+        return frames.sorted { $0.pts < $1.pts }
     }
 
     static func readMotion(_ url: URL) throws -> [MotionEvent] {
@@ -59,7 +79,16 @@ enum RecordingFinalizer {
         guard let clock, abs(clock.callbackMinusPTSSeconds) < 2.0 else {
             throw RecorderError.unavailable("Video PTS and host uptime could not be reconciled; raw files retained")
         }
+        let started = ProcessInfo.processInfo.systemUptime
+        var stage = "inspect MOV sample index"
+        defer {
+            if stage != "completed" { DiagnosticsCollector.record(String(format: "finalizer stage=%@ elapsed=%.3fs", stage,
+                ProcessInfo.processInfo.systemUptime - started), folder: folder) }
+        }
         let video = try inspectVideo(folder.recordingFile("mov"))
+        DiagnosticsCollector.record(String(format: "MOV index inspected frames=%d elapsed=%.3fs", video.frames.count,
+            ProcessInfo.processInfo.systemUptime - started), folder: folder)
+        stage = "validate timing and motion"
         let events = try readMotion(folder.appendingPathComponent("imu_raw.jsonl"))
         guard events.contains(where: { $0.kind == .gyro }), events.contains(where: { $0.kind == .accel }) else {
             throw RecorderError.unavailable("Missing gyro or accelerometer samples")
@@ -71,7 +100,9 @@ enum RecordingFinalizer {
             let track = AVURLAsset(url: folder.recordingFile("mov")).tracks(withMediaType: .video).first
             guard let transform = track?.preferredTransform else { throw RecorderError.unavailable("Missing video orientation") }
             let actual = (Int((atan2(transform.b, transform.a) * 180 / .pi).rounded()) + 360) % 360
-            guard actual == expected else { throw RecorderError.unavailable("MOV orientation \(actual) differs from captured \(expected)") }
+            guard actual == expected,
+                  let orientation = RecordingOrientation(rawValue: expected),
+                  orientation.matchesMovieTransform(transform, width: video.width, height: video.height) else { throw RecorderError.unavailable("MOV orientation \(actual) differs from captured \(expected)") }
         }
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
         let requestedFPS = Double(diagnostics.requestedFrameRate ?? 30)
@@ -146,27 +177,33 @@ enum RecordingFinalizer {
                 .filter { $0.isFinite && $0 > 0 }.sorted()
             if !isos.isEmpty { diagnostics.medianDeviceISOAtCallback = isos[isos.count / 2] }
         }
+        stage = "write Gyroflow sidecars"
         diagnostics.gcsvAlignment = try LegacyGyroflowExporter.write(folder: folder, video: video, events: events,
                                          sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps, evidence: evidence, lens: diagnostics.selectedLens, cameraModel: diagnostics.deviceModel, clockMap: diagnostics.recordedClockMap,
                                          rotationDegrees: diagnostics.recordingRotationDegrees ?? 0)
         diagnostics.outputMode = outputMode
         if outputMode != .gcsv {
+            stage = "append embedded metadata"
             try EmbeddedTelemetryExporter.write(mode: outputMode, folder: folder, video: video,
                 events: events, evidence: evidence, diagnostics: diagnostics,
                 sourceFirstPTS: clock.firstVideoHostPTSSeconds ?? clock.firstVideoPTSSeconds, fps: fps)
             diagnostics.embeddedTelemetryStatus = "embedded; optical sync and RAW color export unverified"
-            // Remove legacy delivery sidecars only after a verified, atomic MOV replacement.
+            // Remove legacy delivery sidecars only after a verified metadata append.
             for filename in [folder.recordingFile("gcsv").lastPathComponent, folder.recordingFile("gyroflow").lastPathComponent, "lens_profile.json"] {
                 try FileManager.default.removeItem(at: folder.appendingPathComponent(filename))
             }
         }
+        stage = "cleanup delivery files"
         diagnostics.status = "completed_unverified_on_device"
         try JSONEncoder.pretty.encode(diagnostics).write(to: diagnosticsURL)
+        DiagnosticsCollector.record(String(format: "finalizer export completed elapsed=%.3fs",
+            ProcessInfo.processInfo.systemUptime - started), folder: folder)
         if outputMode != .gcsv && !retainDebugFiles {
             for name in ["imu_raw.jsonl", "video_samples.jsonl", "diagnostics.json", "events.log", "embedded_metadata.json"] {
                 let item = folder.appendingPathComponent(name)
                 if FileManager.default.fileExists(atPath: item.path) { try FileManager.default.removeItem(at: item) }
             }
         }
+        stage = "completed"
     }
 }

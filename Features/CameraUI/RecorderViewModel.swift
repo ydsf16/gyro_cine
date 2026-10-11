@@ -56,6 +56,9 @@ final class RecorderViewModel: ObservableObject {
         RecordingCodec.selectableCases.filter { canSelectCodec($0) || $0 == selectedCodec }
     }
     var videoLabel: String { "\(selectedCodec.label) · \(selectedMode?.label ?? "不可用")" }
+    @Published var rawStoragePrompt: String?
+    @Published private(set) var internalRAWSupported: Bool?
+    @Published private(set) var internalRAWStatus = "点击录制时检测 RAW 内录能力"
     var supportsRAW: Bool {
         guard #available(iOS 26.0, *) else { return false }
         guard let device = selectedLens.flatMap({ CameraCapabilityScanner.device(id: $0.id) }) else { return false }
@@ -79,6 +82,7 @@ final class RecorderViewModel: ObservableObject {
     let coordinator = CaptureCoordinator()
     private let motion = MotionRecorder()
     private var currentFolder: URL?
+    private var recordingGravity: RecordingGravity?
     private var recordingOrientation: RecordingOrientation = .landscapeRight
     private var recordingColorSpace: RecordingColorSpace = .rec709
     private var recordingDebugFiles = false
@@ -119,7 +123,7 @@ final class RecorderViewModel: ObservableObject {
     }
     var cameraDevice: AVCaptureDevice? { selectedLens.flatMap { CameraCapabilityScanner.device(id: $0.id) } }
     var isoRange: ClosedRange<Double> {
-        guard let d = cameraDevice, let m = selectedMode else { return 25...3200 }
+        guard let d = cameraDevice, let m = selectedMode, d.formats.indices.contains(m.formatIndex) else { return 25...3200 }
         let f = d.formats[m.formatIndex]
         return Double(f.minISO)...Double(f.maxISO)
     }
@@ -128,7 +132,7 @@ final class RecorderViewModel: ObservableObject {
     }
     var canAdjustSensorControls: Bool { canSelectLens || state == .recording }
     var exposureRange: ClosedRange<Double> {
-        guard let device = cameraDevice, let mode = selectedMode else { return (1.0 / 2000)...(1.0 / 30) }
+        guard let device = cameraDevice, let mode = selectedMode, device.formats.indices.contains(mode.formatIndex) else { return (1.0 / 2000)...(1.0 / 30) }
         let format = device.formats[mode.formatIndex]
         let lower = max(0.000001, format.minExposureDuration.seconds)
         return lower...max(lower, min(format.maxExposureDuration.seconds, 1.0 / Double(mode.fps)))
@@ -186,6 +190,13 @@ final class RecorderViewModel: ObservableObject {
 
     init() {
         restoreStorageLocation()
+        coordinator.onInternalRAWSupport = { [weak self] supported, status in
+            Task { @MainActor in
+                self?.internalRAWSupported = supported
+                self?.internalRAWStatus = status
+                if supported == false { self?.rawStoragePrompt = status }
+            }
+        }
         coordinator.onAvailableWriterCodecs = { [weak self] codecs in
             Task { @MainActor in self?.availableWriterCodecTags = Set(codecs.map(\.rawValue)) }
         }
@@ -239,8 +250,9 @@ final class RecorderViewModel: ObservableObject {
         }
         refreshRecordings()
         lenses = CameraCapabilityScanner.lenses()
-        selectedLens = lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue && $0.supports4K30 }
-            ?? lenses.first { $0.supports4K30 }
+        selectedLens = lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInUltraWideCamera.rawValue }
+            ?? lenses.first { $0.deviceType == AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue }
+            ?? lenses.first
         reconfigure()
     }
 
@@ -362,6 +374,7 @@ final class RecorderViewModel: ObservableObject {
         guard canSelectLens else { return }
         let candidates = CameraCapabilityScanner.lenses(position: frontCamera ? .back : .front)
         guard let lens = candidates.first(where: { $0.displayMultiplier == 1 }) ?? candidates.first else { return }
+        selectedMode = nil
         frontCamera.toggle()
         lenses = candidates
         selectedLens = lens
@@ -371,8 +384,10 @@ final class RecorderViewModel: ObservableObject {
 
     func selectLens(_ lens: CameraLens) {
         guard canSelectLens, lenses.contains(lens), lens.id != selectedLens?.id else { return }
+        let previous = selectedMode
+        selectedMode = nil // Never expose the old lens's format index with the new device.
         selectedLens = lens
-        if !supportedShutters.contains(shutter) { shutter = supportedShutters.contains(.oneFiveHundredth) ? .oneFiveHundredth : (supportedShutters.first ?? .auto) }
+        selectedMode = CameraMode.preferred(in: modes, previous: previous)
         reconfigure()
     }
 
@@ -382,18 +397,15 @@ final class RecorderViewModel: ObservableObject {
         let available = modes
         selectedMode = CameraMode.preferred(in: available, previous: selectedMode)
         if !supportedShutters.contains(shutter) { shutter = supportedShutters.contains(.oneFiveHundredth) ? .oneFiveHundredth : (supportedShutters.first ?? .auto) }
+        internalRAWSupported = nil
+        internalRAWStatus = "点击录制时检测 RAW 内录能力"
         state = .configuring
         coordinator.configure(audio: audioEnabled, cameraID: selectedLens?.id, shutter: shutter, codec: selectedCodec, requestedMode: selectedMode, controls: controls, color: colorSpace)
     }
 
     func start() {
         guard state == .ready || state == .completed else { return }
-        if selectedCodec.isRAW {
-            guard storageLocation == .ssd else {
-                state = .failed
-                message = "ProRes RAW / RAW HQ 录制前，请在设置中将录制位置改为 SSD。"
-                return
-            }
+        if selectedCodec.isRAW && storageLocation == .ssd {
             do { _ = try selectedRecordingRoot() }
             catch {
                 state = .failed
@@ -417,12 +429,14 @@ final class RecorderViewModel: ObservableObject {
                 return
             }
         }
-        guard let physicalOrientation = motion.recordingDirection else {
+        guard let gravity = motion.recordingGravity,
+              let physicalOrientation = gravity.direction(at: ProcessInfo.processInfo.systemUptime) else {
             message = "正在读取手机方向，请将手机稍微立起后重试"
             return
         }
         state = .configuring // Disable lens changes immediately, including before the first video sample.
         recordingOrientation = physicalOrientation
+        recordingGravity = gravity
         recordingColorSpace = colorSpace
         recordingDebugFiles = debugFilesEnabled
 
@@ -453,6 +467,7 @@ final class RecorderViewModel: ObservableObject {
             recordingOutputMode = outputMode
             DiagnosticsCollector.record("storage capacity location=\(storageLocation.rawValue) selected=\(freeBytes) external=\(String(describing: externalBytes)) ordinary=\(String(describing: capacity?.volumeAvailableCapacity)) important=\(String(describing: capacity?.volumeAvailableCapacityForImportantUsage))", folder: folder)
             DiagnosticsCollector.record("start requested codec=\(selectedCodec.label) video=\(selectedMode?.label ?? "unknown") audio=\(audioEnabled) shutter=\(shutter.label) lens=\(selectedLens?.name ?? "unknown") multiplier=\(selectedLens?.label ?? "unknown") cameraID=\(selectedLens?.id ?? "unknown")", folder: folder)
+            DiagnosticsCollector.record("recording direction frozen degrees=\(recordingOrientation.degrees) gravity=\(gravity.x),\(gravity.y),\(gravity.z) sampleTimestamp=\(gravity.timestamp)", folder: folder)
             try motion.start(at: folder.appendingPathComponent("imu_raw.jsonl"))
             DiagnosticsCollector.record("IMU pre-roll started; waiting for 100ms of gyro samples", folder: folder)
             primingTask = Task { @MainActor [weak self] in
@@ -521,6 +536,7 @@ final class RecorderViewModel: ObservableObject {
             clock: nil, captureError: reason, status: "failed")
         diagnostics.outputMode = recordingOutputMode
         diagnostics.recordingRotationDegrees = recordingOrientation.degrees
+        diagnostics.recordingGravity = recordingGravity
         diagnostics.recordedColorSpace = selectedCodec.isRAW ? "Sensor RAW" : recordingColorSpace.label
         diagnostics.requestedFrameRate = selectedMode?.fps
         diagnostics.selectedLens = selectedLens
@@ -532,6 +548,7 @@ final class RecorderViewModel: ObservableObject {
     }
 
     private func finish(url: URL, clock: ClockEvidence?, frames: Int, error: String?) async {
+        defer { coordinator.releaseExternalMovieAccess() }
         primingTask?.cancel()
         primingTask = nil
         motion.stop()
@@ -545,6 +562,7 @@ final class RecorderViewModel: ObservableObject {
             status: error == nil && motion.error == nil ? "finalizing" : "failed")
         diagnostics.outputMode = recordingOutputMode
         diagnostics.recordingRotationDegrees = recordingOrientation.degrees
+        diagnostics.recordingGravity = recordingGravity
         diagnostics.recordedColorSpace = selectedCodec.isRAW ? "Sensor RAW" : recordingColorSpace.label
         diagnostics.requestedFrameRate = selectedMode?.fps
         diagnostics.selectedLens = selectedLens
@@ -577,7 +595,7 @@ final class RecorderViewModel: ObservableObject {
                 failed.captureError = error.localizedDescription
                 try? JSONEncoder.pretty.encode(failed).write(to: diagnosticsURL)
             }
-            DiagnosticsCollector.record("finalization failed reason=\(error.localizedDescription)", folder: folder)
+            DiagnosticsCollector.record("finalization failed reason=\(error.localizedDescription) domain=\((error as NSError).domain) code=\((error as NSError).code) details=\((error as NSError).userInfo)", folder: folder)
         }
         imuRateLabel = "\(motion.count) events"
         refreshRecordings()
@@ -591,6 +609,10 @@ final class RecorderViewModel: ObservableObject {
         recordings = roots.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }
             .filter { $0.lastPathComponent.hasPrefix("recording_") || $0.lastPathComponent.hasPrefix("GyroCine_") || $0.lastPathComponent.hasPrefix("SteadyCine_") }
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
+        for folder in recordings where state != .finalizing && state != .recording && state != .configuring {
+            do { try MOVTelemetryMuxer.recoverIfNeeded(folder.recordingFile("mov")) }
+            catch { message = "录制恢复失败，请保留文件夹并重新连接存储：\(error.localizedDescription)" }
+        }
     }
 }
 

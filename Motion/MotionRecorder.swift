@@ -20,26 +20,19 @@ final class MotionRecorder {
     private var latestGyroTimestamp: TimeInterval?
     private var writeFailure: String?
     private let encoder = JSONEncoder()
-    private var gravityOrientation: RecordingOrientation?
-    private var gravityTimestamp: TimeInterval = 0
-
     func startOrientationMonitoring() {
         guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
-        manager.deviceMotionUpdateInterval = 0.1
-        manager.startDeviceMotionUpdates(to: .main) { [weak self] sample, _ in
-            guard let self, let sample else { return }
-            self.lock.lock(); defer { self.lock.unlock() }
-            self.gravityTimestamp = sample.timestamp
-            if let orientation = RecordingOrientation.fromGravity(x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z) {
-                self.gravityOrientation = orientation
-            }
-        }
+        manager.deviceMotionUpdateInterval = 0.05
+        // Poll the latest fused sample at REC, avoiding queued UI callbacks and stale direction caching.
+        manager.startDeviceMotionUpdates()
     }
 
-    var recordingDirection: RecordingOrientation? {
-        lock.lock(); defer { lock.unlock() }
-        guard ProcessInfo.processInfo.systemUptime - gravityTimestamp < 1 else { return nil }
-        return gravityOrientation
+    var recordingGravity: RecordingGravity? {
+        guard let sample = manager.deviceMotion else { return nil }
+        let reading = RecordingGravity(timestamp: sample.timestamp,
+            x: sample.gravity.x, y: sample.gravity.y, z: sample.gravity.z)
+        guard reading.direction(at: ProcessInfo.processInfo.systemUptime) != nil else { return nil }
+        return reading
     }
 
     var isAvailable: Bool { manager.isGyroAvailable && manager.isAccelerometerAvailable }

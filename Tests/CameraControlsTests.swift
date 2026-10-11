@@ -3,6 +3,34 @@ import AVFoundation
 @testable import GyroCine
 
 final class CameraControlsTests: XCTestCase {
+    func testGravityRejectsStaleFlatAndAmbiguousReadings() {
+        let valid = RecordingGravity(timestamp: 10, x: -1, y: 0, z: 0)
+        XCTAssertEqual(valid.direction(at: 10.05), .landscapeRight)
+        XCTAssertNil(valid.direction(at: 10.6))
+        XCTAssertNil(valid.direction(at: 9.9))
+        XCTAssertNil(RecordingGravity(timestamp: 10, x: 0, y: 0, z: 1).direction(at: 10))
+        XCTAssertNil(RecordingGravity(timestamp: 10, x: 0.7, y: -0.7, z: 0).direction(at: 10))
+        XCTAssertEqual(RecordingOrientation.previewAngle(for: .portrait), 90)
+        XCTAssertEqual(RecordingOrientation.previewAngle(for: .portraitUpsideDown), 270)
+        XCTAssertNil(RecordingOrientation.previewAngle(for: .unknown))
+        // Portrait-locked UI stays portrait while physical recording is landscape.
+        XCTAssertEqual(valid.direction(at: 10), .landscapeRight)
+        XCTAssertEqual(RecordingOrientation.previewAngle(for: .portrait), 90)
+    }
+
+    func testFullTransformValidationAcrossSensorSizes() {
+        for (w, h) in [(1920, 1080), (3840, 2160), (3840, 2880), (4032, 3024), (4224, 2240), (4224, 3024)] {
+            for direction in [RecordingOrientation.landscapeRight, .portrait, .landscapeLeft, .portraitUpsideDown] {
+                let transform = direction.movieTransform(width: w, height: h)
+                XCTAssertTrue(direction.matchesMovieTransform(transform, width: w, height: h))
+                var wrong = transform; wrong.tx += 1
+                XCTAssertFalse(direction.matchesMovieTransform(wrong, width: w, height: h))
+                wrong = transform; wrong.c *= -1; wrong.d *= -1
+                XCTAssertFalse(direction.matchesMovieTransform(wrong, width: w, height: h))
+            }
+        }
+    }
+
     func testRecordingDirectionUsesGravityIndependentlyOfInterfaceLock() {
         XCTAssertEqual(RecordingOrientation.fromGravity(x: 0, y: -1, z: 0), .portrait)
         XCTAssertEqual(RecordingOrientation.fromGravity(x: -1, y: 0, z: 0), .landscapeRight)
@@ -54,6 +82,12 @@ final class CameraControlsTests: XCTestCase {
             XCTAssertEqual(orientation.remap(source).map { $0 * $0 }.reduce(0, +), 14)
             XCTAssertEqual(orientation.imuOrientation, "XYZ")
         }
+    }
+    func testWhiteBalanceGainsAreValidWhenSwitchingRawLenses() {
+        let gains = CameraControls.validWhiteBalanceGains(.init(redGain: .nan, greenGain: 0.5, blueGain: 9), maximum: 4)
+        XCTAssertEqual(gains.redGain, 1)
+        XCTAssertEqual(gains.greenGain, 1)
+        XCTAssertEqual(gains.blueGain, 4)
     }
     func testGainAndISOSafety() {
         XCTAssertEqual(CameraControls.clamped(.nan, minimum: 1, maximum: 4), 1)

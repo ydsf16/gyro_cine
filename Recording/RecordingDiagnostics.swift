@@ -10,6 +10,7 @@ struct RecordingDiagnostics: Codable {
     let motionEventCount: Int
     let clock: ClockEvidence?
     var outputMode: RecordingOutputMode? = nil
+    var recordingGravity: RecordingGravity? = nil
     var recordingRotationDegrees: Int? = nil
     var recordedColorSpace: String? = nil
     var embeddedTelemetryStatus: String? = nil

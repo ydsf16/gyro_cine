@@ -24,6 +24,7 @@ enum ShutterSetting: Int, CaseIterable, Identifiable {
     var durationSeconds: Double? { self == .auto ? nil : 1.0 / Double(rawValue) }
 
     func isSupported(by device: AVCaptureDevice, mode: CameraMode) -> Bool {
+        guard device.formats.indices.contains(mode.formatIndex) else { return false }
         guard let durationSeconds else { return true }
         let format = device.formats[mode.formatIndex]
         return device.isExposureModeSupported(.continuousAutoExposure)

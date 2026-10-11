@@ -3,6 +3,109 @@ import AVFoundation
 @testable import GyroCine
 
 final class EmbeddedTelemetryTests: XCTestCase {
+    func testExternalSyncFallbackRetriesInterruptedCall() throws {
+        let wrapped = NSError(domain: NSCocoaErrorDomain, code: 512, userInfo: [
+            NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL))
+        ])
+        var calls = 0
+        try MOVTelemetryMuxer.synchronize(primary: { throw wrapped }, fallback: {
+            calls += 1
+            return calls == 1 ? EINTR : 0
+        })
+        XCTAssertEqual(calls, 2)
+    }
+
+    func testExternalSyncDoesNotHideIOFailure() {
+        var calls = 0
+        XCTAssertThrowsError(try MOVTelemetryMuxer.synchronize(primary: {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EIO))
+        }, fallback: { calls += 1; return 0 }))
+        XCTAssertEqual(calls, 0)
+        for code in [EINVAL, EIO, ENOSPC] {
+            XCTAssertThrowsError(try MOVTelemetryMuxer.synchronize(primary: {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(EINVAL))
+            }, fallback: { code })) { error in
+                XCTAssertEqual((error as NSError).code, Int(code))
+            }
+        }
+    }
+
+    func testWriterAndBothMetadataFormatsPreserveAllFourDirections() async throws {
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
+        let asset = AVURLAsset(url: fixture)
+        let track = try XCTUnwrap(asset.tracks(withMediaType: .video).first)
+        let format = try XCTUnwrap(track.formatDescriptions.first) as! CMFormatDescription
+        let size = CMVideoFormatDescriptionGetDimensions(format)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        for direction in [RecordingOrientation.landscapeRight, .portrait, .landscapeLeft, .portraitUpsideDown] {
+            let url = folder.appendingPathComponent("source\(direction.degrees).mov")
+            let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+            let input = AVAssetWriterInput(mediaType: .video, outputSettings: nil, sourceFormatHint: format)
+            input.transform = direction.movieTransform(width: Int(size.width), height: Int(size.height))
+            writer.add(input)
+            XCTAssertTrue(writer.startWriting()); writer.startSession(atSourceTime: .zero)
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            reader.add(output); XCTAssertTrue(reader.startReading())
+            while let sample = output.copyNextSampleBuffer() {
+                if CMSampleBufferGetNumSamples(sample) == 0 { continue }
+                XCTAssertTrue(input.isReadyForMoreMediaData)
+                XCTAssertTrue(input.append(sample))
+            }
+            input.markAsFinished()
+            await writer.finishWriting()
+            XCTAssertEqual(writer.status, .completed)
+            for kind in ["rtmd", "gyrf"] {
+                let copy = folder.appendingPathComponent("\(kind)\(direction.degrees).mov")
+                try FileManager.default.copyItem(at: url, to: copy)
+                try MOVTelemetryMuxer.append(to: copy, kind: kind, packets: [Data([1])], durations: [100_000], note: Data())
+                let saved = try XCTUnwrap(AVURLAsset(url: copy).tracks(withMediaType: .video).first)
+                XCTAssertTrue(direction.matchesMovieTransform(saved.preferredTransform, width: Int(size.width), height: Int(size.height)))
+                XCTAssertEqual(try RecordingFinalizer.inspectVideo(copy).frames.count, 3)
+            }
+        }
+    }
+
+    func testNestedStorageErrorsExposeUnderlyingCode() {
+        let underlying = NSError(domain: NSPOSIXErrorDomain, code: 45)
+        let outer = NSError(domain: NSCocoaErrorDomain, code: 512, userInfo: [NSUnderlyingErrorKey: underlying])
+        let message = MOVTelemetryMuxer.errorChain(outer)
+        XCTAssertTrue(message.contains("NSCocoaErrorDomain:512"))
+        XCTAssertTrue(message.contains("NSPOSIXErrorDomain:45"))
+    }
+
+    func testIndexedTimelineMatchesEncodedReader() throws {
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
+        let asset = AVURLAsset(url: fixture)
+        let track = try XCTUnwrap(asset.tracks(withMediaType: .video).first)
+        XCTAssertNotNil(track.makeSampleCursorAtFirstSampleInDecodeOrder())
+        let decoded = try RecordingFinalizer.readFrames(asset: asset, track: track)
+        let indexed = try RecordingFinalizer.inspectVideo(fixture)
+        XCTAssertEqual(indexed.frames.map(\.pts), decoded.map(\.pts))
+        XCTAssertEqual(indexed.frames.count, 3)
+    }
+
+    func testInterruptedMetadataAppendRestoresOriginalBeforeAndAfterCommit() throws {
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
+        let bytes = try Data(contentsOf: fixture)
+        let moov = try XCTUnwrap(MOVTelemetryMuxer.atoms(bytes).first { $0.type == "moov" })
+        for type in ["moov", "free", "frxx"] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+            defer { try? FileManager.default.removeItem(at: url) }
+            var interrupted = bytes
+            interrupted.replaceSubrange(moov.offset + 4..<moov.offset + 8, with: Data(type.utf8))
+            interrupted += Data(repeating: 0xFF, count: 1024)
+            try interrupted.write(to: url)
+            let state = MOVTelemetryMuxer.Recovery(originalLength: UInt64(bytes.count), moovOffset: UInt64(moov.offset))
+            try JSONEncoder().encode(state).write(to: MOVTelemetryMuxer.recoveryURL(url))
+            try MOVTelemetryMuxer.recoverIfNeeded(url)
+            XCTAssertEqual(try Data(contentsOf: url), bytes)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: MOVTelemetryMuxer.recoveryURL(url).path))
+        }
+    }
+
     func testCopyCapacityUsesDestinationFreeBytesWhenImportantUsageIsZero() throws {
         XCTAssertNoThrow(try MOVTelemetryMuxer.checkCopyCapacity(ordinary: 813_038_567_424,
             important: 0, required: 700_000_000))

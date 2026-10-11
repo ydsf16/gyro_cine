@@ -23,9 +23,12 @@ final class PreviewView: UIView {
     }
     override func layoutSubviews() { super.layoutSubviews(); updateRotation() }
     func updateRotation() {
+        if let connection = layerForPreview.connection, connection.isVideoStabilizationSupported {
+            connection.preferredVideoStabilizationMode = .off
+        }
         // Preview rotation only; the MOV buffers and intrinsic coordinates stay native.
-        let orientation = window?.windowScene?.interfaceOrientation
-        let angle: CGFloat = orientation == .landscapeLeft ? 180 : orientation == .landscapeRight ? 0 : 90
+        guard let orientation = window?.windowScene?.interfaceOrientation,
+              let angle = RecordingOrientation.previewAngle(for: orientation) else { return }
         if let connection = layerForPreview.connection, connection.videoRotationAngle != angle,
            connection.isVideoRotationAngleSupported(angle) {
             CATransaction.begin()
@@ -86,6 +89,10 @@ struct ContentView: View {
                 .foregroundStyle(.white)
             }
         }.background(.black).statusBarHidden()
+            .alert("RAW 录制位置", isPresented: Binding(get: { model.rawStoragePrompt != nil }, set: { if !$0 { model.rawStoragePrompt = nil } })) {
+                Button("打开录制设置") { model.rawStoragePrompt = nil; showingSettings = true }
+                Button("取消", role: .cancel) { model.rawStoragePrompt = nil }
+            } message: { Text(model.rawStoragePrompt ?? "") }
             .sheet(isPresented: $showingSettings) { SettingsView(model: model) }
             .sheet(isPresented: $showingLibrary) { RecordingLibraryView(model: model) }
             .task { model.prepare() }
@@ -284,10 +291,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 ForEach(model.codecOptions) { codec in
                                     dropdownRow(codec.label, selected: model.selectedCodec == codec) {
-                                        if codec.isRAW && model.storageLocation != .ssd {
-                                            storageErrorTitle = "请先选择 SSD"
-                                            storageError = "请先将录制位置设为 SSD，再选择 ProRes RAW。"
-                                        } else { model.codecMode = codec; showCodecOptions = false }
+                                        model.codecMode = codec; showCodecOptions = false
                                     }.disabled(!model.canSelectCodec(codec))
                                 }
                             }.padding(8).frame(minWidth: 260)
@@ -300,12 +304,10 @@ struct SettingsView: View {
                         }
                     if model.selectedCodec.isRAW {
                         LabeledContent("色彩空间", value: "传感器 RAW")
-                        if model.storageLocation != .ssd {
-                            Text("ProRes RAW / RAW HQ 需要将录制位置设为 SSD。")
-                                .font(.caption).foregroundStyle(.orange)
+                        Text(model.internalRAWStatus).font(.caption)
+                        if model.storageLocation == .ssd {
+                            Text(model.externalStorageStatus).font(.caption).foregroundStyle(.secondary)
                         }
-                        Text(model.externalStorageStatus)
-                            .font(.caption).foregroundStyle(.secondary)
                     } else {
                         LabeledContent("色彩空间", value: "SDR / Rec.709")
                     }
