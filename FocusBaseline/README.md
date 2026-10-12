@@ -35,3 +35,6 @@ does not pass this gate.
   return to 1× read back `aprn`, format [69], 1/30 second, continuous AF. In the
   final 28.6-second 1× interval the focus position varied from 0 to 0.745; the
   user reported sustained visible refocus. This gate covers preview only.
+- A microphone-input candidate is built and installed separately. Its RAW AF
+  behavior and HEVC audio/video save still require device acceptance before
+  further recording features are added.

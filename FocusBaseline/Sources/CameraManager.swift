@@ -52,9 +52,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         observeSessionEvents()
         AVCaptureDevice.requestAccess(for: .video) { [weak self] allowed in
             guard let self else { return }
-            self.queue.async {
-                if allowed { self.configureSession() }
-                else { self.fail("Camera permission denied. Enable Camera in Settings.") }
+            guard allowed else {
+                self.queue.async { self.fail("Camera permission denied. Enable Camera in Settings.") }
+                return
+            }
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] audioAllowed in
+                guard let self else { return }
+                self.queue.async { self.configureSession(audioAllowed: audioAllowed) }
             }
         }
     }
@@ -72,7 +76,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish { self.errorText = message; self.status = message }
     }
 
-    private func configureSession() {
+    private func configureSession(audioAllowed: Bool) {
         let physicalLenses: [(AVCaptureDevice.DeviceType, String)] = [
             (.builtInUltraWideCamera, "0.5×"), (.builtInWideAngleCamera, "1×"),
             (.builtInTelephotoCamera, "4×")
@@ -95,8 +99,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.commitConfiguration(); fail("Cannot add camera input or movie output"); return
             }
             session.addInput(input); session.addOutput(output)
+            if audioAllowed, let microphone = AVCaptureDevice.default(for: .audio) {
+                let audioInput = try AVCaptureDeviceInput(device: microphone)
+                guard session.canAddInput(audioInput) else {
+                    session.commitConfiguration(); fail("Cannot add microphone input"); return
+                }
+                session.addInput(audioInput)
+            }
             session.commitConfiguration()
             logger.event("camera_ready", ["deviceID": camera.uniqueID, "name": camera.localizedName,
+                                          "audioAuthorized": audioAllowed,
                                           "supportsFocusPoint": camera.isFocusPointOfInterestSupported,
                                           "supportsSmoothAutoFocus": camera.isSmoothAutoFocusSupported,
                                           "formatCount": camera.formats.count])

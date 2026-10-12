@@ -9,6 +9,7 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     GENERATE_INFOPLIST_FILE: YES
     INFOPLIST_KEY_NSCameraUsageDescription: 'Test camera formats, recording, and autofocus.'
+    INFOPLIST_KEY_NSMicrophoneUsageDescription: 'Record synchronized audio with video.'
     INFOPLIST_KEY_CFBundleDisplayName: 'GyroCine Rebuild'
     INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
     INFOPLIST_KEY_UIRequiresFullScreen: YES
