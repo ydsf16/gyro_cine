@@ -16,6 +16,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var status = "Requesting camera permission"
     @Published private(set) var errorText: String?
     @Published private(set) var exportURL: URL?
+    @Published private(set) var lenses: [LensChoice] = []
+    @Published private(set) var selectedLensID: String?
+    @Published private(set) var switchingLens = false
 
     let session = AVCaptureSession()
     let logger = DiagnosticLogger()
@@ -27,6 +30,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var chosenIndex: Int?
     private var chosenFPS: Double = 30
     private var chosenFocus: FocusChoice = .continuous
+    private var lensDevices: [String: AVCaptureDevice] = [:]
+    private struct LensState {
+        let formats: [FormatInfo]
+        let codecs: [AVVideoCodecType]
+        let codec: AVVideoCodecType?
+        let formatIndex: Int?
+        let fps: Double
+    }
+    private var lensStates: [String: LensState] = [:]
     private var observations: [NSKeyValueObservation] = []
     private var sampleTimer: DispatchSourceTimer?
     private var notificationTokens: [NSObjectProtocol] = []
@@ -61,10 +73,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func configureSession() {
+        let physicalLenses: [(AVCaptureDevice.DeviceType, String)] = [
+            (.builtInUltraWideCamera, "0.5×"), (.builtInWideAngleCamera, "1×"),
+            (.builtInTelephotoCamera, "4×")
+        ]
+        let discovered = physicalLenses.compactMap { type, label -> (AVCaptureDevice, LensChoice)? in
+            guard let device = AVCaptureDevice.default(type, for: .video, position: .back) else { return nil }
+            return (device, LensChoice(id: device.uniqueID, label: label))
+        }
+        lensDevices = Dictionary(uniqueKeysWithValues: discovered.map { ($0.0.uniqueID, $0.0) })
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
             fail("Rear physical Wide camera unavailable"); return
         }
         device = camera
+        publish { self.lenses = discovered.map(\.1); self.selectedLensID = camera.uniqueID }
         do {
             let input = try AVCaptureDeviceInput(device: camera)
             session.beginConfiguration()
@@ -89,6 +111,70 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             session.startRunning()
             publish { self.status = "Camera ready" }
         } catch { fail("Camera setup: \(error)") }
+    }
+
+    func chooseLens(_ id: String) {
+        queue.async {
+            guard !self.output.isRecording, !self.recordingStarting else {
+                self.fail("Lens cannot change during recording"); return
+            }
+            guard let current = self.device, current.uniqueID != id,
+                  let next = self.lensDevices[id],
+                  let oldInput = self.session.inputs.compactMap({ $0 as? AVCaptureDeviceInput }).first else { return }
+            self.publish { self.switchingLens = true }
+            self.lensStates[current.uniqueID] = LensState(formats: self.formatObjects,
+                codecs: self.codecs, codec: self.chosenCodec, formatIndex: self.chosenIndex, fps: self.chosenFPS)
+            self.logger.event("lens_switch_request", ["from": current.uniqueID, "to": id,
+                "before": self.configurationSnapshot()])
+            do {
+                let newInput = try AVCaptureDeviceInput(device: next)
+                self.session.beginConfiguration()
+                self.session.removeInput(oldInput)
+                guard self.session.canAddInput(newInput) else {
+                    self.session.addInput(oldInput)
+                    self.session.commitConfiguration()
+                    throw CameraError.unsupportedFocus("Camera input unavailable")
+                }
+                self.session.addInput(newInput)
+                self.session.commitConfiguration()
+                self.observations.removeAll()
+                self.sampleTimer?.cancel(); self.sampleTimer = nil
+                self.device = next
+                self.installFocusObservers(next)
+                self.startSampling(next)
+                if let saved = self.lensStates[id] {
+                    self.formatObjects = saved.formats
+                    self.codecs = saved.codecs
+                    self.chosenCodec = saved.codec
+                    self.chosenIndex = saved.formatIndex
+                    self.chosenFPS = saved.fps
+                    // Re-adding an input can reset its active frame durations. Reapply the
+                    // saved format, FPS and codec together before reporting the switch done.
+                    guard let index = saved.formatIndex,
+                          self.applyFormat(index, reason: "lens_restore") else {
+                        throw CameraError.unsupportedFocus("Saved lens format could not be restored")
+                    }
+                    self.publish {
+                        self.formats = saved.formats; self.codecs = saved.codecs
+                        self.selectedCodec = saved.codec; self.selectedFormatIndex = saved.formatIndex
+                        self.fps = saved.fps
+                    }
+                } else {
+                    self.discoverCapabilities(next)
+                }
+                self.logger.event("lens_switch_result", ["success": true, "after": self.configurationSnapshot()])
+                self.publish {
+                    self.selectedLensID = id
+                    self.actualFocusMode = self.focusName(next.focusMode)
+                    self.lensPosition = next.lensPosition
+                    self.switchingLens = false
+                }
+            } catch {
+                self.logger.event("lens_switch_result", ["success": false, "error": String(describing: error)])
+                self.publish { self.switchingLens = false }
+                self.fail("Lens switch: \(error)")
+            }
+        }
     }
 
     private func discoverCapabilities(_ camera: AVCaptureDevice) {

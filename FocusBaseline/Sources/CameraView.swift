@@ -44,6 +44,14 @@ struct CameraView: View {
                 }.padding(8)
             }.frame(maxHeight: .infinity)
             VStack(spacing: 7) {
+                HStack {
+                    ForEach(camera.lenses) { lens in
+                        Button(lens.label) { camera.chooseLens(lens.id) }
+                            .buttonStyle(.bordered)
+                            .tint(camera.selectedLensID == lens.id ? .yellow : .gray)
+                            .disabled(camera.recording || camera.switchingLens)
+                    }
+                }
                 diagnostics
                 HStack {
                     Button("MARK") { camera.mark() }.buttonStyle(.bordered)

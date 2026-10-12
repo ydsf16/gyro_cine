@@ -6,6 +6,11 @@ enum FocusChoice: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct LensChoice: Identifiable {
+    let id: String
+    let label: String
+}
+
 struct FormatInfo: Identifiable {
     let index: Int
     let format: AVCaptureDevice.Format

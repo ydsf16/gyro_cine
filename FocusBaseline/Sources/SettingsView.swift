@@ -47,7 +47,7 @@ struct SettingsView: View {
                     Text("Session \(camera.logger.sessionID)").font(.caption).textSelection(.enabled)
                 }
             }
-            .navigationTitle("RAW Focus Test")
+            .navigationTitle("GyroCine Rebuild")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
             .sheet(item: $shareURL) { url in ShareSheet(items: [url]) }
             .onChange(of: camera.exportURL) { _, value in shareURL = value }
