@@ -1,0 +1,336 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1CE9A5FB04148C5892571EF1 /* RAWFocusTestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */; };
+		2A7D2083492A13ECB9A78F7C /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1955D3BE91E80609106339 /* CameraManager.swift */; };
+		3D35F02479A42CDBD8237540 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AEA962B5C246FDCD4C125E /* SettingsView.swift */; };
+		5D2B64739F80DD359E941E51 /* CameraModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C05029D1FDA801C98769366 /* CameraModels.swift */; };
+		D58E36B7E18FFCA6218EB5A6 /* RecordingExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */; };
+		DF4F011A895C95E528EB6DE8 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */; };
+		FC734D063F7AD16E30518AB6 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E9685BA71993FDED107C79 /* CameraView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		02E9685BA71993FDED107C79 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		1C05029D1FDA801C98769366 /* CameraModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModels.swift; sourceTree = "<group>"; };
+		4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWFocusTestApp.swift; sourceTree = "<group>"; };
+		5125666099553568C24BB6BE /* GyroCineRebuild.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GyroCineRebuild.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		A92D48296F15CE1EE0B3DCB7 /* RAWFocusTest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RAWFocusTest-Bridging-Header.h"; sourceTree = "<group>"; };
+		B7A4CE2F72771FA923EE943E /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
+		B7AEA962B5C246FDCD4C125E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RecordingExceptionCatcher.m; sourceTree = "<group>"; };
+		DD1955D3BE91E80609106339 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		260D825E92CCCAAA6BE88383 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5125666099553568C24BB6BE /* GyroCineRebuild.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		494AAC0E48AE996564EA69C9 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DD1955D3BE91E80609106339 /* CameraManager.swift */,
+				1C05029D1FDA801C98769366 /* CameraModels.swift */,
+				02E9685BA71993FDED107C79 /* CameraView.swift */,
+				7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */,
+				A92D48296F15CE1EE0B3DCB7 /* RAWFocusTest-Bridging-Header.h */,
+				4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */,
+				B7A4CE2F72771FA923EE943E /* RecordingExceptionCatcher.h */,
+				D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */,
+				B7AEA962B5C246FDCD4C125E /* SettingsView.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		E13006FEF49860AAE6171EBB = {
+			isa = PBXGroup;
+			children = (
+				494AAC0E48AE996564EA69C9 /* Sources */,
+				260D825E92CCCAAA6BE88383 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3767E1B85897F65E215182FD /* GyroCineRebuild */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3313051076D4F55C89E29E13 /* Build configuration list for PBXNativeTarget "GyroCineRebuild" */;
+			buildPhases = (
+				5116C6086BE53181947D1D78 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GyroCineRebuild;
+			packageProductDependencies = (
+			);
+			productName = GyroCineRebuild;
+			productReference = 5125666099553568C24BB6BE /* GyroCineRebuild.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5E1E75B7A18AFBD591C05DDB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					3767E1B85897F65E215182FD = {
+						DevelopmentTeam = F2LVFHW3ZH;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 49226401EA3EF6A8459F889F /* Build configuration list for PBXProject "GyroCineRebuild" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E13006FEF49860AAE6171EBB;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 260D825E92CCCAAA6BE88383 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3767E1B85897F65E215182FD /* GyroCineRebuild */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5116C6086BE53181947D1D78 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A7D2083492A13ECB9A78F7C /* CameraManager.swift in Sources */,
+				5D2B64739F80DD359E941E51 /* CameraModels.swift in Sources */,
+				FC734D063F7AD16E30518AB6 /* CameraView.swift in Sources */,
+				DF4F011A895C95E528EB6DE8 /* DiagnosticLogger.swift in Sources */,
+				1CE9A5FB04148C5892571EF1 /* RAWFocusTestApp.swift in Sources */,
+				D58E36B7E18FFCA6218EB5A6 /* RecordingExceptionCatcher.m in Sources */,
+				3D35F02479A42CDBD8237540 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		17EFDAC509B46364A1C0F778 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = F2LVFHW3ZH;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "GyroCine Rebuild";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Test camera formats, recording, and autofocus.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.GyroCineRebuild;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RAWFocusTest-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		1BB9B361B5FA22C8A6C1DD9E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_UIApplicationSupportsDocumentBrowser = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		517668260FDED15286109302 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_UIApplicationSupportsDocumentBrowser = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BE4A889A001E65CEAE9E0B21 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = F2LVFHW3ZH;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "GyroCine Rebuild";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Test camera formats, recording, and autofocus.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.GyroCineRebuild;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RAWFocusTest-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3313051076D4F55C89E29E13 /* Build configuration list for PBXNativeTarget "GyroCineRebuild" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				517668260FDED15286109302 /* Debug */,
+				1BB9B361B5FA22C8A6C1DD9E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		49226401EA3EF6A8459F889F /* Build configuration list for PBXProject "GyroCineRebuild" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17EFDAC509B46364A1C0F778 /* Debug */,
+				BE4A889A001E65CEAE9E0B21 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5E1E75B7A18AFBD591C05DDB /* Project object */;
+}
