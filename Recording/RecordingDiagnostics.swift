@@ -41,6 +41,7 @@ struct RecordingDiagnostics: Codable {
     var framesWithAPIIntrinsics: Int? = nil
     var maximumSourceToAssetTimingResidualMs: Double? = nil
     var intrinsicCalibrationStatus: String = "API K is optional; lens distortion, readout and OIS remain unknown"
+    var captureTimingSource: String? = nil
     var actualAudioTrackPresent: Bool? = nil
     var gcsvAlignment: GCSVAlignmentDiagnostics? = nil
 }

@@ -11,21 +11,24 @@ enum LegacyGyroflowExporter {
         let matrices = evidence.compactMap(\.cameraIntrinsicMatrix)
         guard matrices.count == video.frames.count, matrices.allSatisfy({
             $0.count == 9 && $0.allSatisfy(\.isFinite) && $0[0] > 0 && $0[4] > 0
-        }) else { throw RecorderError.unavailable("Fixed lens export requires API intrinsics on every frame; raw files retained") }
+        }) else { throw RecorderError.unavailable("Fixed lens export requires camera intrinsics on every frame; raw files retained") }
         let k = (0..<9).map { column -> Double in
             let values = matrices.map { $0[column] }.sorted()
             return (values[(values.count - 1) / 2] + values[values.count / 2]) / 2
         }
+        let estimatedIntrinsics = evidence.contains { $0.evidenceSource == "movie_index_derived" }
         let codecLabel = ["aprn": "ProRes RAW", "aprh": "ProRes RAW HQ", "apcn": "ProRes 422", "apch": "ProRes 422 HQ", "avc1": "H.264"][video.codecFourCC] ?? "HEVC"
         let profile: [String: Any] = [
-            "name": "GyroCine \(lens?.label ?? "fixed lens") API intrinsics - distortion UNCALIBRATED",
-            "note": "Median output-image API K. Zero distortion is an uncalibrated approximation. Offline sync and axis validation required.",
+            "name": "GyroCine \(lens?.label ?? "fixed lens") \(estimatedIntrinsics ? "format FOV estimate" : "API intrinsics") - distortion UNCALIBRATED",
+            "note": estimatedIntrinsics
+                ? "Pinhole K estimated from format horizontal FOV; centered principal point and zero distortion are uncalibrated. Optical sync validation required."
+                : "Median output-image API K. Zero distortion is an uncalibrated approximation. Offline sync and axis validation required.",
             "camera_brand": "Apple", "camera_model": cameraModel,
             "lens_model": lens.map { "\($0.name) \($0.label) (\($0.deviceType))" } ?? "Unknown physical lens",
-            "calibrated_by": "Apple API intrinsics / GyroCine (not calibrated)",
+            "calibrated_by": estimatedIntrinsics ? "GyroCine format FOV estimate (not calibrated)" : "Apple API intrinsics / GyroCine (not calibrated)",
             "date": String(ISO8601DateFormatter().string(from: Date()).prefix(10)),
             "camera_setting": "\(lens?.name ?? "Unknown lens") \(lens?.label ?? "") \(codecLabel) \(video.width)x\(video.height) \(fps)fps",
-            "calibrator_version": "GyroCine-API-K-unvalidated-v1", "official": false,
+            "calibrator_version": estimatedIntrinsics ? "GyroCine-FOV-estimate-v1" : "GyroCine-API-K-unvalidated-v1", "official": false,
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height], "fps": fps,
             "input_horizontal_stretch": 1.0, "input_vertical_stretch": 1.0,

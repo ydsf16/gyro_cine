@@ -178,8 +178,12 @@ enum MOVTelemetryMuxer {
         var updated = Data()
         for child in children {
             updated += child.type == "mvhd" ? mv : Data(moov[child.offset..<(child.offset + child.size)])
+            // Gyroflow's metadata reader selects the first metadata track.
+            // MovieFileOutput also writes an Apple metadata track, so place our
+            // IMU track ahead of it while leaving the video/audio tracks intact.
+            if child.type == "mvhd" { updated += track }
         }
-        updated += box("udta", note) + track
+        updated += box("udta", note)
         stage = "读取磁盘容量"
         let volume = try url.deletingLastPathComponent().resourceValues(forKeys: [
             .volumeAvailableCapacityKey

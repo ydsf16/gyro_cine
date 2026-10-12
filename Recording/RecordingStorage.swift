@@ -77,6 +77,17 @@ extension URL {
 /// Public iOS 27 selectors, runtime-gated while building with the iOS 26 SDK.
 /// Never infer support from a model name or OS version alone.
 enum RAWInternalStorage {
+    static func enableProStorageIfSupported(on movie: AVCaptureMovieFileOutput) -> Bool {
+        let supported = NSSelectorFromString("isProVideoStorageSupported")
+        let alternate = NSSelectorFromString("proVideoStorageSupported")
+        let setter = NSSelectorFromString("setUsesProVideoStorage:")
+        guard movie.responds(to: supported) || movie.responds(to: alternate),
+              movie.responds(to: setter),
+              (movie.value(forKey: "proVideoStorageSupported") as? NSNumber)?.boolValue == true else { return false }
+        movie.setValue(true, forKey: "usesProVideoStorage")
+        return (movie.value(forKey: "usesProVideoStorage") as? NSNumber)?.boolValue == true
+    }
+
     static func enableProStorageIfSupported(on writer: AVAssetWriter) -> Bool {
         let supported = NSSelectorFromString("isProVideoStorageSupported")
         let alternate = NSSelectorFromString("proVideoStorageSupported")

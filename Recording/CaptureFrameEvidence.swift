@@ -16,6 +16,8 @@ struct CaptureFrameEvidence: Codable {
     var deviceFocusModeAtCallback: Int? = nil
     var deviceLensPositionAtCallback: Float? = nil
     var deviceIsAdjustingFocusAtCallback: Bool? = nil
+    var evidenceSource: String? = nil
+    var exposureSource: String? = nil
 
     static func intrinsicMatrix(_ sample: CMSampleBuffer) -> [Double]? {
         guard let attachment = CMGetAttachment(sample, key: kCMSampleBufferAttachmentKey_CameraIntrinsicMatrix,

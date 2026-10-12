@@ -270,8 +270,8 @@ final class RecorderViewModel: ObservableObject {
         coordinator.onCompleted = { [weak self] url, clock, frames, error in
             Task { @MainActor in await self?.finish(url: url, clock: clock, frames: frames, error: error) }
         }
-        coordinator.onMovieFileCompleted = { [weak self] url, error in
-            Task { @MainActor in self?.finishMovieFileAFTest(url: url, error: error) }
+        coordinator.onMovieFileCompleted = { [weak self] url, context, error in
+            Task { @MainActor in await self?.finishMovieFile(url: url, context: context, error: error) }
         }
         coordinator.onWhiteBalanceReading = { [weak self] temperature, tint in
             Task { @MainActor in
@@ -641,6 +641,10 @@ final class RecorderViewModel: ObservableObject {
         diagnostics.requestedShutter = shutter.label
         diagnostics.exposureControlMode = controls.manualExposure ? "customExposure" : "continuousAutoExposureWithDurationLimit"
         diagnostics.requestedMaximumExposureDurationSeconds = shutter.durationSeconds
+        if clock?.method.contains("AVCaptureMovieFileOutput") == true {
+            diagnostics.captureTimingSource = "movie_start_pts_plus_index; optical sync unverified"
+            diagnostics.intrinsicCalibrationStatus = "format horizontal FOV estimate; principal point centered; distortion, readout and OIS uncalibrated"
+        }
         do {
             try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
             guard error == nil, motion.error == nil, frames > 0 else {
@@ -674,35 +678,23 @@ final class RecorderViewModel: ObservableObject {
         currentFolder = nil
     }
 
-    private func finishMovieFileAFTest(url: URL, error: String?) {
-        defer { coordinator.releaseExternalMovieAccess() }
+    private func finishMovieFile(url: URL, context: MovieFileCaptureContext?, error: String?) async {
         motion.stop()
-        guard let folder = currentFolder else { return }
+        guard let folder = currentFolder else {
+            coordinator.releaseExternalMovieAccess()
+            return
+        }
         do {
             if let error { throw RecorderError.unavailable(error) }
+            guard let context else { throw RecorderError.unavailable("MOV 缺少系统时间锚点") }
             let video = try RecordingFinalizer.inspectVideo(url)
             guard !video.frames.isEmpty else { throw RecorderError.unavailable("MOV has no video frames") }
-            var diagnostics = RecordingDiagnostics(deviceModel: RecorderIdentity.cameraModel,
-                systemVersion: UIDevice.current.systemVersion, configuredCodec: selectedCodec.label,
-                audioEnabled: audioEnabled, requestedVideo: selectedMode?.label ?? "unknown",
-                submittedFrameCount: video.frames.count, motionEventCount: motion.count,
-                clock: nil, captureError: nil, status: "af_test_movie_only")
-            diagnostics.actualCodecFourCC = video.codecFourCC
-            diagnostics.actualWidth = video.width
-            diagnostics.actualHeight = video.height
-            diagnostics.actualFrameCount = video.frames.count
-            diagnostics.actualDurationSeconds = video.duration
-            try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
-            state = .completed
-            message = "AF 测试片已保存；IMU 暂未嵌入"
-            elapsedSeconds = 0
+            let (clock, evidence) = try MovieFileEvidenceBuilder.make(video: video, context: context)
+            try MovieFileEvidenceBuilder.write(evidence, to: folder.appendingPathComponent("video_samples.jsonl"))
+            await finish(url: url, clock: clock, frames: video.frames.count, error: nil)
         } catch {
-            state = .failed
-            message = "MOV 测试片保留供诊断：\(error.localizedDescription)"
-            recordFailure(error.localizedDescription)
+            await finish(url: url, clock: nil, frames: 0, error: error.localizedDescription)
         }
-        refreshRecordings()
-        currentFolder = nil
     }
 
     func refreshRecordings() {

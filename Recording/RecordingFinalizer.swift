@@ -145,6 +145,7 @@ enum RecordingFinalizer {
             evidence = try text.split(whereSeparator: \.isNewline).map {
                 try JSONDecoder().decode(CaptureFrameEvidence.self, from: Data($0.utf8))
             }.sorted { $0.sourcePTSSeconds < $1.sourcePTSSeconds }
+            let movieIndexDerived = evidence.first?.evidenceSource == "movie_index_derived"
             guard evidence.count == video.frames.count else {
                 throw RecorderError.unavailable("Source timing count differs from actual MOV frame count")
             }
@@ -154,7 +155,7 @@ enum RecordingFinalizer {
             guard residuals.allSatisfy({ $0 <= 0.001 }) else {
                 throw RecorderError.unavailable("Source sample PTS and MOV frame mapping differ by more than 1ms")
             }
-            if let hostOrigin = clock.firstVideoHostPTSSeconds {
+            if !movieIndexDerived, let hostOrigin = clock.firstVideoHostPTSSeconds {
                 let hostTimes = evidence.compactMap(\.hostPTSSeconds)
                 guard hostTimes.count == evidence.count else { throw RecorderError.unavailable("Missing converted frame timestamps") }
                 let drift = zip(hostTimes, evidence).map {
@@ -164,8 +165,12 @@ enum RecordingFinalizer {
                 diagnostics.maximumCaptureToHostClockDriftMs = drift * 1000
             }
             diagnostics.sourceVideoSampleCount = evidence.count
-            diagnostics.framesWithAPIIntrinsics = evidence.filter { $0.cameraIntrinsicMatrix != nil }.count
-            diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
+            diagnostics.framesWithAPIIntrinsics = evidence.filter {
+                $0.cameraIntrinsicMatrix != nil && $0.evidenceSource != "movie_index_derived"
+            }.count
+            if !movieIndexDerived {
+                diagnostics.maximumSourceToAssetTimingResidualMs = (residuals.max() ?? 0) * 1000
+            }
             let exposures = evidence.compactMap(\.deviceExposureDurationAtCallbackSeconds)
                 .filter { $0.isFinite && $0 > 0 }.sorted()
             if !exposures.isEmpty {

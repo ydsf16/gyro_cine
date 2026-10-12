@@ -27,9 +27,18 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var recordingOrientation: RecordingOrientation = .landscapeRight
     private var color: RecordingColorSpace = .rec709
     private var captureVideoOutput: AVCaptureVideoDataOutput?
-    // Temporary AF comparison path: the system records the MOV without our frame-copy writer.
+    // MovieFileOutput keeps the RAW capture graph that passed device AF testing.
     private var captureMovieOutput: AVCaptureMovieFileOutput?
     private var focusPollToken = UUID()
+    private var movieSensorPollToken = UUID()
+    private var movieSensorSamples: [MovieSensorSample] = []
+    private var movieFirstBufferPTSSeconds: Double?
+    private var movieFirstBufferHostSeconds: Double?
+    private var movieStartCallbackHostSeconds: Double?
+    private var movieHorizontalFieldOfViewDegrees: Float = 0
+    private var movieVideoStabilizationMode = 0
+    private var configuredControls = CameraControls()
+    private var configuredShutter: ShutterSetting = .auto
     private var audioEnabled = true
     private var fileURL: URL?
     private var externalMovieURL: URL?
@@ -65,7 +74,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     var onFocusReading: ((Float, AVCaptureDevice.FocusMode, Bool) -> Void)?
     var onInternalRAWSupport: ((Bool?, String) -> Void)?
     var onAvailableWriterCodecs: (([AVVideoCodecType]) -> Void)?
-    var onMovieFileCompleted: ((URL, String?) -> Void)?
+    var onMovieFileCompleted: ((URL, MovieFileCaptureContext?, String?) -> Void)?
 
     deinit { if let observer = focusObserver { NotificationCenter.default.removeObserver(observer) } }
 
@@ -96,6 +105,8 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.device = device
                 self.mode = mode
                 self.audioEnabled = audio
+                self.configuredControls = controls
+                self.configuredShutter = shutter
                 let rawAFMinimalComparison = codec.isRAW
                 let preSessionFormatIndex = device.formats.firstIndex(where: { $0 === device.activeFormat }) ?? -1
                 let avoidRAWStabilizationOverride = codec.isRAW && device.deviceType == .builtInWideAngleCamera
@@ -181,7 +192,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     "width": mode.width, "height": mode.height, "fps": mode.fps,
                     "requestedCodec": targetCodec.rawValue, "availableWriterCodecs": available.map(\.rawValue),
                     "availablePixelFormats": [Int](),
-                    "storage": codec.isRAW ? "destination capability checked at runtime" : "internal Documents", "output": "AVCaptureMovieFileOutput AF test"]
+                    "storage": codec.isRAW ? "destination capability checked at runtime" : "internal Documents", "output": "AVCaptureMovieFileOutput"]
                 let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("GyroCineDiagnostics", isDirectory: true)
                 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -206,7 +217,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     }
                 }
                 catch { device.unlockForConfiguration(); throw error }
-                // AF comparison: set continuous focus without touching face-driven behavior.
+                // Keep the system's face-driven focus behavior on RAW.
                 if !rawAFMinimalComparison && device.isFocusModeSupported(.continuousAutoFocus) {
                     device.focusMode = .continuousAutoFocus
                 }
@@ -233,7 +244,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 configuredCapability["activeVideoStabilizationMode"] = video.connection(with: .video)?.activeVideoStabilizationMode.rawValue
                 configuredCapability["configuredMinFrameDurationSeconds"] = actualMin
                 configuredCapability["configuredMaxFrameDurationSeconds"] = actualMax
-                configuredCapability["movieFileOutputAFTest"] = true
+                configuredCapability["movieFileOutput"] = true
                 configuredCapability["formatAppliedAfterSessionStart"] = liveRAWFormatSelection
                 configuredCapability["codecConfiguredWithinFormatTransaction"] = liveRAWFormatSelection
                 configuredCapability["preSessionFormatIndex"] = preSessionFormatIndex
@@ -368,6 +379,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             guard let device = self.device, let mode = self.mode, self.session.isRunning else {
                 completion("相机尚未准备好"); return
             }
+            self.configuredControls = controls
+            self.configuredShutter = shutter
+            if self.codec.isRAW && self.captureMovieOutput?.isRecording != true {
+                // Keep the tested RAW preview graph unchanged. Apply these
+                // settings immediately before MovieFileOutput starts.
+                completion(nil)
+                return
+            }
             do {
                 try device.lockForConfiguration()
                 defer { device.unlockForConfiguration() }
@@ -385,7 +404,10 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     func start(at url: URL, orientation: RecordingOrientation, externalDestination: Bool) {
         if captureMovieOutput != nil {
-            sessionQueue.async { self.startMovieFile(at: url, externalDestination: externalDestination) }
+            sessionQueue.async {
+                self.recordingOrientation = orientation
+                self.startMovieFile(at: url, externalDestination: externalDestination)
+            }
             return
         }
         sampleQueue.async {
@@ -518,16 +540,16 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     private func startMovieFile(at url: URL, externalDestination: Bool) {
         do {
-            guard let movie = captureMovieOutput, session.isRunning, !movie.isRecording,
-                  let connection = movie.connection(with: .video),
-                  connection.activeVideoStabilizationMode == .off else {
+            guard let movie = captureMovieOutput, let device, let mode,
+                  session.isRunning, !movie.isRecording else {
                 throw RecorderError.unavailable("Movie output is not ready")
             }
-            guard !codec.isRAW || externalDestination else {
-                throw RecorderError.unavailable("RAW 对焦测试版录制需要外接 SSD；取景对焦无需录制")
+            if codec.isRAW && !externalDestination && !RAWInternalStorage.enableProStorageIfSupported(on: movie) {
+                onInternalRAWSupport?(false, "当前设备无法将 RAW 录到手机文件位置，请选择已授权的 SSD。")
+                throw RecorderError.unavailable("ProRes RAW 当前需要外接 SSD")
             }
             var outputURL = url
-            if codec.isRAW {
+            if codec.isRAW && externalDestination {
                 guard AVExternalStorageDevice.authorizationStatus == .authorized,
                       let storage = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.first(where: { $0.isConnected }),
                       storage.freeSize >= 2_000_000_000,
@@ -541,8 +563,64 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             guard !FileManager.default.fileExists(atPath: outputURL.path) else {
                 throw RecorderError.unavailable("Movie output file already exists")
             }
+            if audioEnabled && !session.inputs.contains(where: { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }) {
+                guard let microphone = AVCaptureDevice.default(for: .audio) else {
+                    throw RecorderError.unavailable("Microphone unavailable")
+                }
+                let input = try AVCaptureDeviceInput(device: microphone)
+                session.beginConfiguration()
+                guard session.canAddInput(input) else {
+                    session.commitConfiguration()
+                    throw RecorderError.unavailable("当前 RAW 格式无法同时录制音频；关闭音频后重试")
+                }
+                session.addInput(input)
+                session.commitConfiguration()
+            }
+            try device.lockForConfiguration()
+            do {
+                try configuredControls.apply(to: device, fps: mode.fps, shutter: configuredShutter, raw: codec.isRAW)
+                let frameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                device.activeVideoMinFrameDuration = frameDuration
+                device.activeVideoMaxFrameDuration = frameDuration
+                device.unlockForConfiguration()
+            } catch {
+                device.unlockForConfiguration()
+                throw error
+            }
+            guard let connection = movie.connection(with: .video) else {
+                throw RecorderError.unavailable("Movie output video connection unavailable")
+            }
+            if connection.isVideoStabilizationSupported { connection.preferredVideoStabilizationMode = .off }
+            guard connection.activeVideoStabilizationMode == .off else {
+                throw RecorderError.unavailable("录制视频防抖未关闭")
+            }
+            let angle = CGFloat(recordingOrientation.degrees)
+            guard connection.isVideoRotationAngleSupported(angle) else {
+                throw RecorderError.unavailable("录制方向 \(recordingOrientation.degrees)° 不受支持")
+            }
+            connection.videoRotationAngle = angle
+            if connection.isVideoMirroringSupported { connection.isVideoMirrored = false }
+            let make = AVMutableMetadataItem()
+            make.identifier = .quickTimeMetadataMake
+            make.value = "Apple" as NSString
+            let modelItem = AVMutableMetadataItem()
+            modelItem.identifier = .quickTimeMetadataModel
+            modelItem.value = RecorderIdentity.cameraModel as NSString
+            let software = AVMutableMetadataItem()
+            software.identifier = .quickTimeMetadataSoftware
+            software.value = "GyroCine" as NSString
+            movie.metadata = [make, modelItem, software]
+            movieSensorSamples = []
+            movieFirstBufferPTSSeconds = nil
+            movieFirstBufferHostSeconds = nil
+            movieStartCallbackHostSeconds = nil
+            movieHorizontalFieldOfViewDegrees = device.activeFormat.videoFieldOfView
+            movieVideoStabilizationMode = connection.activeVideoStabilizationMode.rawValue
+            sampleMovieSensor(device)
             fileURL = url
             movie.startRecording(to: outputURL, recordingDelegate: self)
+            movieSensorPollToken = UUID()
+            scheduleMovieSensorPoll(device, token: movieSensorPollToken)
             onState?(.recording, nil)
         } catch {
             externalMovieURL?.stopAccessingSecurityScopedResource()
@@ -554,9 +632,11 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL,
                     startPTS: CMTime, from connections: [AVCaptureConnection]) {
         sessionQueue.async {
-            let hostPTS = try? ClockAligner.hostTime(startPTS, clock: self.session.synchronizationClock)
-            DiagnosticsCollector.record("MovieFileOutput startPTS=\(startPTS.seconds) hostPTS=\(String(describing: hostPTS))",
-                                        folder: self.fileURL?.deletingLastPathComponent())
+            self.movieFirstBufferPTSSeconds = startPTS.seconds
+            self.movieFirstBufferHostSeconds = try? ClockAligner.hostTime(startPTS, clock: self.session.synchronizationClock)
+            self.movieStartCallbackHostSeconds = ProcessInfo.processInfo.systemUptime
+            DiagnosticsCollector.record("MovieFileOutput startPTS=\(startPTS.seconds) hostPTS=\(String(describing: self.movieFirstBufferHostSeconds))",
+                folder: self.fileURL?.deletingLastPathComponent())
         }
     }
 
@@ -564,19 +644,52 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     from connections: [AVCaptureConnection], error: Error?) {
         sessionQueue.async {
             guard let url = self.fileURL else { return }
+            self.movieSensorPollToken = UUID()
             var failure = error?.localizedDescription
             if failure == nil, let external = self.externalMovieURL {
                 do { try FileManager.default.moveItem(at: external, to: url) }
                 catch { failure = "RAW 已保存在 SSD，归档失败: \(error.localizedDescription)" }
             }
+            let context: MovieFileCaptureContext?
+            if let pts = self.movieFirstBufferPTSSeconds,
+               let host = self.movieFirstBufferHostSeconds,
+               let callback = self.movieStartCallbackHostSeconds {
+                context = MovieFileCaptureContext(firstBufferPTSSeconds: pts,
+                    firstBufferHostSeconds: host,
+                    startCallbackHostSeconds: callback,
+                    horizontalFieldOfViewDegrees: self.movieHorizontalFieldOfViewDegrees,
+                    sensorSamples: self.movieSensorSamples,
+                    stabilizationMode: self.movieVideoStabilizationMode)
+            } else {
+                context = nil
+                failure = failure ?? "MovieFileOutput did not supply a valid start timestamp"
+            }
             self.onCaptureFinished?()
-            self.onMovieFileCompleted?(url, failure)
+            self.onMovieFileCompleted?(url, context, failure)
             self.fileURL = nil
         }
     }
 
+    private func sampleMovieSensor(_ device: AVCaptureDevice) {
+        let exposure = device.exposureDuration.seconds
+        let iso = device.iso
+        guard exposure.isFinite, exposure > 0, iso.isFinite else { return }
+        movieSensorSamples.append(MovieSensorSample(hostSeconds: ProcessInfo.processInfo.systemUptime,
+            exposureSeconds: exposure, iso: iso, focusMode: device.focusMode.rawValue,
+            lensPosition: device.lensPosition, adjustingFocus: device.isAdjustingFocus))
+    }
+
+    private func scheduleMovieSensorPoll(_ device: AVCaptureDevice, token: UUID) {
+        sessionQueue.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self, weak device] in
+            guard let self, let device, self.device === device,
+                  self.movieSensorPollToken == token, self.captureMovieOutput?.isRecording == true else { return }
+            self.sampleMovieSensor(device)
+            self.scheduleMovieSensorPoll(device, token: token)
+        }
+    }
+
     func releaseExternalMovieAccess() {
-        sampleQueue.async {
+        sessionQueue.async {
             self.externalMovieURL?.stopAccessingSecurityScopedResource()
             self.externalMovieURL = nil
         }

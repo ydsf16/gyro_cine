@@ -136,6 +136,11 @@ final class EmbeddedTelemetryTests: XCTestCase {
             }
             XCTAssertEqual(atoms.filter { $0.type == "moov" }.count, 1)
             XCTAssertTrue(output.range(of: Data(kind.utf8)) != nil)
+            let moov = try XCTUnwrap(atoms.first { $0.type == "moov" })
+            let children = try MOVTelemetryMuxer.atoms(Data(output[(moov.offset + moov.header)..<(moov.offset + moov.size)]))
+            let firstTrack = try XCTUnwrap(children.first { $0.type == "trak" })
+            let firstTrackData = output[(moov.offset + moov.header + firstTrack.offset)..<(moov.offset + moov.header + firstTrack.offset + firstTrack.size)]
+            XCTAssertNotNil(firstTrackData.range(of: Data(kind.utf8)))
         }
     }
 
@@ -229,6 +234,8 @@ final class EmbeddedTelemetryTests: XCTestCase {
         let matrix: [Double] = [100, 0, 50, 0, 100, 50, 0, 0, 1]
         let packet = try EmbeddedTelemetryExporter.sonyPacket(sample, matrix: matrix,
             width: 1920, height: 1080, orientation: .portrait)
+        XCTAssertNotNil(packet.range(of: Data([0xe4, 0x3a, 0, 2, 0x05, 0x02])))
+        XCTAssertNotNil(packet.range(of: Data([0xe4, 0x4a, 0, 2, 0x05, 0x02])))
         let gyroTag = try XCTUnwrap(packet.range(of: Data([0xe4, 0x3b, 0, 14])))
         let g = (0..<3).map { Int16(bitPattern: UInt16(packet.uint(gyroTag.upperBound + 8 + $0 * 2, 2))) }
         XCTAssertEqual(g, [100, 0, 0])

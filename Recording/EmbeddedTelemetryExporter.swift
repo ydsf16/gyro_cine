@@ -146,6 +146,8 @@ enum EmbeddedTelemetryExporter {
                 }
                 vector += Data.be(UInt64(UInt16(bitPattern: Int16(integer))), 2)
             }
+            // Gyroflow's Sony parser swaps X/Y and inverts Z during normalization.
+            // Encode YXz so its resulting IMU orientation is XYZ, like GCSV.
             p += tag(start, Data.be(100, 4)) + tag(start + 4, Data.be(UInt64(scale.bitPattern), 4))
                 + tag(start + 5, Data.be(0x502, 2)) + tag(start + 6, Data.be(1, 4) + Data.be(6, 4) + vector)
         }

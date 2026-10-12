@@ -38,6 +38,7 @@
 		B43AC37C8469DF8B924A6516 /* RecordingFinalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354FCA44764369A898E82A18 /* RecordingFinalizer.swift */; };
 		BD09211B280651C0FA9B905A /* CameraControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AAD5A918D7EE61194B8D579 /* CameraControls.swift */; };
 		BEAD82D1B3909CF99D963FA2 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A9F6128688A3793E315C5A /* EmbeddedTelemetryExporter.swift */; };
+		C20B952CC5B232E0A6BAF318 /* MovieFileEvidenceBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */; };
 		C91C84B12F0A581F346C0859 /* CameraControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080F90B2A73265BBC678B5AA /* CameraControlsTests.swift */; };
 		CBF4F7B2C1B095AF4704E803 /* CameraControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F874861AEE8FAB6B9557C376 /* CameraControlView.swift */; };
 		CF5E68B9C41916005C393F1B /* MOVTelemetryMuxer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DDC7C0081387622A6555643 /* MOVTelemetryMuxer.swift */; };
@@ -92,6 +93,7 @@
 		A3CD1C812F28FE17474CECDA /* CaptureFrameCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameCopier.swift; sourceTree = "<group>"; };
 		A5053C49565BC9949F1BCBC9 /* EmbeddedTelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTelemetryTests.swift; sourceTree = "<group>"; };
 		A59C662BD90EFDFCB7232D2A /* MotionRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionRecorder.swift; sourceTree = "<group>"; };
+		A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieFileEvidenceBuilder.swift; sourceTree = "<group>"; };
 		A9CE172C9617E7E0A9AC3D61 /* RecordedClockMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedClockMap.swift; sourceTree = "<group>"; };
 		AE647E0E767CA21AB1AE54DE /* RecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderTests.swift; sourceTree = "<group>"; };
 		B1CE028DEC74DFCE7D504035 /* RAWSettingsProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RAWSettingsProbe.h; sourceTree = "<group>"; };
@@ -144,6 +146,7 @@
 				F5F82C58D8F13A931FC7C7A8 /* DiagnosticsCollector.swift */,
 				07A9F6128688A3793E315C5A /* EmbeddedTelemetryExporter.swift */,
 				5D7FABD172E4BF873F342DA2 /* LegacyGyroflowExporter.swift */,
+				A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */,
 				7DDC7C0081387622A6555643 /* MOVTelemetryMuxer.swift */,
 				EB33B5C08F73B6879FD06566 /* RecorderIdentity.swift */,
 				47F82B3A8DEA45A9F26D8EAD /* RecordingDiagnostics.swift */,
@@ -402,6 +405,7 @@
 				01F2B39363E12F251C135FE6 /* LegacyGyroflowExporter.swift in Sources */,
 				CF5E68B9C41916005C393F1B /* MOVTelemetryMuxer.swift in Sources */,
 				40D5EDC0F01E7BD8F68E5DE5 /* MotionRecorder.swift in Sources */,
+				C20B952CC5B232E0A6BAF318 /* MovieFileEvidenceBuilder.swift in Sources */,
 				304F7C9F259F150ABD16117D /* RAWSettingsProbe.m in Sources */,
 				5A4484C1F23AFF6A5DB6C574 /* RecordedClockMap.swift in Sources */,
 				47F929064CEFFFA750573035 /* RecorderIdentity.swift in Sources */,
@@ -489,6 +493,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -512,6 +517,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -519,8 +525,6 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.1;
-				MARKETING_VERSION = 1.0;
-				CURRENT_PROJECT_VERSION = 3;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -560,6 +564,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -589,6 +594,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -597,8 +603,6 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.1;
-				MARKETING_VERSION = 1.0;
-				CURRENT_PROJECT_VERSION = 3;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;

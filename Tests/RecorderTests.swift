@@ -79,6 +79,25 @@ final class RecorderTests: XCTestCase {
         XCTAssertEqual(video.frames.map(\.pts), [0, 1.0 / 30, 2.0 / 30])
     }
 
+    func testMovieEvidenceMapsIndexedFramesToHostClockAndLabelsEstimates() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
+        let video = try RecordingFinalizer.inspectVideo(url)
+        let context = MovieFileCaptureContext(firstBufferPTSSeconds: 500,
+            firstBufferHostSeconds: 100, startCallbackHostSeconds: 100.05,
+            horizontalFieldOfViewDegrees: 60,
+            sensorSamples: [MovieSensorSample(hostSeconds: 99.9, exposureSeconds: 1.0 / 120,
+                iso: 100, focusMode: 2, lensPosition: 0.4, adjustingFocus: false)],
+            stabilizationMode: 0)
+        let (clock, evidence) = try MovieFileEvidenceBuilder.make(video: video, context: context)
+        XCTAssertEqual(evidence.count, 3)
+        XCTAssertEqual(evidence.map(\.sourcePTSSeconds), [500, 500 + 1.0 / 30, 500 + 2.0 / 30])
+        XCTAssertEqual(evidence.map(\.hostPTSSeconds), [100, 100 + 1.0 / 30, 100 + 2.0 / 30])
+        XCTAssertEqual(clock.callbackMinusPTSSeconds, 0.05, accuracy: 1e-8)
+        XCTAssertEqual(evidence[0].cameraIntrinsicMatrix?[2], 960)
+        XCTAssertEqual(evidence[0].evidenceSource, "movie_index_derived")
+        XCTAssertEqual(evidence[0].exposureSource, "nearest_prior_device_poll")
+    }
+
     func testAPIIntrinsicsUseRowMajorBufferCoordinatesAndRejectShortPayload() throws {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "writer3frames", withExtension: "mov"))
         let asset = AVURLAsset(url: url)
