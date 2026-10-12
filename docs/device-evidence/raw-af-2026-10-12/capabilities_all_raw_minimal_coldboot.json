@@ -1,0 +1,40 @@
+{
+  "activeVideoStabilizationMode" : 0,
+  "autoFocusRangeRestriction" : 0,
+  "autoFocusSupported" : true,
+  "autoFocusSystem" : 1,
+  "availablePixelFormats" : [
+
+  ],
+  "availableWriterCodecs" : [
+    "aprh",
+    "aprn"
+  ],
+  "camera" : "com.apple.avfoundation.avcapturedevice.built-in_video:2",
+  "codecConfiguredWithinFormatTransaction" : true,
+  "configuredMaxFrameDurationSeconds" : 0.033333333333333333,
+  "configuredMinFrameDurationSeconds" : 0.033333333333333333,
+  "continuousAutoFocusSupported" : true,
+  "explicitFaceDrivenAFOverride" : false,
+  "explicitRAWStabilizationOverride" : true,
+  "focusMode" : 2,
+  "formatAppliedAfterSessionStart" : true,
+  "formatIndex" : 62,
+  "fps" : 30,
+  "height" : 3024,
+  "minimumFocusDistanceMillimeters" : 1160,
+  "movieFileOutputAFTest" : true,
+  "output" : "AVCaptureMovieFileOutput AF test",
+  "preSessionDeviceConfigurationSkipped" : true,
+  "preSessionFormatIndex" : 62,
+  "rawAFMinimalGraph" : true,
+  "rawAFWhiteBalanceLockedAfterSessionStart" : false,
+  "rawAFWhiteBalanceLockMethod" : "none",
+  "rawMainCameraFocusRecovery" : false,
+  "requestedCodec" : "aprn",
+  "smoothAutoFocusEnabled" : false,
+  "smoothAutoFocusSupported" : true,
+  "storage" : "destination capability checked at runtime",
+  "whiteBalanceMode" : 2,
+  "width" : 4224
+}

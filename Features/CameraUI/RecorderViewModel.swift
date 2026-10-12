@@ -76,6 +76,9 @@ final class RecorderViewModel: ObservableObject {
     @Published var actualTemperature: Float = 5600
     @Published var actualTint: Float = 0
     @Published var exposureReadout = "等待相机读数"
+    @Published private(set) var focusPosition: Float?
+    @Published private(set) var focusMode: AVCaptureDevice.FocusMode = .locked
+    @Published private(set) var focusAdjusting = false
     @Published var recordings: [URL] = []
     @Published var imuRateLabel = "pending"
     @Published var elapsedSeconds = 0
@@ -267,6 +270,9 @@ final class RecorderViewModel: ObservableObject {
         coordinator.onCompleted = { [weak self] url, clock, frames, error in
             Task { @MainActor in await self?.finish(url: url, clock: clock, frames: frames, error: error) }
         }
+        coordinator.onMovieFileCompleted = { [weak self] url, error in
+            Task { @MainActor in self?.finishMovieFileAFTest(url: url, error: error) }
+        }
         coordinator.onWhiteBalanceReading = { [weak self] temperature, tint in
             Task { @MainActor in
                 if temperature.isFinite && tint.isFinite { self?.actualTemperature = temperature; self?.actualTint = tint }
@@ -278,6 +284,14 @@ final class RecorderViewModel: ObservableObject {
                 self?.actualISO = iso
                 self?.actualExposure = duration
                 self?.exposureReadout = String(format: "实际约 1/%.1f 秒 · ISO %.0f", 1 / duration, iso)
+            }
+        }
+        coordinator.onFocusReading = { [weak self] position, mode, adjusting in
+            Task { @MainActor in
+                guard position.isFinite else { return }
+                self?.focusPosition = position
+                self?.focusMode = mode
+                self?.focusAdjusting = adjusting
             }
         }
     }
@@ -656,6 +670,37 @@ final class RecorderViewModel: ObservableObject {
             DiagnosticsCollector.record("finalization failed reason=\(error.localizedDescription) domain=\((error as NSError).domain) code=\((error as NSError).code) details=\((error as NSError).userInfo)", folder: folder)
         }
         imuRateLabel = "\(motion.count) events"
+        refreshRecordings()
+        currentFolder = nil
+    }
+
+    private func finishMovieFileAFTest(url: URL, error: String?) {
+        defer { coordinator.releaseExternalMovieAccess() }
+        motion.stop()
+        guard let folder = currentFolder else { return }
+        do {
+            if let error { throw RecorderError.unavailable(error) }
+            let video = try RecordingFinalizer.inspectVideo(url)
+            guard !video.frames.isEmpty else { throw RecorderError.unavailable("MOV has no video frames") }
+            var diagnostics = RecordingDiagnostics(deviceModel: RecorderIdentity.cameraModel,
+                systemVersion: UIDevice.current.systemVersion, configuredCodec: selectedCodec.label,
+                audioEnabled: audioEnabled, requestedVideo: selectedMode?.label ?? "unknown",
+                submittedFrameCount: video.frames.count, motionEventCount: motion.count,
+                clock: nil, captureError: nil, status: "af_test_movie_only")
+            diagnostics.actualCodecFourCC = video.codecFourCC
+            diagnostics.actualWidth = video.width
+            diagnostics.actualHeight = video.height
+            diagnostics.actualFrameCount = video.frames.count
+            diagnostics.actualDurationSeconds = video.duration
+            try JSONEncoder.pretty.encode(diagnostics).write(to: folder.appendingPathComponent("diagnostics.json"))
+            state = .completed
+            message = "AF 测试片已保存；IMU 暂未嵌入"
+            elapsedSeconds = 0
+        } catch {
+            state = .failed
+            message = "MOV 测试片保留供诊断：\(error.localizedDescription)"
+            recordFailure(error.localizedDescription)
+        }
         refreshRecordings()
         currentFolder = nil
     }

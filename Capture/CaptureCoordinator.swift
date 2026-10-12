@@ -2,7 +2,7 @@ import AVFoundation
 import CoreMedia
 import Foundation
 
-final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate, AVCaptureFileOutputRecordingDelegate {
     let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "capture.session")
     private let sampleQueue = DispatchQueue(label: "capture.samples")
@@ -27,6 +27,9 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var recordingOrientation: RecordingOrientation = .landscapeRight
     private var color: RecordingColorSpace = .rec709
     private var captureVideoOutput: AVCaptureVideoDataOutput?
+    // Temporary AF comparison path: the system records the MOV without our frame-copy writer.
+    private var captureMovieOutput: AVCaptureMovieFileOutput?
+    private var focusPollToken = UUID()
     private var audioEnabled = true
     private var fileURL: URL?
     private var externalMovieURL: URL?
@@ -59,8 +62,10 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     var onCaptureFinished: (() -> Void)?
     var onWhiteBalanceReading: ((Float, Float) -> Void)?
     var onExposureReading: ((Double, Float) -> Void)?
+    var onFocusReading: ((Float, AVCaptureDevice.FocusMode, Bool) -> Void)?
     var onInternalRAWSupport: ((Bool?, String) -> Void)?
     var onAvailableWriterCodecs: (([AVVideoCodecType]) -> Void)?
+    var onMovieFileCompleted: ((URL, String?) -> Void)?
 
     deinit { if let observer = focusObserver { NotificationCenter.default.removeObserver(observer) } }
 
@@ -82,6 +87,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 if let observer = self.focusObserver { NotificationCenter.default.removeObserver(observer); self.focusObserver = nil }
                 self.focusAdjustmentObservation = nil
                 self.focusRecoveryID = nil
+                self.focusPollToken = UUID()
                 self.session.stopRunning()
                 self.captureVideoOutput?.setSampleBufferDelegate(nil, queue: nil)
                 self.sampleQueue.sync {}
@@ -90,74 +96,92 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 self.device = device
                 self.mode = mode
                 self.audioEnabled = audio
+                let rawAFMinimalComparison = codec.isRAW
+                let preSessionFormatIndex = device.formats.firstIndex(where: { $0 === device.activeFormat }) ?? -1
+                let avoidRAWStabilizationOverride = codec.isRAW && device.deviceType == .builtInWideAngleCamera
+                    && mode.formatIndex == 69
                 self.session.beginConfiguration()
                 var configurationOpen = true
                 defer { if configurationOpen { self.session.commitConfiguration() } }
                 self.session.sessionPreset = .inputPriority
-                self.session.automaticallyConfiguresCaptureDeviceForWideColor = false
+                if !rawAFMinimalComparison { self.session.automaticallyConfiguresCaptureDeviceForWideColor = false }
                 self.session.inputs.forEach(self.session.removeInput)
                 self.session.outputs.forEach(self.session.removeOutput)
-                try device.lockForConfiguration()
-                device.activeFormat = device.formats[mode.formatIndex]
-                if !codec.isRAW { device.activeColorSpace = color.captureSpace }
-                device.videoZoomFactor = 1.0
-                device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
-                device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
-                if codec.isRAW {
-                    guard device.isWhiteBalanceModeSupported(.locked) else {
-                        device.unlockForConfiguration()
-                        throw RecorderError.unavailable("RAW requires locked white balance")
+                // Compare the test app's RAW setup order: add the camera first,
+                // start the session, then select the requested RAW format.
+                let liveRAWFormatSelection = codec.isRAW
+                if !rawAFMinimalComparison {
+                    try device.lockForConfiguration()
+                    device.activeFormat = device.formats[liveRAWFormatSelection ? 26 : mode.formatIndex]
+                    if !codec.isRAW { device.activeColorSpace = color.captureSpace }
+                    device.videoZoomFactor = 1.0
+                    device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                    device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                    if codec.isRAW {
+                        guard device.isWhiteBalanceModeSupported(.locked) else {
+                            device.unlockForConfiguration()
+                            throw RecorderError.unavailable("RAW requires locked white balance")
+                        }
+                        let gains = CameraControls.validWhiteBalanceGains(device.deviceWhiteBalanceGains,
+                            maximum: device.maxWhiteBalanceGain)
+                        device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+                    } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                        device.whiteBalanceMode = .continuousAutoWhiteBalance
                     }
-                    let gains = CameraControls.validWhiteBalanceGains(device.deviceWhiteBalanceGains,
-                        maximum: device.maxWhiteBalanceGain)
-                    device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
-                } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                    device.whiteBalanceMode = .continuousAutoWhiteBalance
+                    device.unlockForConfiguration()
                 }
-                device.unlockForConfiguration()
                 let cameraInput = try AVCaptureDeviceInput(device: device)
                 guard self.session.canAddInput(cameraInput) else { throw RecorderError.unavailable("Cannot add camera input") }
                 self.session.addInput(cameraInput)
-                let video = AVCaptureVideoDataOutput()
-                video.alwaysDiscardsLateVideoFrames = false
-                video.setSampleBufferDelegate(self, queue: self.sampleQueue)
+                let video = AVCaptureMovieFileOutput()
                 guard self.session.canAddOutput(video) else { throw RecorderError.unavailable("Cannot add video output") }
                 self.session.addOutput(video)
-                self.captureVideoOutput = video
-                if codec.isRAW { video.videoSettings = [:] }
-                else if color == .hlg || color == .appleLog {
-                    video.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange]
-                }
-                if #available(iOS 26.0, *), video.isDeferredStartSupported {
-                    video.isDeferredStartEnabled = false
-                }
-                if let connection = video.connection(with: .video) {
-                    if connection.isVideoStabilizationSupported { connection.preferredVideoStabilizationMode = .off }
+                self.captureVideoOutput = nil
+                self.captureMovieOutput = video
+                if !rawAFMinimalComparison, let connection = video.connection(with: .video) {
+                    if !avoidRAWStabilizationOverride && connection.isVideoStabilizationSupported {
+                        connection.preferredVideoStabilizationMode = .off
+                    }
                     if connection.isVideoRotationAngleSupported(0) { connection.videoRotationAngle = 0 }
                     connection.automaticallyAdjustsVideoMirroring = false
                     if connection.isVideoMirroringSupported { connection.isVideoMirrored = false }
-                    if connection.isCameraIntrinsicMatrixDeliverySupported { connection.isCameraIntrinsicMatrixDeliveryEnabled = true }
                 }
-                if audio {
+                if audio && !rawAFMinimalComparison {
                     guard let microphone = AVCaptureDevice.default(for: .audio) else { throw RecorderError.unavailable("Microphone unavailable") }
                     let microphoneInput = try AVCaptureDeviceInput(device: microphone)
                     guard self.session.canAddInput(microphoneInput) else { throw RecorderError.unavailable("Cannot add microphone input") }
                     self.session.addInput(microphoneInput)
-                    let output = AVCaptureAudioDataOutput()
-                    output.setSampleBufferDelegate(self, queue: self.sampleQueue)
-                    guard self.session.canAddOutput(output) else { throw RecorderError.unavailable("Cannot add audio output") }
-                    self.session.addOutput(output)
                 }
                 self.session.commitConfiguration()
                 configurationOpen = false
                 self.session.startRunning()
-                let available = video.availableVideoCodecTypesForAssetWriter(writingTo: .mov)
+                if liveRAWFormatSelection {
+                    self.session.beginConfiguration()
+                    do {
+                        try device.lockForConfiguration()
+                        device.activeFormat = device.formats[mode.formatIndex]
+                        let duration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
+                        device.activeVideoMinFrameDuration = duration
+                        device.activeVideoMaxFrameDuration = duration
+                        device.unlockForConfiguration()
+                        guard video.availableVideoCodecTypes.contains(targetCodec),
+                              let connection = video.connection(with: .video) else {
+                            throw RecorderError.unavailable("RAW movie codec unavailable after format change")
+                        }
+                        video.setOutputSettings([AVVideoCodecKey: targetCodec], for: connection)
+                        self.session.commitConfiguration()
+                    } catch {
+                        self.session.commitConfiguration()
+                        throw error
+                    }
+                }
+                let available = video.availableVideoCodecTypes
                 self.onAvailableWriterCodecs?(available)
                 let capability: [String: Any] = ["camera": device.uniqueID, "formatIndex": mode.formatIndex,
                     "width": mode.width, "height": mode.height, "fps": mode.fps,
                     "requestedCodec": targetCodec.rawValue, "availableWriterCodecs": available.map(\.rawValue),
-                    "availablePixelFormats": video.availableVideoPixelFormatTypes,
-                    "storage": codec.isRAW ? "destination capability checked at runtime" : "internal Documents", "deferredStartEnabled": false]
+                    "availablePixelFormats": [Int](),
+                    "storage": codec.isRAW ? "destination capability checked at runtime" : "internal Documents", "output": "AVCaptureMovieFileOutput AF test"]
                 let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("GyroCineDiagnostics", isDirectory: true)
                 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -166,32 +190,27 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 guard available.contains(targetCodec) else {
                     throw RecorderError.unavailable("\(codec.label) encoder unavailable for active format; available: \(available.map(\.rawValue))")
                 }
+                guard let movieConnection = video.connection(with: .video) else {
+                    throw RecorderError.unavailable("Movie output has no video connection")
+                }
+                if !liveRAWFormatSelection {
+                    video.setOutputSettings([AVVideoCodecKey: targetCodec], for: movieConnection)
+                }
                 guard shutter.isSupported(by: device, mode: mode) else {
                     throw RecorderError.unavailable("Selected exposure limit is unsupported for the selected camera mode")
                 }
                 try device.lockForConfiguration()
-                do { try controls.apply(to: device, fps: mode.fps, shutter: shutter, raw: codec.isRAW) }
-                catch { device.unlockForConfiguration(); throw error }
-                // Configure focus explicitly after the input and active format are established.
-                if device.isFocusPointOfInterestSupported {
-                    device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
-                }
-                if device.isAutoFocusRangeRestrictionSupported { device.autoFocusRangeRestriction = .none }
-                // Use fast continuous scene AF for every RAW lens.
-                // Smooth AF deliberately trades speed for a less visible transition.
-                if device.isSmoothAutoFocusSupported { device.isSmoothAutoFocusEnabled = false }
-                if device.isFocusModeSupported(.continuousAutoFocus) {
-                    if codec.isRAW {
-                        device.automaticallyAdjustsFaceDrivenAutoFocusEnabled = false
-                        device.isFaceDrivenAutoFocusEnabled = false
-                    } else {
-                        device.automaticallyAdjustsFaceDrivenAutoFocusEnabled = true
+                do {
+                    if !rawAFMinimalComparison {
+                        try controls.apply(to: device, fps: mode.fps, shutter: shutter, raw: codec.isRAW)
                     }
                 }
-                // Enter continuous AF directly; do not immediately cancel a single-shot scan.
-                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
-                else if device.isFocusModeSupported(.autoFocus) { device.focusMode = .autoFocus }
-                device.isSubjectAreaChangeMonitoringEnabled = true
+                catch { device.unlockForConfiguration(); throw error }
+                // AF comparison: set continuous focus without touching face-driven behavior.
+                if !rawAFMinimalComparison && device.isFocusModeSupported(.continuousAutoFocus) {
+                    device.focusMode = .continuousAutoFocus
+                }
+                if !rawAFMinimalComparison { device.isSubjectAreaChangeMonitoringEnabled = false }
                 // Adding inputs / configuring exposure can reset frame durations.
                 // Apply the requested cadence last, after the session is running.
                 let frameDuration = CMTime(value: 1, timescale: CMTimeScale(mode.fps))
@@ -200,21 +219,7 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 let actualMin = device.activeVideoMinFrameDuration.seconds
                 let actualMax = device.activeVideoMaxFrameDuration.seconds
                 device.unlockForConfiguration()
-                self.focusObserver = NotificationCenter.default.addObserver(forName: AVCaptureDevice.subjectAreaDidChangeNotification,
-                    object: device, queue: nil) { [weak self, weak device] _ in
-                    guard let self, let device else { return }
-                    self.sessionQueue.async {
-                        guard self.device === device, self.session.isRunning else { return }
-                        self.recordFocusState(device, event: "subject-area-change-observed")
-                        if self.codec.isRAW && device.deviceType == .builtInWideAngleCamera {
-                            self.reacquireRAWFocus(device, reason: "subject-area-change")
-                        }
-                    }
-                }
                 self.recordFocusState(device, event: "configured")
-                if codec.isRAW && device.deviceType == .builtInWideAngleCamera {
-                    self.reacquireRAWFocus(device, reason: "raw-configuration")
-                }
                 var configuredCapability = capability
                 configuredCapability["focusMode"] = device.focusMode.rawValue
                 configuredCapability["smoothAutoFocusSupported"] = device.isSmoothAutoFocusSupported
@@ -223,11 +228,22 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 configuredCapability["autoFocusSupported"] = device.isFocusModeSupported(.autoFocus)
                 configuredCapability["autoFocusSystem"] = device.activeFormat.autoFocusSystem.rawValue
                 configuredCapability["minimumFocusDistanceMillimeters"] = device.minimumFocusDistance
-                configuredCapability["rawMainCameraFocusRecovery"] = codec.isRAW && device.deviceType == .builtInWideAngleCamera
+                configuredCapability["rawMainCameraFocusRecovery"] = false
                 configuredCapability["continuousAutoFocusSupported"] = device.isFocusModeSupported(.continuousAutoFocus)
                 configuredCapability["activeVideoStabilizationMode"] = video.connection(with: .video)?.activeVideoStabilizationMode.rawValue
                 configuredCapability["configuredMinFrameDurationSeconds"] = actualMin
                 configuredCapability["configuredMaxFrameDurationSeconds"] = actualMax
+                configuredCapability["movieFileOutputAFTest"] = true
+                configuredCapability["formatAppliedAfterSessionStart"] = liveRAWFormatSelection
+                configuredCapability["codecConfiguredWithinFormatTransaction"] = liveRAWFormatSelection
+                configuredCapability["preSessionFormatIndex"] = preSessionFormatIndex
+                configuredCapability["preSessionDeviceConfigurationSkipped"] = rawAFMinimalComparison
+                configuredCapability["rawAFMinimalGraph"] = rawAFMinimalComparison
+                configuredCapability["rawAFWhiteBalanceLockedAfterSessionStart"] = false
+                configuredCapability["rawAFWhiteBalanceLockMethod"] = rawAFMinimalComparison ? "none" : "gains"
+                configuredCapability["explicitFaceDrivenAFOverride"] = false
+                configuredCapability["explicitRAWStabilizationOverride"] = !avoidRAWStabilizationOverride
+                configuredCapability["whiteBalanceMode"] = device.whiteBalanceMode.rawValue
                 try JSONSerialization.data(withJSONObject: configuredCapability, options: [.prettyPrinted, .sortedKeys])
                     .write(to: root.appendingPathComponent("capture_capabilities_\(targetCodec.rawValue).json"))
                 guard abs(actualMin - frameDuration.seconds) < 0.000001,
@@ -235,28 +251,32 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                     throw RecorderError.unavailable("Camera did not accept requested frame rate")
                 }
                 self.onExposureReading?(device.exposureDuration.seconds, device.iso)
+                self.scheduleFocusPoll(device, token: self.focusPollToken)
                 self.onState?(.ready, nil)
             } catch { self.onState?(.failed, error.localizedDescription) }
         }
     }
 
     private func recordFocusState(_ device: AVCaptureDevice, event: String) {
+        func finite(_ value: Double) -> Any { value.isFinite ? value : NSNull() }
         let state: [String: Any] = ["hostSeconds": ProcessInfo.processInfo.systemUptime,
             "event": event, "camera": device.uniqueID, "codec": codec.rawValue,
             "mode": device.focusMode.rawValue, "adjusting": device.isAdjustingFocus,
-            "lensPosition": device.lensPosition, "system": device.activeFormat.autoFocusSystem.rawValue,
+            "lensPosition": finite(Double(device.lensPosition)), "system": device.activeFormat.autoFocusSystem.rawValue,
             "faceDriven": device.isFaceDrivenAutoFocusEnabled,
             "automaticFaceDriven": device.automaticallyAdjustsFaceDrivenAutoFocusEnabled,
             "smooth": device.isSmoothAutoFocusEnabled,
             "rangeRestriction": device.autoFocusRangeRestriction.rawValue,
-            "exposureSeconds": device.exposureDuration.seconds, "iso": device.iso]
+            "exposureSeconds": finite(device.exposureDuration.seconds), "iso": finite(Double(device.iso))]
         var diagnosticState = state
-        diagnosticState["focusPoint"] = [device.focusPointOfInterest.x, device.focusPointOfInterest.y]
+        diagnosticState["focusPoint"] = [finite(Double(device.focusPointOfInterest.x)),
+                                          finite(Double(device.focusPointOfInterest.y))]
         if #available(iOS 26.0, *) {
             diagnosticState["fullFrameFocusSupported"] = device.isFocusRectOfInterestSupported
             if device.isFocusRectOfInterestSupported {
                 let rect = device.focusRectOfInterest
-                diagnosticState["focusRect"] = [rect.origin.x, rect.origin.y, rect.width, rect.height]
+                diagnosticState["focusRect"] = [finite(Double(rect.origin.x)), finite(Double(rect.origin.y)),
+                                                 finite(Double(rect.width)), finite(Double(rect.height))]
             }
         }
         let snapshot = diagnosticState
@@ -270,6 +290,19 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                 try JSONSerialization.data(withJSONObject: self.focusDiagnostics, options: [.sortedKeys])
                     .write(to: root.appendingPathComponent("focus_trace.json"), options: .atomic)
             } catch { NSLog("GyroCine focus diagnostics write failed: %@", error.localizedDescription) }
+        }
+    }
+
+    private func scheduleFocusPoll(_ device: AVCaptureDevice, token: UUID) {
+        sessionQueue.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self, weak device] in
+            guard let self, let device, self.focusPollToken == token,
+                  self.device === device, self.session.isRunning else { return }
+            self.recordFocusState(device, event: "preview")
+            self.onFocusReading?(device.lensPosition, device.focusMode, device.isAdjustingFocus)
+            self.onExposureReading?(device.exposureDuration.seconds, device.iso)
+            let wb = device.temperatureAndTintValues(for: device.deviceWhiteBalanceGains)
+            self.onWhiteBalanceReading?(wb.temperature, wb.tint)
+            self.scheduleFocusPoll(device, token: token)
         }
     }
 
@@ -351,6 +384,10 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 
     func start(at url: URL, orientation: RecordingOrientation, externalDestination: Bool) {
+        if captureMovieOutput != nil {
+            sessionQueue.async { self.startMovieFile(at: url, externalDestination: externalDestination) }
+            return
+        }
         sampleQueue.async {
             do {
                 self.recordingOrientation = orientation
@@ -479,6 +516,65 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
     }
 
+    private func startMovieFile(at url: URL, externalDestination: Bool) {
+        do {
+            guard let movie = captureMovieOutput, session.isRunning, !movie.isRecording,
+                  let connection = movie.connection(with: .video),
+                  connection.activeVideoStabilizationMode == .off else {
+                throw RecorderError.unavailable("Movie output is not ready")
+            }
+            guard !codec.isRAW || externalDestination else {
+                throw RecorderError.unavailable("RAW 对焦测试版录制需要外接 SSD；取景对焦无需录制")
+            }
+            var outputURL = url
+            if codec.isRAW {
+                guard AVExternalStorageDevice.authorizationStatus == .authorized,
+                      let storage = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.first(where: { $0.isConnected }),
+                      storage.freeSize >= 2_000_000_000,
+                      let external = try storage.nextAvailableURLs(withPathExtensions: ["mov"]).first,
+                      external.startAccessingSecurityScopedResource() else {
+                    throw RecorderError.unavailable("ProRes RAW 需要已授权且至少有 2 GB 空间的外接 SSD")
+                }
+                outputURL = external
+                externalMovieURL = external
+            }
+            guard !FileManager.default.fileExists(atPath: outputURL.path) else {
+                throw RecorderError.unavailable("Movie output file already exists")
+            }
+            fileURL = url
+            movie.startRecording(to: outputURL, recordingDelegate: self)
+            onState?(.recording, nil)
+        } catch {
+            externalMovieURL?.stopAccessingSecurityScopedResource()
+            externalMovieURL = nil
+            onState?(.failed, error.localizedDescription)
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL,
+                    startPTS: CMTime, from connections: [AVCaptureConnection]) {
+        sessionQueue.async {
+            let hostPTS = try? ClockAligner.hostTime(startPTS, clock: self.session.synchronizationClock)
+            DiagnosticsCollector.record("MovieFileOutput startPTS=\(startPTS.seconds) hostPTS=\(String(describing: hostPTS))",
+                                        folder: self.fileURL?.deletingLastPathComponent())
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL,
+                    from connections: [AVCaptureConnection], error: Error?) {
+        sessionQueue.async {
+            guard let url = self.fileURL else { return }
+            var failure = error?.localizedDescription
+            if failure == nil, let external = self.externalMovieURL {
+                do { try FileManager.default.moveItem(at: external, to: url) }
+                catch { failure = "RAW 已保存在 SSD，归档失败: \(error.localizedDescription)" }
+            }
+            self.onCaptureFinished?()
+            self.onMovieFileCompleted?(url, failure)
+            self.fileURL = nil
+        }
+    }
+
     func releaseExternalMovieAccess() {
         sampleQueue.async {
             self.externalMovieURL?.stopAccessingSecurityScopedResource()
@@ -487,6 +583,14 @@ final class CaptureCoordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 
     func stop() {
+        if captureMovieOutput != nil {
+            sessionQueue.async {
+                guard let movie = self.captureMovieOutput, movie.isRecording else { return }
+                self.onState?(.finalizing, nil)
+                movie.stopRecording()
+            }
+            return
+        }
         // The UI can request STOP while capture callbacks already fill sampleQueue.
         // Prevent those callbacks from copying more full-resolution frames.
         stopRequestLock.lock()

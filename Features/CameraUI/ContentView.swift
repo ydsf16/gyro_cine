@@ -144,6 +144,21 @@ struct ContentView: View {
             .foregroundStyle(recording ? .red : .white).monospacedDigit()
     }
 
+    private var focusReadout: some View {
+        let mode = switch model.focusMode {
+        case .continuousAutoFocus: "AF-C"
+        case .autoFocus: "AF-S"
+        case .locked: "MF"
+        @unknown default: "AF?"
+        }
+        return Text("焦点位置 \(model.focusPosition.map { String(format: "%.3f", $0) } ?? "—") · \(mode)\(model.focusAdjusting ? " ↔" : "")")
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
+            .monospacedDigit()
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityIdentifier("focusPositionReadout")
+    }
+
     private func value(for selection: CameraControl) -> String {
         switch selection {
         case .resolution:
@@ -183,6 +198,10 @@ struct ContentView: View {
                     if model.state == .finalizing {
                         Text("正在保存…").font(.caption).padding(8)
                     }
+                    HStack {
+                        focusReadout
+                        Spacer(minLength: 0)
+                    }.padding(.horizontal, 8).padding(.bottom, 8)
                 }
                 if landscape, let selection = selectedControl {
                     HStack(spacing: 0) {

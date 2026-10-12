@@ -362,3 +362,38 @@ RAW writer codecs, and its startup trace showed a single-shot scan followed
 by restoration of continuous AF. The signed device build and all 53 simulator
 unit tests passed. Static near/far optical acceptance and recording-time
 focus stability remain open.
+
+## 2026-10-12 — MovieFileOutput comparison on iPhone 17 Pro
+
+The standalone RAWFocusTest visibly refocused at `aprn` / physical 1× / RAW
+format 69 (4224×3024) / 30 fps. GyroCine was changed to a temporary
+`AVCaptureMovieFileOutput` diagnostic path with a live lens-position readout.
+The IMU-to-MOV post-process is bypassed in this path. Without an external SSD,
+RAW recording and recorded-image sharpness were not tested.
+
+GyroCine initially configured only 1× RAW with a minimal capture graph. Its
+continuous-AF mode read back as 2, yet after lens changes the user sometimes
+observed blur and a fixed lens position. One trace held 1× at 0.541 for about
+55 seconds; another held 0.553 for about 11 seconds after returning from 4×.
+Moving the 1× white-balance lock to after session start, locking by mode only,
+then omitting it did not consistently restore AF. Keeping the session and
+MovieFileOutput running across RAW lens switches also failed. Removing RAW
+preview rotation/stabilization overrides did not prevent intermittent failure.
+Applying the RAW format after session start sometimes worked, but a later
+cold-boot/switch trial failed. Setting the movie codec in the same session
+configuration transaction as RAW format 69 also did not suffice by itself.
+
+The current diagnostic build applies the minimal RAW graph to all RAW lenses:
+it adds the movie output before selecting each RAW format, selects format and
+codec together after starting the session, and skips extra audio, white-balance,
+exposure, focus and movie-connection setters during RAW configuration. The user
+reported near/far refocus after repeated lens switches and again after a true
+iPhone power cycle. The latter trace began at about 30 seconds of system uptime;
+multiple 1× segments after lens changes had changing lens positions. This is
+promising preview evidence, not an isolated cause: several 4×/0.5× settings
+changed together, and earlier variants also passed briefly before failing.
+
+Evidence: `docs/device-evidence/raw-af-2026-10-12/` contains a stalled
+comparison trace and the current cold-boot trace/capability snapshot. Before
+shipping, restore and validate RAW audio, requested exposure/white balance,
+SSD recording, IMU embedding, MOV playback, and autofocus during recording.
