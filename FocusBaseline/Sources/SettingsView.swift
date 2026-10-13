@@ -21,13 +21,19 @@ struct SettingsView: View {
         camera.formats.filter { $0.compatibleCodecs.contains(camera.selectedCodec?.rawValue ?? "") }
     }
     private var resolutions: [ResolutionOption] {
-        let groups = Dictionary(grouping: compatibleFormats) { "\($0.width)×\($0.height)" }
-        return groups.compactMap { key, formats in
-            guard let first = formats.first else { return nil }
-            return ResolutionOption(id: key, width: first.width, height: first.height, formats: formats)
-        }.sorted { Int64($0.width) * Int64($0.height) > Int64($1.width) * Int64($1.height) }
+        ResolutionCategory.allCases.compactMap { category in
+            let formats = compatibleFormats.filter { ResolutionCategory.of($0) == category }
+            return formats.isEmpty ? nil : ResolutionOption(category: category, formats: formats)
+        }
     }
     private var currentFormat: FormatInfo? { camera.formats.first { $0.index == camera.selectedFormatIndex } }
+    private var selectedResolution: ResolutionCategory? { currentFormat.flatMap(ResolutionCategory.of) }
+    private var resolutionValue: String {
+        guard let currentFormat else { return "—" }
+        let dimensions = "\(currentFormat.width)×\(currentFormat.height)"
+        guard let selectedResolution else { return dimensions }
+        return selectedResolution == .openGate ? "Open Gate · \(dimensions)" : selectedResolution.title
+    }
 
     var body: some View {
         NavigationStack {
@@ -64,40 +70,39 @@ struct SettingsView: View {
 
     private var videoSection: some View {
         Section("VIDEO") {
-                    NavigationLink {
-                        optionList(codecOptions, selection: camera.selectedCodec) { codec in
-                            camera.chooseCodec(codec)
-                        } title: { codecName($0) }
-                        .navigationTitle("视频编码")
-                    } label: { row("视频编码", codecName(camera.selectedCodec)) }
-                    .disabled(locked)
-                    NavigationLink {
-                        List {
-                            ForEach(resolutions) { resolution in
-                                Button {
-                                    let preferred = resolution.formats.first { $0.index == camera.selectedFormatIndex }
-                                        ?? resolution.formats.first { $0.supports(camera.fps) }
-                                        ?? resolution.formats.first
-                                    if let preferred { camera.chooseFormat(preferred.index) }
-                                } label: {
-                                    HStack {
-                                        Text(resolution.label)
-                                        Spacer()
-                                        if resolution.id == currentFormat.map({ "\($0.width)×\($0.height)" }) {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .navigationTitle("分辨率")
-                    } label: { row("分辨率", currentFormat.map { "\($0.width)×\($0.height)" } ?? "—") }
-                    .disabled(locked)
-                    NavigationLink {
-                        optionList(camera.availableFPS, selection: camera.fps) { camera.chooseFPS($0) } title: { fpsLabel($0) }
-                            .navigationTitle("帧率")
-                    } label: { row("帧率", fpsLabel(camera.fps)) }
-                    .disabled(locked)
+            Menu {
+                ForEach(codecOptions, id: \.rawValue) { codec in
+                    Button {
+                        camera.chooseCodec(codec)
+                    } label: {
+                        if camera.selectedCodec == codec { Label(codecName(codec), systemImage: "checkmark") }
+                        else { Text(codecName(codec)) }
+                    }
+                }
+            } label: { row("视频编码", codecName(camera.selectedCodec)) }
+                .tint(.primary).disabled(locked || codecOptions.isEmpty)
+            Menu {
+                ForEach(resolutions) { resolution in
+                    Button {
+                        if let format = resolution.preferredFormat(at: camera.fps) { camera.chooseFormat(format.index) }
+                    } label: {
+                        if selectedResolution == resolution.category { Label(resolution.label, systemImage: "checkmark") }
+                        else { Text(resolution.label) }
+                    }
+                }
+            } label: { row("分辨率", resolutionValue) }
+                .tint(.primary).disabled(locked || resolutions.isEmpty)
+            Menu {
+                ForEach(camera.availableFPS.sorted(), id: \.self) { fps in
+                    Button {
+                        camera.chooseFPS(fps)
+                    } label: {
+                        if abs(camera.fps - fps) < 0.001 { Label(fpsLabel(fps), systemImage: "checkmark") }
+                        else { Text(fpsLabel(fps)) }
+                    }
+                }
+            } label: { row("帧率", fpsLabel(camera.fps)) }
+                .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
         }
     }
     private var storageSection: some View {
@@ -158,31 +163,45 @@ struct SettingsView: View {
         }
     }
     private func fpsLabel(_ value: Double) -> String {
-        value.rounded() == value ? "\(Int(value)) fps" : String(format: "%.3f fps", value)
+        if abs(value.rounded() - value) < 0.001 { return "\(Int(value.rounded())) fps" }
+        return String(format: value == 23.976 ? "%.3f fps" : "%.2f fps", value)
     }
-    private func optionList<T: Hashable>(_ values: [T], selection: T?, action: @escaping (T) -> Void, title: @escaping (T) -> String) -> some View {
-        List {
-            ForEach(values, id: \.self) { value in
-                Button { action(value) } label: {
-                    HStack { Text(title(value)); Spacer(); if selection == value { Image(systemName: "checkmark") } }
-                }
-            }
-        }
+}
+
+private enum ResolutionCategory: String, CaseIterable, Identifiable {
+    case fourK, fullHD, hd, openGate
+    var id: Self { self }
+    var title: String {
+        switch self { case .fourK: "4K"; case .fullHD: "1080p"; case .hd: "720p"; case .openGate: "Open Gate" }
+    }
+    static func of(_ format: FormatInfo) -> Self? {
+        let ratio = Double(format.width) / Double(format.height)
+        if format.width >= 3000 && ratio < 1.65 { return .openGate }
+        if format.width >= 3800 && ratio >= 1.65 { return .fourK }
+        if format.width == 1920 && format.height == 1080 { return .fullHD }
+        if format.width == 1280 && format.height == 720 { return .hd }
+        return nil
     }
 }
 
 private struct ResolutionOption: Identifiable {
-    let id: String
-    let width: Int32
-    let height: Int32
+    let category: ResolutionCategory
     let formats: [FormatInfo]
+    var id: ResolutionCategory { category }
     var label: String {
-        let category: String
-        if width >= 4000 && Double(height) / Double(width) > 0.65 { category = "Open Gate" }
-        else if width >= 3800 { category = "4K" }
-        else if width >= 1900 { category = "1080p" }
-        else if width >= 1200 { category = "720p" }
-        else { category = "视频" }
-        return "\(category) · \(width)×\(height)"
+        guard category == .openGate, let largest = formats.max(by: { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }) else { return category.title }
+        return "Open Gate · \(largest.width)×\(largest.height)"
+    }
+    func preferredFormat(at fps: Double) -> FormatInfo? {
+        let supported = formats.filter { $0.supports(fps) }
+        let candidates = supported.isEmpty ? formats : supported
+        if category == .fourK {
+            return candidates.min { first, second in
+                let firstDistance = abs(Int(first.width) - 3840) + abs(Int(first.height) - 2160)
+                let secondDistance = abs(Int(second.width) - 3840) + abs(Int(second.height) - 2160)
+                return firstDistance < secondDistance
+            }
+        }
+        return candidates.max { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }
     }
 }

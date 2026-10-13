@@ -14,6 +14,7 @@
 		5D2B64739F80DD359E941E51 /* CameraModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C05029D1FDA801C98769366 /* CameraModels.swift */; };
 		D58E36B7E18FFCA6218EB5A6 /* RecordingExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */; };
 		DF4F011A895C95E528EB6DE8 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */; };
+		F39F700D9307D8B002C8DECE /* MovingRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B2CEC1B9A6BC2630578CD9 /* MovingRuler.swift */; };
 		FC734D063F7AD16E30518AB6 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E9685BA71993FDED107C79 /* CameraView.swift */; };
 /* End PBXBuildFile section */
 
@@ -24,6 +25,7 @@
 		4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWFocusTestApp.swift; sourceTree = "<group>"; };
 		5125666099553568C24BB6BE /* GyroCineRebuild.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GyroCineRebuild.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		97B2CEC1B9A6BC2630578CD9 /* MovingRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovingRuler.swift; sourceTree = "<group>"; };
 		A92D48296F15CE1EE0B3DCB7 /* RAWFocusTest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RAWFocusTest-Bridging-Header.h"; sourceTree = "<group>"; };
 		B7A4CE2F72771FA923EE943E /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
 		B7AEA962B5C246FDCD4C125E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -48,6 +50,7 @@
 				02E9685BA71993FDED107C79 /* CameraView.swift */,
 				7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */,
 				3097CB64F77AB71C6B9C2175 /* MediaLibraryView.swift */,
+				97B2CEC1B9A6BC2630578CD9 /* MovingRuler.swift */,
 				A92D48296F15CE1EE0B3DCB7 /* RAWFocusTest-Bridging-Header.h */,
 				4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */,
 				B7A4CE2F72771FA923EE943E /* RecordingExceptionCatcher.h */,
@@ -129,6 +132,7 @@
 				FC734D063F7AD16E30518AB6 /* CameraView.swift in Sources */,
 				DF4F011A895C95E528EB6DE8 /* DiagnosticLogger.swift in Sources */,
 				1407C058C2EE41FE16DFD2D9 /* MediaLibraryView.swift in Sources */,
+				F39F700D9307D8B002C8DECE /* MovingRuler.swift in Sources */,
 				1CE9A5FB04148C5892571EF1 /* RAWFocusTestApp.swift in Sources */,
 				D58E36B7E18FFCA6218EB5A6 /* RecordingExceptionCatcher.m in Sources */,
 				3D35F02479A42CDBD8237540 /* SettingsView.swift in Sources */,

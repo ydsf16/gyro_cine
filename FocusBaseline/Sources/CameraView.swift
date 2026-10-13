@@ -57,20 +57,15 @@ struct CameraView: View {
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .top) {
-                Preview(session: camera.session, onTap: camera.tapFocus)
-                .frame(width: geometry.size.width, height: geometry.size.height)
+        ZStack {
+            Preview(session: camera.session, onTap: camera.tapFocus)
                 .ignoresSafeArea()
-                VStack(spacing: 0) {
-                    topHUD
-                    Spacer(minLength: 0)
-                    if let selected { parameterPanel(selected).padding(.horizontal, 14).padding(.bottom, 14) }
-                    bottomBar
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
+            VStack(spacing: 0) {
+                topHUD
+                Spacer(minLength: 0)
+                if let selected { parameterPanel(selected).padding(.horizontal, 14).padding(.bottom, 14) }
+                bottomBar
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black)
@@ -80,6 +75,12 @@ struct CameraView: View {
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
             Button("确定") { camera.clearError() }
         } message: { Text(camera.errorText ?? "") }
+        .onAppear {
+            shutterValue = camera.exposureSeconds
+            isoValue = Double(camera.iso)
+            wbValue = Double(camera.whiteBalanceKelvin)
+            focusValue = Double(camera.lensPosition)
+        }
         .onChange(of: camera.exposureSeconds) { _, value in if camera.exposureAuto { shutterValue = value } }
         .onChange(of: camera.iso) { _, value in if camera.exposureAuto { isoValue = Double(value) } }
         .onChange(of: camera.whiteBalanceKelvin) { _, value in if camera.whiteBalanceAuto { wbValue = Double(value) } }
@@ -197,16 +198,16 @@ struct CameraView: View {
                         }
                     }
                 case .shutter:
-                    scaleSlider(value: $shutterValue, range: camera.exposureRange, labels: shutterLabels) { camera.setManualExposure(seconds: $0) }
+                    movingRuler(value: $shutterValue, range: camera.exposureRange, mapping: .logarithmic, format: shutterLabel) { camera.setManualExposure(seconds: $0) }
                         .disabled(camera.exposureAuto)
                 case .iso:
-                    scaleSlider(value: $isoValue, range: camera.isoRange, labels: isoLabels) { camera.setManualExposure(iso: $0) }
+                    movingRuler(value: $isoValue, range: camera.isoRange, mapping: .logarithmic, format: { String(Int($0.rounded())) }) { camera.setManualExposure(iso: $0) }
                         .disabled(camera.exposureAuto)
                 case .wb:
-                    scaleSlider(value: $wbValue, range: 2000...10000, labels: ["2000", "3200", "5600", "8000", "10000"]) { camera.setWhiteBalance(kelvin: Float($0)) }
+                    movingRuler(value: $wbValue, range: 2000...10000, format: { "\(Int($0.rounded()))" }) { camera.setWhiteBalance(kelvin: Float($0)) }
                         .disabled(camera.whiteBalanceAuto)
                 case .focus:
-                    scaleSlider(value: $focusValue, range: 0...1, labels: ["0", "0.25", "0.5", "0.75", "1"]) { camera.setManualPosition(Float($0)) }
+                    movingRuler(value: $focusValue, range: 0...1, format: { String(format: "%.2f", $0) }) { camera.setManualPosition(Float($0)) }
                         .disabled(camera.focusChoice != .manual)
                 }
             }
@@ -244,47 +245,17 @@ struct CameraView: View {
         .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
     }
 
-    private func scaleSlider(value: Binding<Double>, range: ClosedRange<Double>, labels: [String], onChange: @escaping (Double) -> Void) -> some View {
-        VStack(spacing: 3) {
-            GeometryReader { proxy in
-                ZStack {
-                    HStack(alignment: .center, spacing: 0) {
-                        ForEach(0..<41, id: \.self) { index in
-                            Rectangle().fill(.white.opacity(index.isMultiple(of: 5) ? 0.65 : 0.32))
-                                .frame(width: 1, height: index.isMultiple(of: 5) ? 17 : 9)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    Rectangle().fill(accent).frame(width: 3, height: 31)
-                        .position(x: max(2, min(proxy.size.width - 2, proxy.size.width * (value.wrappedValue - range.lowerBound) / max(range.upperBound - range.lowerBound, 0.000001))), y: proxy.size.height / 2)
-                }
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        let fraction = min(max(gesture.location.x / max(proxy.size.width, 1), 0), 1)
-                        let newValue = range.lowerBound + fraction * (range.upperBound - range.lowerBound)
-                        value.wrappedValue = newValue
-                        if Date().timeIntervalSince(lastControlSend) > 0.06 {
-                            lastControlSend = Date()
-                            onChange(newValue)
-                        }
-                    }
-                    .onEnded { _ in onChange(value.wrappedValue) })
+    private func movingRuler(value: Binding<Double>, range: ClosedRange<Double>, mapping: RulerMapping = .linear, format: @escaping (Double) -> String,
+                             onChange: @escaping (Double) -> Void) -> some View {
+        MovingRuler(value: value, range: range, mapping: mapping, format: format) { selectedValue, finished in
+            if finished || Date().timeIntervalSince(lastControlSend) > 0.06 {
+                lastControlSend = Date()
+                onChange(selectedValue)
             }
-            HStack { ForEach(labels, id: \.self) { label in Text(label).frame(maxWidth: .infinity) } }
-                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.65))
         }
     }
-    private var shutterLabels: [String] {
-        let range = camera.exposureRange
-        return (0...4).map { step in
-            let seconds = range.lowerBound + Double(step) / 4 * (range.upperBound - range.lowerBound)
-            return seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
-        }
-    }
-    private var isoLabels: [String] {
-        let range = camera.isoRange
-        return (0...4).map { step in String(Int((range.lowerBound + Double(step) / 4 * (range.upperBound - range.lowerBound)).rounded())) }
+    private func shutterLabel(_ seconds: Double) -> String {
+        seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
     }
 
     private var bottomBar: some View {

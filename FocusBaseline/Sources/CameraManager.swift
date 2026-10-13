@@ -383,8 +383,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     var availableFPS: [Double] {
         guard let index = selectedFormatIndex, formats.indices.contains(index) else { return [] }
-        let common = [23.976, 24, 25, 29.97, 30, 59.94, 60, 120, 240].filter(formats[index].supports)
-        return common.isEmpty ? formats[index].format.videoSupportedFrameRateRanges.map(\.maxFrameRate) : common
+        let common = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60, 119.88, 120, 240].filter(formats[index].supports)
+        let rates = common.isEmpty ? formats[index].format.videoSupportedFrameRateRanges.map(\.maxFrameRate) : common
+        return Array(Set(rates)).sorted()
     }
 
     private func configurationSnapshot() -> [String: Any] {
