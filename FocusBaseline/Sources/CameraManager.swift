@@ -19,6 +19,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var lenses: [LensChoice] = []
     @Published private(set) var selectedLensID: String?
     @Published private(set) var switchingLens = false
+    @Published private(set) var audioAvailable = false
+    @Published private(set) var cameraReady = false
+    @Published private(set) var finalizing = false
+    @Published private(set) var recordingStartedAt: Date?
+    @Published private(set) var exposureSeconds: Double = 1.0 / 60.0
+    @Published private(set) var iso: Float = 100
+    @Published private(set) var whiteBalanceKelvin: Float = 5600
+    @Published private(set) var exposureAuto = true
+    @Published private(set) var whiteBalanceAuto = true
+    @Published private(set) var isoRange: ClosedRange<Double> = 50...3200
+    @Published private(set) var exposureRange: ClosedRange<Double> = 1.0 / 1000.0...1.0 / 30.0
 
     let session = AVCaptureSession()
     let logger = DiagnosticLogger()
@@ -44,6 +55,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var notificationTokens: [NSObjectProtocol] = []
     private var currentFile: URL?
     private var recordingStarting = false
+    private var audioReady = false
+    private var telemetryReadoutTick = 0
 
     override init() {
         super.init()
@@ -107,6 +120,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.addInput(audioInput)
             }
             session.commitConfiguration()
+            audioReady = audioAllowed && session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }
+            publish { self.audioAvailable = self.audioReady }
             logger.event("camera_ready", ["deviceID": camera.uniqueID, "name": camera.localizedName,
                                           "audioAuthorized": audioAllowed,
                                           "supportsFocusPoint": camera.isFocusPointOfInterestSupported,
@@ -118,10 +133,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.adjusting = camera.isAdjustingFocus
                 self.lensPosition = camera.lensPosition
             }
+            publish { self.isoRange = Double(camera.activeFormat.minISO)...Double(camera.activeFormat.maxISO) }
             discoverCapabilities(camera)
             startSampling(camera)
             session.startRunning()
-            publish { self.status = "Camera ready" }
+            publish { self.status = "Camera ready"; self.cameraReady = self.session.isRunning }
         } catch { fail("Camera setup: \(error)") }
     }
 
@@ -179,6 +195,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.selectedLensID = id
                     self.actualFocusMode = self.focusName(next.focusMode)
                     self.lensPosition = next.lensPosition
+                    self.isoRange = Double(next.activeFormat.minISO)...Double(next.activeFormat.maxISO)
                     self.switchingLens = false
                 }
             } catch {
@@ -222,11 +239,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             found.append(info)
         }
         formatObjects = found
-        let preferred = union.first(where: { $0 == .hevc }) ?? union.first
+        let preferences = UserDefaults.standard
+        let codecKey = "capture.codec.\(camera.uniqueID)"
+        let formatKey = "capture.format.\(camera.uniqueID)"
+        let fpsKey = "capture.fps.\(camera.uniqueID)"
+        let rememberedCodec = preferences.string(forKey: codecKey).map(AVVideoCodecType.init(rawValue:))
+        let preferred = union.first(where: { $0 == rememberedCodec }) ?? union.first(where: { $0 == .hevc }) ?? union.first
         chosenCodec = preferred
+        let rememberedIndex = preferences.object(forKey: formatKey) as? Int
         let originalIndex = found.firstIndex(where: { $0.format === oldFormat })
-        chosenIndex = originalIndex.flatMap { found[$0].compatibleCodecs.contains(preferred?.rawValue ?? "") ? $0 : nil }
+        chosenIndex = rememberedIndex.flatMap { found.indices.contains($0) && found[$0].compatibleCodecs.contains(preferred?.rawValue ?? "") ? $0 : nil }
+            ?? originalIndex.flatMap { found[$0].compatibleCodecs.contains(preferred?.rawValue ?? "") ? $0 : nil }
             ?? found.firstIndex(where: { $0.compatibleCodecs.contains(preferred?.rawValue ?? "") })
+        if let chosenIndex, let rememberedFPS = preferences.object(forKey: fpsKey) as? Double,
+           found[chosenIndex].supports(rememberedFPS) { chosenFPS = rememberedFPS }
         let report: [String: Any] = ["sessionID": logger.sessionID, "model": Self.hardwareModel(),
                                      "iOS": UIDevice.current.systemVersion, "cameraID": camera.uniqueID,
                                      "cameraName": camera.localizedName, "allCodecs": union.map(\.rawValue),
@@ -289,8 +315,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             output.setOutputSettings([AVVideoCodecKey: codec.rawValue], for: connection)
             chosenIndex = index; chosenFPS = targetFPS
+            if reason != "initial_selection" && reason != "lens_restore" {
+                let preferences = UserDefaults.standard
+                preferences.set(codec.rawValue, forKey: "capture.codec.\(camera.uniqueID)")
+                preferences.set(index, forKey: "capture.format.\(camera.uniqueID)")
+                preferences.set(targetFPS, forKey: "capture.fps.\(camera.uniqueID)")
+            }
             logger.event("configuration_result", ["kind": reason, "success": true, "after": configurationSnapshot()])
-            publish { self.selectedCodec = codec; self.selectedFormatIndex = index; self.fps = targetFPS; self.errorText = nil }
+            publish {
+                self.selectedCodec = codec; self.selectedFormatIndex = index; self.fps = targetFPS
+                self.isoRange = Double(camera.activeFormat.minISO)...Double(camera.activeFormat.maxISO)
+                self.exposureRange = CMTimeGetSeconds(camera.activeFormat.minExposureDuration)...CMTimeGetSeconds(camera.activeFormat.maxExposureDuration)
+                self.errorText = nil
+            }
             return true
         } catch {
             do {
@@ -329,6 +366,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     throw CameraError.unavailableCodec(self.chosenCodec?.rawValue ?? "none", index)
                 }
                 self.chosenFPS = value
+                UserDefaults.standard.set(value, forKey: "capture.fps.\(camera.uniqueID)")
                 self.logger.event("fps_result", ["success": true, "after": self.configurationSnapshot()])
                 self.publish { self.fps = value; self.errorText = nil }
             } catch {
@@ -405,14 +443,81 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     func tapFocus(_ point: CGPoint) { chooseFocus(.tap, point: point) }
     func setManualPosition(_ value: Float) { chooseFocus(.manual, manualPosition: value) }
+    func setExposureAuto(_ enabled: Bool) {
+        queue.async {
+            guard let camera = self.device else { return }
+            do {
+                try camera.lockForConfiguration()
+                defer { camera.unlockForConfiguration() }
+                if enabled {
+                    guard camera.isExposureModeSupported(.continuousAutoExposure) else { throw CameraError.unsupportedFocus("Auto exposure") }
+                    camera.exposureMode = .continuousAutoExposure
+                } else {
+                    guard camera.isExposureModeSupported(.custom) else { throw CameraError.unsupportedFocus("Manual exposure") }
+                    camera.setExposureModeCustom(duration: camera.exposureDuration, iso: camera.iso)
+                }
+                self.publish { self.exposureAuto = enabled }
+            } catch { self.fail("Exposure: \(error)") }
+        }
+    }
+    func setManualExposure(seconds: Double? = nil, iso: Double? = nil) {
+        queue.async {
+            guard let camera = self.device, camera.isExposureModeSupported(.custom) else { return }
+            do {
+                try camera.lockForConfiguration()
+                defer { camera.unlockForConfiguration() }
+                let range = camera.activeFormat.minExposureDuration...camera.activeFormat.maxExposureDuration
+                let requested = CMTime(seconds: seconds ?? CMTimeGetSeconds(camera.exposureDuration), preferredTimescale: 1_000_000)
+                let duration = min(max(requested, range.lowerBound), range.upperBound)
+                let level = Float(min(max(iso ?? Double(camera.iso), Double(camera.activeFormat.minISO)), Double(camera.activeFormat.maxISO)))
+                camera.setExposureModeCustom(duration: duration, iso: level)
+                camera.unlockForConfiguration()
+                self.publish { self.exposureAuto = false }
+            } catch { self.fail("Exposure: \(error)") }
+        }
+    }
+    func setWhiteBalanceAuto(_ enabled: Bool) {
+        queue.async {
+            guard let camera = self.device else { return }
+            do {
+                try camera.lockForConfiguration()
+                if enabled {
+                    guard camera.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else { throw CameraError.unsupportedFocus("Auto white balance") }
+                    camera.whiteBalanceMode = .continuousAutoWhiteBalance
+                } else {
+                    guard camera.isWhiteBalanceModeSupported(.locked) else { throw CameraError.unsupportedFocus("Manual white balance") }
+                    camera.whiteBalanceMode = .locked
+                }
+                self.publish { self.whiteBalanceAuto = enabled }
+            } catch { self.fail("White balance: \(error)") }
+        }
+    }
+    func setWhiteBalance(kelvin: Float) {
+        queue.async {
+            guard let camera = self.device, camera.isWhiteBalanceModeSupported(.locked) else { return }
+            do {
+                try camera.lockForConfiguration()
+                defer { camera.unlockForConfiguration() }
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: 0)
+                let gains = camera.deviceWhiteBalanceGains(for: values)
+                let ceiling = camera.maxWhiteBalanceGain
+                let safe = AVCaptureDevice.WhiteBalanceGains(redGain: min(max(gains.redGain, 1), ceiling),
+                    greenGain: min(max(gains.greenGain, 1), ceiling), blueGain: min(max(gains.blueGain, 1), ceiling))
+                camera.setWhiteBalanceModeLocked(with: safe)
+                self.publish { self.whiteBalanceAuto = false; self.whiteBalanceKelvin = kelvin }
+            } catch { self.fail("White balance: \(error)") }
+        }
+    }
     func mark() { queue.async { self.logger.event("mark", ["state": self.configurationSnapshot(), "recording": self.output.isRecording]) } }
 
     func toggleRecording() {
         queue.async {
             if self.output.isRecording {
                 self.logger.event("record_stop_request", ["state": self.configurationSnapshot()])
+                self.publish { self.finalizing = true }
                 if let exception = RecordingExceptionCatcher.exceptionMessage(for: { self.output.stopRecording() }) {
                     self.logger.event("record_stop_exception", ["message": exception])
+                    self.publish { self.finalizing = false }
                     self.fail("Stop recording: \(exception)")
                 }
                 return
@@ -422,6 +527,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             guard self.session.isRunning else { self.fail("Camera session is not running"); return }
+            guard self.audioReady else { self.fail("需要麦克风权限才能录制声音。请在系统设置中允许麦克风访问。"); return }
             guard let codec = self.chosenCodec, let index = self.chosenIndex,
                   self.formatObjects[index].compatibleCodecs.contains(codec.rawValue),
                   self.output.availableVideoCodecTypes.contains(codec) else {
@@ -449,7 +555,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.recordingStarting = false
             self.logger.event("record_delegate_start", ["path": fileURL.path, "state": self.configurationSnapshot(),
                                                         "outputIsRecording": self.output.isRecording])
-            self.publish { self.recording = true }
+            self.publish { self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
         }
     }
 
@@ -460,7 +566,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.logger.event("record_delegate_finish", ["path": fileURL.path,
                 "fileBytes": attributes?[.size] as? NSNumber ?? 0, "error": error.map { String(describing: $0) } ?? "",
                 "state": self.configurationSnapshot()])
-            self.publish { self.recording = false; if let error { self.errorText = "Recording failed: \(error)" } }
+            self.publish {
+                self.recording = false; self.finalizing = false; self.recordingStartedAt = nil
+                if let error { self.errorText = "Recording failed: \(error)" }
+                else { self.errorText = "测试视频已保存；IMU 和 Sony MOV 元数据尚未接入。" }
+            }
         }
     }
 
@@ -488,6 +598,21 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         timer.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
         timer.setEventHandler { [weak self, weak camera] in
             guard let self, let camera else { return }
+            self.telemetryReadoutTick += 1
+            if self.telemetryReadoutTick % 5 == 0 {
+                let temperature = camera.temperatureAndTintValues(for: camera.deviceWhiteBalanceGains).temperature
+                let iso = camera.iso
+                let exposureSeconds = CMTimeGetSeconds(camera.exposureDuration)
+                let exposureAuto = camera.exposureMode == .continuousAutoExposure
+                let whiteBalanceAuto = camera.whiteBalanceMode == .continuousAutoWhiteBalance
+                self.publish {
+                    self.iso = iso
+                    self.exposureSeconds = exposureSeconds
+                    self.whiteBalanceKelvin = temperature
+                    self.exposureAuto = exposureAuto
+                    self.whiteBalanceAuto = whiteBalanceAuto
+                }
+            }
             self.logger.event("focus_sample", ["focusMode": self.focusName(camera.focusMode),
                                                 "adjusting": camera.isAdjustingFocus, "lensPosition": camera.lensPosition,
                                                 "recording": self.output.isRecording])
@@ -508,9 +633,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     if name == UIApplication.didEnterBackgroundNotification, self.output.isRecording { self.output.stopRecording() }
                     if name == UIApplication.willEnterForegroundNotification || name == AVCaptureSession.interruptionEndedNotification {
                         if !self.session.isRunning { self.session.startRunning() }
-                        self.publish { self.status = self.session.isRunning ? "Camera ready" : "Camera interrupted" }
+                        self.publish { self.status = self.session.isRunning ? "Camera ready" : "Camera interrupted"; self.cameraReady = self.session.isRunning }
                     }
-                    if name == AVCaptureSession.wasInterruptedNotification { self.publish { self.status = "Camera interrupted" } }
+                    if name == AVCaptureSession.wasInterruptedNotification { self.publish { self.status = "Camera interrupted"; self.cameraReady = false } }
                     if name == AVCaptureSession.runtimeErrorNotification { self.fail("Capture session runtime error") }
                 }
             })
