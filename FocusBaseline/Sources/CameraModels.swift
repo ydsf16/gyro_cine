@@ -1,5 +1,27 @@
 import AVFoundation
 
+enum VideoEncoding: String, CaseIterable, Identifiable {
+    case hevc, hevcHQ, proResRAW, proResRAWHQ
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .hevc: "H.265"
+        case .hevcHQ: "H.265 HQ"
+        case .proResRAW: "ProRes RAW"
+        case .proResRAWHQ: "ProRes RAW HQ"
+        }
+    }
+    var codec: AVVideoCodecType {
+        switch self {
+        case .hevc, .hevcHQ: .hevc
+        case .proResRAW: AVVideoCodecType(rawValue: "aprn")
+        case .proResRAWHQ: AVVideoCodecType(rawValue: "aprh")
+        }
+    }
+}
+
+enum ShutterMode { case auto, autoMax, manual }
+
 enum FocusChoice: String, CaseIterable, Identifiable {
     case continuous = "Continuous AF", single = "Single AF", locked = "Locked"
     case manual = "Manual", tap = "Tap to Focus"

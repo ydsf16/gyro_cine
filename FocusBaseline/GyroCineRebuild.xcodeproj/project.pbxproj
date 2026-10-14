@@ -12,6 +12,8 @@
 		2A7D2083492A13ECB9A78F7C /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1955D3BE91E80609106339 /* CameraManager.swift */; };
 		3D35F02479A42CDBD8237540 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7AEA962B5C246FDCD4C125E /* SettingsView.swift */; };
 		5D2B64739F80DD359E941E51 /* CameraModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C05029D1FDA801C98769366 /* CameraModels.swift */; };
+		B32E940016C37D0729D497C4 /* AppText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6163DC000A31C52467646AF /* AppText.swift */; };
+		CBBFE52DE4C60220AA985103 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = BEC6C31371A625EB5F50CE55 /* Localizable.strings */; };
 		D58E36B7E18FFCA6218EB5A6 /* RecordingExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */; };
 		DF4F011A895C95E528EB6DE8 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */; };
 		F39F700D9307D8B002C8DECE /* MovingRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B2CEC1B9A6BC2630578CD9 /* MovingRuler.swift */; };
@@ -23,17 +25,28 @@
 		1C05029D1FDA801C98769366 /* CameraModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModels.swift; sourceTree = "<group>"; };
 		3097CB64F77AB71C6B9C2175 /* MediaLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLibraryView.swift; sourceTree = "<group>"; };
 		4C1C223FCE9EA4F2D0DC95E7 /* RAWFocusTestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWFocusTestApp.swift; sourceTree = "<group>"; };
+		503C0181E4D6A5E37F1B24B5 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		5125666099553568C24BB6BE /* GyroCineRebuild.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GyroCineRebuild.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7510E37BF40BAD5BB332102F /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		7E32C328CD39C470CFA26278 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		97B2CEC1B9A6BC2630578CD9 /* MovingRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovingRuler.swift; sourceTree = "<group>"; };
 		A92D48296F15CE1EE0B3DCB7 /* RAWFocusTest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RAWFocusTest-Bridging-Header.h"; sourceTree = "<group>"; };
 		B7A4CE2F72771FA923EE943E /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
 		B7AEA962B5C246FDCD4C125E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D0816E0B36D0FAEEE15DDB0B /* RecordingExceptionCatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RecordingExceptionCatcher.m; sourceTree = "<group>"; };
 		DD1955D3BE91E80609106339 /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		E6163DC000A31C52467646AF /* AppText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppText.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		066F559CB5160C2F2A0EC79A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BEC6C31371A625EB5F50CE55 /* Localizable.strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		260D825E92CCCAAA6BE88383 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -45,6 +58,7 @@
 		494AAC0E48AE996564EA69C9 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				E6163DC000A31C52467646AF /* AppText.swift */,
 				DD1955D3BE91E80609106339 /* CameraManager.swift */,
 				1C05029D1FDA801C98769366 /* CameraModels.swift */,
 				02E9685BA71993FDED107C79 /* CameraView.swift */,
@@ -63,6 +77,7 @@
 		E13006FEF49860AAE6171EBB = {
 			isa = PBXGroup;
 			children = (
+				066F559CB5160C2F2A0EC79A /* Resources */,
 				494AAC0E48AE996564EA69C9 /* Sources */,
 				260D825E92CCCAAA6BE88383 /* Products */,
 			);
@@ -76,6 +91,7 @@
 			buildConfigurationList = 3313051076D4F55C89E29E13 /* Build configuration list for PBXNativeTarget "GyroCineRebuild" */;
 			buildPhases = (
 				5116C6086BE53181947D1D78 /* Sources */,
+				546E70D34BE6DF3F1D7446F0 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -109,6 +125,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = E13006FEF49860AAE6171EBB;
 			minimizedProjectReferenceProxies = 1;
@@ -122,11 +139,23 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		546E70D34BE6DF3F1D7446F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CBBFE52DE4C60220AA985103 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		5116C6086BE53181947D1D78 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B32E940016C37D0729D497C4 /* AppText.swift in Sources */,
 				2A7D2083492A13ECB9A78F7C /* CameraManager.swift in Sources */,
 				5D2B64739F80DD359E941E51 /* CameraModels.swift in Sources */,
 				FC734D063F7AD16E30518AB6 /* CameraView.swift in Sources */,
@@ -140,6 +169,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		BEC6C31371A625EB5F50CE55 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				503C0181E4D6A5E37F1B24B5 /* en */,
+				7E32C328CD39C470CFA26278 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		17EFDAC509B46364A1C0F778 /* Debug */ = {
@@ -200,6 +241,7 @@
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record audio with your video.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save selected recordings to your photo library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -302,6 +344,7 @@
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record audio with your video.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save selected recordings to your photo library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
