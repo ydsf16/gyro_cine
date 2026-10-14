@@ -176,7 +176,7 @@ struct CameraView: View {
                 }
                 Spacer(minLength: 3)
                 statusBadge("SSD", healthy: false)
-                statusBadge("IMU", healthy: false)
+                statusBadge("IMU", healthy: camera.imuAvailable)
             }
             Text(specification)
                 .font(.system(size: 13, weight: .medium))
@@ -204,6 +204,7 @@ struct CameraView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("parameter.\(parameter.rawValue)")
                 }
             }
         }
@@ -275,6 +276,7 @@ struct CameraView: View {
                                     .frame(maxWidth: .infinity).frame(height: 40)
                                     .background(camera.selectedLensID == lens.id ? accent : .white.opacity(0.08), in: Circle())
                             }
+                            .accessibilityIdentifier("lens.\(lens.label)")
                             .disabled(camera.recording || camera.finalizing || camera.switchingLens)
                         }
                     }
@@ -405,6 +407,7 @@ struct CameraView: View {
             }
             .disabled(!camera.cameraReady || camera.finalizing || camera.switchingLens)
             .accessibilityLabel(camera.finalizing ? t("正在保存", "Finalizing") : camera.recording ? t("停止录制", "Stop recording") : t("开始录制", "Record"))
+            .accessibilityIdentifier("recordToggle")
             .frame(maxWidth: .infinity)
             Button { showingSettings = true } label: {
                 VStack(spacing: 5) { Image(systemName: "gearshape").font(.system(size: 25)); Text(t("设置", "Settings")).font(.caption) }
@@ -420,6 +423,10 @@ struct CameraView: View {
             if camera.finalizing {
                 HStack(spacing: 7) { ProgressView().tint(.white); Text(t("正在保存…", "Saving…")) }
                     .font(.caption).foregroundStyle(.white)
+            } else if camera.status == "Saved · IMU embedded" {
+                Text(t("已保存 · IMU 已嵌入", "Saved · IMU embedded"))
+                    .font(.caption).foregroundStyle(.green)
+                    .accessibilityIdentifier("saveStatus")
             }
         }
     }

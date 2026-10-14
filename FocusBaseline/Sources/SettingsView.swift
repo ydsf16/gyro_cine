@@ -132,17 +132,18 @@ struct SettingsView: View {
                     }
                     Menu {
                         Button("Sony MOV") { outputFormat = "SonyMov" }
-                        Button(t("Gyroflow 项目", "Gyroflow Project")) { outputFormat = "GyroflowProto" }
-                    } label: { row(t("存储格式", "Output format"), outputFormat == "SonyMov" ? "Sony MOV" : t("Gyroflow 项目", "Gyroflow Project")) }.tint(.primary)
+                        Button("Gyroflow Proto MOV") { outputFormat = "GyroflowProto" }
+                    } label: { row(t("存储格式", "Output format"), outputFormat == "SonyMov" ? "Sony MOV" : "Gyroflow Proto MOV") }.tint(.primary)
+                    .accessibilityIdentifier("outputFormatMenu")
                     .disabled(locked)
         } header: { Text(t("存储", "STORAGE")) } footer: {
-                    Text(t("当前重写版只保存测试 MOV。SSD、内嵌 IMU、Sony MOV 和 Gyroflow 项目输出尚未接入。",
-                           "This rebuild currently saves test MOV files. SSD, embedded IMU, Sony MOV and Gyroflow Project output are not connected yet."))
+                    Text(t("两种 MOV 格式均内嵌 IMU。外部 SSD 写入尚未接入。",
+                           "Both MOV formats embed IMU. External SSD recording is not connected yet."))
         }
     }
     private var recordingSection: some View {
         Section(t("录制", "RECORDING")) {
-                    lockedRow(t("记录 IMU", "Record IMU"), t("待接入", "Coming soon"))
+                    lockedRow(t("记录 IMU", "Record IMU"), t("始终开启", "Always on"))
                     lockedRow(t("录制声音", "Record audio"), camera.audioAvailable ? t("始终开启", "Always on") : t("无权限", "No permission"))
         }
     }
@@ -150,8 +151,8 @@ struct SettingsView: View {
         Section {
                     Toggle(t("调试", "Debug"), isOn: $debugEnabled)
         } header: { Text(t("高级", "ADVANCED")) } footer: {
-            Text(t("诊断文件保留规则将在正式录制流程接入时生效。",
-                   "Diagnostic retention will take effect when the full recording flow is connected."))
+            Text(t("开启时保留原始 IMU 记录；封装失败时始终保留原始文件。",
+                   "Retain raw IMU when enabled. Failed embeds always retain raw files."))
         }
     }
 

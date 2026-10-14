@@ -29,3 +29,13 @@ targets:
     settings:
       base:
         INFOPLIST_KEY_UIApplicationSupportsDocumentBrowser: NO
+  GyroCineRebuildUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: GyroCineRebuild
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tinygrape.GyroCineRebuildUITests
+        TEST_TARGET_NAME: GyroCineRebuild

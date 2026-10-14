@@ -22,6 +22,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var selectedLensID: String?
     @Published private(set) var switchingLens = false
     @Published private(set) var audioAvailable = false
+    @Published private(set) var imuAvailable = false
     @Published private(set) var cameraReady = false
     @Published private(set) var finalizing = false
     @Published private(set) var recordingStartedAt: Date?
@@ -39,6 +40,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     let logger = DiagnosticLogger()
     private let queue = DispatchQueue(label: "RAWFocusTest.camera")
     private let output = AVCaptureMovieFileOutput()
+    private let intrinsicOutput = AVCaptureVideoDataOutput()
+    private let intrinsicRecorder = CameraIntrinsicsRecorder()
+    private var intrinsicURL: URL?
     private var device: AVCaptureDevice?
     private var formatObjects: [FormatInfo] = []
     private var chosenCodec: AVVideoCodecType?
@@ -59,6 +63,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var notificationTokens: [NSObjectProtocol] = []
     private var currentFile: URL?
     private var recordingStarting = false
+    private var imuRecorder: IMURecorder?
+    private var movieFirstFrameHost: Double?
+    private var recordingLens = ""
     private var audioReady = false
     private var telemetryReadoutTick = 0
 
@@ -116,6 +123,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.commitConfiguration(); fail("Cannot add camera input or movie output"); return
             }
             session.addInput(input); session.addOutput(output)
+            intrinsicOutput.alwaysDiscardsLateVideoFrames = true
+            intrinsicOutput.automaticallyConfiguresOutputBufferDimensions = false
+            intrinsicOutput.deliversPreviewSizedOutputBuffers = false
+            intrinsicOutput.setSampleBufferDelegate(intrinsicRecorder, queue: intrinsicRecorder.queue)
+            guard session.canAddOutput(intrinsicOutput) else {
+                session.commitConfiguration(); fail("Cannot add camera intrinsics output"); return
+            }
+            session.addOutput(intrinsicOutput)
+            enableIntrinsicDelivery()
             if audioAllowed, let microphone = AVCaptureDevice.default(for: .audio) {
                 let audioInput = try AVCaptureDeviceInput(device: microphone)
                 guard session.canAddInput(audioInput) else {
@@ -126,6 +142,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             session.commitConfiguration()
             audioReady = audioAllowed && session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }
             publish { self.audioAvailable = self.audioReady }
+            publish { self.imuAvailable = IMURecorder().isAvailable }
             logger.event("camera_ready", ["deviceID": camera.uniqueID, "name": camera.localizedName,
                                           "audioAuthorized": audioAllowed,
                                           "supportsFocusPoint": camera.isFocusPointOfInterestSupported,
@@ -143,6 +160,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             session.startRunning()
             publish { self.status = "Camera ready"; self.cameraReady = self.session.isRunning }
         } catch { fail("Camera setup: \(error)") }
+    }
+
+    private func enableIntrinsicDelivery() {
+        guard let connection = intrinsicOutput.connection(with: .video) else { return }
+        if connection.isCameraIntrinsicMatrixDeliverySupported && !connection.isCameraIntrinsicMatrixDeliveryEnabled {
+            connection.isCameraIntrinsicMatrixDeliveryEnabled = true
+        }
     }
 
     func chooseLens(_ id: String) {
@@ -165,6 +189,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "replacedInput": oldInput.device.localizedName,
                 "sessionInputs": self.session.inputs.compactMap { ($0 as? AVCaptureDeviceInput)?.device.localizedName },
                 "before": self.configurationSnapshot()])
+            let wasRunning = self.session.isRunning
+            if wasRunning { self.session.stopRunning() }
+            defer { if wasRunning { self.session.startRunning() } }
             do {
                 let newInput = try AVCaptureDeviceInput(device: next)
                 self.session.beginConfiguration()
@@ -175,6 +202,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     throw CameraError.unsupportedFocus("Camera input unavailable")
                 }
                 self.session.addInput(newInput)
+                self.enableIntrinsicDelivery()
                 self.session.commitConfiguration()
                 self.observations.removeAll()
                 self.sampleTimer?.cancel(); self.sampleTimer = nil
@@ -200,7 +228,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         self.session.removeInput(inserted)
                     }
                     let restored = self.session.canAddInput(oldInput)
-                    if restored { self.session.addInput(oldInput) }
+                    if restored { self.session.addInput(oldInput); self.enableIntrinsicDelivery() }
                     self.session.commitConfiguration()
                     if restored {
                         self.observations.removeAll()
@@ -364,6 +392,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard output.availableVideoCodecTypes.contains(codec), let connection = output.connection(with: .video) else {
                 throw CameraError.unavailableCodec(codec.rawValue, index)
             }
+            enableIntrinsicDelivery()
             let settings = try encodingSettings(for: info, fps: targetFPS, connection: connection)
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.setOutputSettings(settings, for: connection)
@@ -720,25 +749,77 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 suffix += 1
             }
             self.currentFile = url
+            let imu = IMURecorder()
+            let imuURL = url.deletingPathExtension().appendingPathExtension("imu_raw.jsonl")
+            do { try imu.start(at: imuURL) }
+            catch { self.fail("IMU 启动失败：\(error.localizedDescription)"); return }
+            self.imuRecorder = imu
+            self.movieFirstFrameHost = nil
+            do {
+                let dc = self.intrinsicOutput.connection(with: .video)
+                let mc = self.output.connection(with: .video)
+                self.logger.event("intrinsic_configuration", ["supported": dc?.isCameraIntrinsicMatrixDeliverySupported ?? false,
+                    "enabled": dc?.isCameraIntrinsicMatrixDeliveryEnabled ?? false,
+                    "dataRotation": dc?.videoRotationAngle ?? -1, "movieRotation": mc?.videoRotationAngle ?? -1,
+                    "dataStabilization": dc?.activeVideoStabilizationMode.rawValue ?? -99,
+                    "movieStabilization": mc?.activeVideoStabilizationMode.rawValue ?? -99,
+                    "dataMirrored": dc?.isVideoMirrored ?? false, "movieMirrored": mc?.isVideoMirrored ?? false])
+                guard let camera = self.device,
+                      let dataConnection = self.intrinsicOutput.connection(with: .video),
+                      dataConnection.isCameraIntrinsicMatrixDeliveryEnabled,
+                      let movieConnection = self.output.connection(with: .video),
+                      movieConnection.activeVideoStabilizationMode == .off,
+                      dataConnection.activeVideoStabilizationMode == .off,
+                      dataConnection.videoRotationAngle == 0,
+                      movieConnection.isVideoMirrored == dataConnection.isVideoMirrored else {
+                    throw RecorderError.unavailable("当前配置无法提供与视频一致的真实 K")
+                }
+                let evidenceURL = url.deletingPathExtension().appendingPathExtension("camera_frames.jsonl")
+                try self.intrinsicRecorder.start(at: evidenceURL, clock: self.session.synchronizationClock, camera: camera)
+                self.intrinsicURL = evidenceURL
+            } catch {
+                try? imu.stop(); self.imuRecorder = nil
+                self.fail(error.localizedDescription); return
+            }
+            self.recordingLens = self.device?.localizedName ?? "iPhone camera"
             self.logger.event("record_before_start", ["path": url.path, "state": self.configurationSnapshot()])
             self.recordingStarting = true
-            if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
-                self.output.startRecording(to: url, recordingDelegate: self)
-            }) {
-                self.recordingStarting = false
-                self.logger.event("record_start_exception", ["message": exception, "state": self.configurationSnapshot()])
-                self.fail("Start recording: \(exception)")
-                return
-            }
-            self.logger.event("record_after_start_call", ["state": self.configurationSnapshot(), "outputIsRecording": self.output.isRecording])
+            self.startMovieWhenIMUReady(url: url, deadline: ProcessInfo.processInfo.systemUptime + 2)
         }
     }
 
-    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+    private func startMovieWhenIMUReady(url: URL, deadline: Double) {
+        let uptime = ProcessInfo.processInfo.systemUptime
+        guard let imu = imuRecorder else { recordingStarting = false; return }
+        if let gyro = imu.firstGyroTime, let accel = imu.firstAccelTime,
+           uptime - max(gyro, accel) >= 0.07 {
+            if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
+                self.output.startRecording(to: url, recordingDelegate: self)
+            }) {
+                recordingStarting = false
+                try? self.intrinsicRecorder.stop()
+                try? imu.stop()
+                imuRecorder = nil
+                fail("Start recording: \(exception)")
+            }
+        } else if uptime < deadline {
+            queue.asyncAfter(deadline: .now() + 0.01) { self.startMovieWhenIMUReady(url: url, deadline: deadline) }
+        } else {
+            recordingStarting = false
+            try? intrinsicRecorder.stop()
+            try? imu.stop(); imuRecorder = nil
+            fail("IMU 预录 50 ms 未就绪，录制未开始")
+        }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL,
+                    startPTS: CMTime, from connections: [AVCaptureConnection]) {
         queue.async {
             self.recordingStarting = false
+            self.movieFirstFrameHost = try? ClockAligner.hostTime(startPTS, clock: self.session.synchronizationClock)
             self.logger.event("record_delegate_start", ["path": fileURL.path, "state": self.configurationSnapshot(),
-                                                        "outputIsRecording": self.output.isRecording])
+                "startPTS": startPTS.seconds, "firstHost": self.movieFirstFrameHost ?? -1,
+                "outputIsRecording": self.output.isRecording])
             self.publish { self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
         }
     }
@@ -750,10 +831,37 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.logger.event("record_delegate_finish", ["path": fileURL.path,
                 "fileBytes": attributes?[.size] as? NSNumber ?? 0, "error": error.map { String(describing: $0) } ?? "",
                 "state": self.configurationSnapshot()])
-            self.publish {
-                self.recording = false; self.finalizing = false; self.recordingStartedAt = nil
-                if let error { self.errorText = "Recording failed: \(error)" }
-                else { self.errorText = "测试视频已保存；IMU 和 Sony MOV 元数据尚未接入。" }
+            self.publish { self.recording = false; self.finalizing = true; self.recordingStartedAt = nil }
+            let imu = self.imuRecorder
+            let firstHost = self.movieFirstFrameHost
+            let evidenceURL = self.intrinsicURL
+            let lens = self.recordingLens
+            let mode = UserDefaults.standard.string(forKey: "outputFormat") == "GyroflowProto" ? "GyroflowProto" : "SonyMov"
+            let debug = UserDefaults.standard.bool(forKey: "debugEnabled")
+            // Capture for at least 50 ms beyond the file-output completion callback.
+            self.queue.asyncAfter(deadline: .now() + 0.12) {
+                self.imuRecorder = nil
+                do {
+                    guard let imu, let raw = imu.url else { throw RecorderError.unavailable("IMU 未启动") }
+                    let intrinsicStop = Result { try self.intrinsicRecorder.stop() }
+                    let imuStop = Result { try imu.stop() }
+                    try intrinsicStop.get()
+                    try imuStop.get()
+                    if let error { throw error }
+                    guard let firstHost, let evidenceURL else { throw RecorderError.unavailable("缺少 MOV 首帧时钟映射") }
+                    let result = try MovieIMUFinalizer.finalize(movie: fileURL, rawIMU: raw,
+                        firstFrameHost: firstHost, cameraFrames: evidenceURL,
+                        camera: Self.hardwareModel(), lens: lens, mode: mode, retainDebug: debug)
+                    self.logger.event("imu_embedded", ["format": mode, "samples": result.0,
+                        "preRollMs": result.1 * 1000, "postRollMs": result.2 * 1000])
+                    self.publish { self.finalizing = false; self.status = "Saved · IMU embedded" }
+                } catch {
+                    self.logger.event("imu_embed_failed", ["error": String(describing: error), "movie": fileURL.path])
+                    self.publish {
+                        self.finalizing = false
+                        self.errorText = "视频已录制，但 IMU 封装失败：\(error.localizedDescription)。原始文件已保留。"
+                    }
+                }
             }
         }
     }
