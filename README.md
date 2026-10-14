@@ -4,7 +4,7 @@ Current iOS camera app, promoted from the RAWFocusTest-based rebuild.
 
 - Xcode project: `gyro_cine.xcodeproj`, scheme: `GyroCine`.
 - Regenerate with `xcodegen generate` from `project.yml`.
-- iOS 18.2+, bundle ID `com.tinygrape.RawMotionRecorder`, version 1.0 (1).
+- iOS 18.2+, bundle ID `com.tinygrape.RawMotionRecorder`, version 1.0 (20261014).
 - Sources: `Sources/`; app icon/localization: `Resources/`; tests: `Tests/` and `UITests/`.
 
 ## Capture defaults

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var message: String?
+    @State private var offerProVideoStorageSettings = false
 
     private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing }
     private var codecOptions: [VideoEncoding] {
@@ -58,7 +59,14 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button(t("完成", "Done")) { dismiss() } } }
             .alert(t("设置", "Settings"), isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-                Button(t("确定", "OK")) { message = nil }
+                if offerProVideoStorageSettings {
+                    Button(t("打开专用存储设置", "Open Pro Video Storage Settings")) {
+                        message = nil
+                        offerProVideoStorageSettings = false
+                        ProVideoStorageBridge.openSettings()
+                    }
+                }
+                Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
             } message: { Text(message ?? "") }
             .onAppear {
                 refreshExternalDevices()
@@ -117,11 +125,20 @@ struct SettingsView: View {
     private var storageSection: some View {
         Section {
                     Menu {
-                        Button(t("内部文件", "On My iPhone")) { storageLocation = "内部文件" }
+                        Button(t("内部文件", "On My iPhone")) {
+                            offerProVideoStorageSettings = false
+                            storageLocation = "内部文件"
+                        }
+                        Button(t("专用视频存储", "Pro Video Storage")) {
+                            selectProVideoStorage()
+                        }
                         Button(t("外部 SSD", "External SSD")) {
                             selectExternalStorage()
                         }
-                    } label: { row(t("存储位置", "Storage"), storageLocation == "内部文件" ? t("内部文件", "On My iPhone") : storageLocation) }.tint(.primary)
+                    } label: {
+                        row(t("存储位置", "Storage"), storageLocation == "内部文件" ? t("内部文件", "On My iPhone") :
+                            storageLocation == "专用视频存储" ? t("专用视频存储", "Pro Video Storage") : storageLocation)
+                    }.tint(.primary)
                     .disabled(locked)
                     if storageLocation == "外部 SSD" {
                         Menu {
@@ -146,8 +163,8 @@ struct SettingsView: View {
                     .accessibilityIdentifier("outputFormatMenu")
                     .disabled(locked)
         } header: { Text(t("存储", "STORAGE")) } footer: {
-                    Text(t("本机视频保存在 GyroCine/Media，诊断数据保存在 GyroCine/Log；SSD 视频由系统写入 DCIM/100APPLE。",
-                           "Local videos are in GyroCine/Media, diagnostics in GyroCine/Log; SSD videos are in DCIM/100APPLE."))
+                    Text(t("本机与专用存储的视频均保存在 GyroCine/Media，诊断数据保存在 GyroCine/Log；SSD 视频由系统写入 DCIM/100APPLE。",
+                           "Local and Pro Video Storage videos are in GyroCine/Media, diagnostics in GyroCine/Log; SSD videos are in DCIM/100APPLE."))
         }
     }
     private var selectedExternalName: String {
@@ -158,7 +175,22 @@ struct SettingsView: View {
     private func refreshExternalDevices() {
         externalDevices = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.filter(\.isConnected) ?? []
     }
+    private func selectProVideoStorage() {
+        offerProVideoStorageSettings = false
+        guard ProVideoStorageBridge.isSupported() else {
+            message = t("此设备或 iOS 版本不支持专用视频存储。请使用外部 SSD。",
+                        "This device or iOS version does not support Pro Video Storage. Use an external SSD.")
+            return
+        }
+        storageLocation = "专用视频存储"
+        if ProVideoStorageBridge.remainingCapacity() <= 0 {
+            offerProVideoStorageSettings = true
+            message = t("请在系统设置中分配专用视频存储空间后再录制。",
+                        "Allocate Pro Video Storage in Settings before recording.")
+        }
+    }
     private func selectExternalStorage() {
+        offerProVideoStorageSettings = false
         refreshExternalDevices()
         guard !externalDevices.isEmpty else {
             message = t("未检测到外部 SSD。请连接 SSD 后重试。", "No external SSD detected. Connect it and retry.")

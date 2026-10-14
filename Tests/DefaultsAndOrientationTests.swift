@@ -3,6 +3,15 @@ import AVFoundation
 @testable import GyroCine
 
 final class DefaultsAndOrientationTests: XCTestCase {
+    func testProVideoStorageRequiresRuntimeSupport() {
+        guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27 else { return }
+        let output = AVCaptureMovieFileOutput()
+        XCTAssertFalse(ProVideoStorageBridge.isSupported())
+        XCTAssertFalse(ProVideoStorageBridge.isOutputSupported(output))
+        XCTAssertNotNil(ProVideoStorageBridge.configureOutput(output, enabled: true))
+        XCTAssertNil(ProVideoStorageBridge.configureOutput(output, enabled: false))
+    }
+
     func testSessionMigrationSeparatesMoviesAndLogs() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let legacy = root.appendingPathComponent("Documents/Sessions")
@@ -196,9 +205,12 @@ final class DefaultsAndOrientationTests: XCTestCase {
         let saved = NSError(domain: AVFoundationErrorDomain, code: -11818,
             userInfo: [AVErrorRecordingSuccessfullyFinishedKey: true])
         XCTAssertTrue(CameraManager.recordingFileSucceeded(saved))
+        XCTAssertNil(CameraManager.recordingFailureReason(saved))
+        XCTAssertNil(CameraManager.recordingFailureReason(nil))
         for info: [String: Any] in [[:], [AVErrorRecordingSuccessfullyFinishedKey: false]] {
-            XCTAssertFalse(CameraManager.recordingFileSucceeded(
-                NSError(domain: AVFoundationErrorDomain, code: -11818, userInfo: info)))
+            let error = NSError(domain: AVFoundationErrorDomain, code: -11818, userInfo: info)
+            XCTAssertFalse(CameraManager.recordingFileSucceeded(error))
+            XCTAssertNotNil(CameraManager.recordingFailureReason(error))
         }
         XCTAssertFalse(CameraManager.recordingFileSucceeded(NSError(domain: "Other", code: 1,
             userInfo: [AVErrorRecordingSuccessfullyFinishedKey: true])))

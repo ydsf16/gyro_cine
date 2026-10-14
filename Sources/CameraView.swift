@@ -182,7 +182,7 @@ struct CameraView: View {
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
             if camera.storageSetupRequired {
-                Button(t("设置 SSD", "Set up SSD")) {
+                Button(t("设置存储", "Set up storage")) {
                     camera.clearError()
                     showingSettings = true
                 }
@@ -235,8 +235,11 @@ struct CameraView: View {
                     .foregroundStyle(camera.recording ? .red : .white)
                 }
                 Spacer(minLength: 3)
-                statusBadge(storageLocation == "外部 SSD" ? "SSD" : t("本机", "LOCAL"),
-                            healthy: storageLocation != "外部 SSD" || camera.externalStorageConnected)
+                statusBadge(storageLocation == "外部 SSD" ? "SSD" :
+                            storageLocation == "专用视频存储" ? "PVS" : t("本机", "LOCAL"),
+                            healthy: storageLocation == "外部 SSD" ? camera.externalStorageConnected :
+                                storageLocation == "专用视频存储" ?
+                                    (ProVideoStorageBridge.isSupported() && ProVideoStorageBridge.remainingCapacity() > 0) : true)
                 statusBadge("IMU", healthy: camera.imuAvailable)
             }
             Text(specification)

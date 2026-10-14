@@ -314,15 +314,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     #if DEBUG
     private func runRAWSSDSmoke() {
+        let longHQ = ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke")
         guard UserDefaults.standard.string(forKey: "storageLocation") == "外部 SSD" else {
             logger.event("raw_smoke_failed", ["reason": "SSD is not selected"])
             return
         }
-        let raw: VideoEncoding = ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke")
+        let raw: VideoEncoding = longHQ || ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke")
             ? .proResRAWHQ : .proResRAW
+        let targetFPS = longHQ ? 24.0 : 30.0
         let candidates = formatObjects.filter {
-            $0.compatibleCodecs.contains(raw.codec.rawValue) && $0.supports(30) &&
-            $0.width >= 3840 && Double($0.width) / Double($0.height) >= 1.65
+            $0.compatibleCodecs.contains(raw.codec.rawValue) && $0.supports(targetFPS) &&
+            (longHQ ? ($0.width == 4224 && $0.height == 3024) :
+                ($0.width >= 3840 && Double($0.width) / Double($0.height) >= 1.65))
         }
         guard let target = candidates.max(by: {
             ($0.format.autoFocusSystem == .none ? 0 : 1, Int64($0.width) * Int64($0.height)) <
@@ -331,7 +334,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             logger.event("raw_smoke_failed", ["reason": "No RAW wide 4K 30fps format"])
             return
         }
-        chosenEncoding = raw; chosenCodec = raw.codec; chosenFPS = 30
+        chosenEncoding = raw; chosenCodec = raw.codec; chosenFPS = targetFPS
         guard applyFormat(target.index, reason: "raw_ssd_smoke") else {
             logger.event("raw_smoke_failed", ["reason": "RAW format selection failed"])
             return
@@ -340,7 +343,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                                    "height": target.height, "fps": chosenFPS,
                                                    "codec": chosenCodec?.rawValue ?? "none"])
         queue.asyncAfter(deadline: .now() + 4) { self.toggleRecording() }
-        let stopDelay: Double = ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") ? 45 : 11
+        let stopDelay: Double = longHQ ? 244 :
+            (ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") ? 45 : 11)
         queue.asyncAfter(deadline: .now() + stopDelay) {
             if self.output.isRecording { self.toggleRecording() }
             else { self.logger.event("raw_smoke_failed", ["reason": "MovieFileOutput never entered recording state"]) }
@@ -426,8 +430,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             return (device, LensChoice(id: device.uniqueID, label: label))
         }
         lensDevices = Dictionary(uniqueKeysWithValues: discovered.map { ($0.0.uniqueID, $0.0) })
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            fail("Rear physical Wide camera unavailable"); return
+        let longRAWTest = ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke")
+        guard let camera = (longRAWTest ? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) : nil)
+            ?? AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            fail("Rear physical camera unavailable"); return
         }
         device = camera
         publish { self.lenses = discovered.map(\.1); self.selectedLensID = camera.uniqueID }
@@ -482,6 +489,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--raw-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") { runRAWSSDSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--inspect-hotplug") { inspectHotplugMovie() }
             #endif
@@ -1181,14 +1189,43 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
             let arguments = ProcessInfo.processInfo.arguments
             let isTest = arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
-                arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-hotplug-smoke")
+                arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
+                arguments.contains("--raw-hotplug-smoke")
             let baseName = isTest ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
+            let storageLocation = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
             if (codec.rawValue == "aprn" || codec.rawValue == "aprh"),
-               UserDefaults.standard.string(forKey: "storageLocation") != "外部 SSD" {
+               storageLocation != "外部 SSD", storageLocation != "专用视频存储" {
                 self.restoreRAWWhiteBalance()
-                self.failStorage("ProRes RAW 需要外部 SSD，请打开设置选择 SSD")
+                self.failStorage("ProRes RAW 请在设置中选择专用视频存储或外部 SSD")
                 return
             }
+            if storageLocation == "专用视频存储" {
+                guard ProVideoStorageBridge.isSupported() else {
+                    self.restoreRAWWhiteBalance()
+                    self.failStorage("此设备或 iOS 版本不支持专用视频存储，请选择外部 SSD")
+                    return
+                }
+                guard ProVideoStorageBridge.remainingCapacity() > 0 else {
+                    self.restoreRAWWhiteBalance()
+                    self.failStorage("专用视频存储未分配或空间已用完，请在设置中配置容量或选择外部 SSD")
+                    return
+                }
+                guard !ProVideoStorageBridge.isBusy() else {
+                    self.restoreRAWWhiteBalance()
+                    self.failStorage("专用视频存储正在处理文件，请稍后重试")
+                    return
+                }
+            }
+            if let message = ProVideoStorageBridge.configureOutput(self.output,
+                enabled: storageLocation == "专用视频存储") {
+                self.restoreRAWWhiteBalance()
+                self.failStorage("\(message)。请更换存储位置或视频规格")
+                return
+            }
+            self.logger.event("record_storage_selected", ["location": storageLocation,
+                "proVideoStorageSupported": ProVideoStorageBridge.isOutputSupported(self.output),
+                "proVideoStorageRemainingBytes": storageLocation == "专用视频存储" ?
+                    ProVideoStorageBridge.remainingCapacity() : 0])
             let url: URL
             do {
                 let external: Bool
@@ -1203,6 +1240,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             #if DEBUG
             if arguments.contains("--raw-ssd-smoke") || arguments.contains("--raw-hq-ssd-smoke") ||
+               arguments.contains("--raw-long-hq-ssd-smoke") ||
                arguments.contains("--raw-hotplug-smoke") {
                 self.rawSmokeMovieName = url.lastPathComponent
             }
@@ -1410,6 +1448,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             && (error.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? NSNumber)?.boolValue == true
     }
 
+    static func recordingFailureReason(_ error: Error?) -> String? {
+        guard !recordingFileSucceeded(error) else { return nil }
+        return error?.localizedDescription ?? "未知错误"
+    }
+
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo fileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
         queue.async {
             self.recordingStarting = false
@@ -1418,19 +1461,22 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "fileBytes": attributes?[.size] as? NSNumber ?? 0, "error": error.map { String(describing: $0) } ?? "",
                 "state": self.configurationSnapshot()])
             self.restoreRAWWhiteBalance()
-            let externalRecordingFailed = self.activeExternalMovieURL != nil && error != nil
+            let failureReason = Self.recordingFailureReason(error)
+            let externalRecordingFailed = self.activeExternalMovieURL != nil && failureReason != nil
+            if let error, failureReason == nil {
+                self.logger.event("record_delegate_success_with_warning", ["message": String(describing: error)])
+            }
             self.publish { self.recording = false; self.finalizing = true; self.recordingStartedAt = nil }
             self.captureFinishing = true
             let imu = self.imuRecorder
-            if self.pendingRecordingJob == nil, !Self.recordingFileSucceeded(error) {
-                let message = error?.localizedDescription ?? "未知错误"
+            if self.pendingRecordingJob == nil, let failureReason {
                 try? self.intrinsicRecorder.stop()
                 try? imu?.stop()
                 self.imuRecorder = nil
                 self.captureFinishing = false
                 self.releaseExternalMovieAccess()
                 self.publish { self.finalizing = false; self.endFinalizationLease() }
-                self.fail("视频录制失败：\(message)")
+                self.fail("视频录制失败：\(failureReason)")
                 return
             }
             // Keep collecting the 50 ms tail before closing durable raw data.
@@ -1444,8 +1490,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     let imuStop = Result { try imu?.stop() }
                     guard var job = self.pendingRecordingJob else { throw RecorderError.unavailable("缺少 IMU 恢复任务") }
                     job.ready = true
-                    if let error, !Self.recordingFileSucceeded(error) { job.recordingFailure = error.localizedDescription }
-                    if let error { job.recordingWarning = error.localizedDescription }
+                    job.recordingFailure = failureReason
+                    job.recordingWarning = failureReason
                     try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                     try framesStop.get(); try imuStop.get()
                     self.pendingRecordingJob = nil
@@ -1454,7 +1500,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.resumePendingIMU()
                     self.releaseExternalMovieAccess()
                     if externalRecordingFailed {
-                        self.failStorage("SSD 录制中断：\(error?.localizedDescription ?? "存储不可用")。原始文件已保留",
+                        self.failStorage("SSD 录制中断：\(failureReason ?? "存储不可用")。原始文件已保留",
                                          retryOnReconnect: true)
                     }
                 } catch {
@@ -1497,7 +1543,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard let self, let camera else { return }
             self.telemetryReadoutTick += 1
             if self.telemetryReadoutTick % 5 == 0 {
-                let temperature = camera.temperatureAndTintValues(for: camera.deviceWhiteBalanceGains).temperature
+                var whiteBalanceError: NSString?
+                let temperature = RecordingExceptionCatcher.whiteBalanceTemperature(
+                    for: camera, error: &whiteBalanceError)?.floatValue
+                if let whiteBalanceError, self.telemetryReadoutTick % 50 == 0 {
+                    self.logger.event("white_balance_readout_skipped", ["reason": whiteBalanceError])
+                }
                 let iso = camera.iso
                 let exposureSeconds = CMTimeGetSeconds(camera.exposureDuration)
                 let exposureAuto = camera.exposureMode == .continuousAutoExposure
@@ -1505,7 +1556,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.publish {
                     self.iso = iso
                     self.exposureSeconds = exposureSeconds
-                    self.whiteBalanceKelvin = temperature
+                    if let temperature { self.whiteBalanceKelvin = temperature }
                     self.exposureAuto = exposureAuto
                     self.whiteBalanceAuto = whiteBalanceAuto
                 }
