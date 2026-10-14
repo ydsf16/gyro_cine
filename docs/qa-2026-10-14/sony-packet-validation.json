@@ -1,0 +1,20 @@
+[
+  {
+    "file": "UITEST_G_2026-10-14-13-47-10.mov",
+    "packets_checked": 500,
+    "max_gyro_quantization_error_deg_s": 0.004997556860786789,
+    "result": "PASS"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-46-44.mov",
+    "packets_checked": 499,
+    "max_gyro_quantization_error_deg_s": 0.004997836145057166,
+    "result": "PASS"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-49-17.mov",
+    "packets_checked": 519,
+    "max_gyro_quantization_error_deg_s": 0.005004307980936068,
+    "result": "PASS"
+  }
+]

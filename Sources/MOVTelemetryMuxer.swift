@@ -1,9 +1,16 @@
 import Foundation
+import AVFoundation
 import Darwin
+import CryptoKit
 
 /// Append a metadata track without remuxing or decoding existing media.
 /// Existing chunk offsets and sample descriptions remain byte-for-byte intact.
 enum MOVTelemetryMuxer {
+    static func captureVolumeCapacity(reported: Int64?, externalDevice: Int64?) -> Int64? {
+        if let reported, reported > 0 { return reported }
+        if let externalDevice, externalDevice > 0 { return externalDevice }
+        return nil
+    }
     static func checkCopyCapacity(ordinary: Int64?, important: Int64?, required: Int64) throws {
         guard let available = [ordinary, important].compactMap({ $0 }).first(where: { $0 >= 0 }) else {
             throw RecorderError.unavailable("无法读取录制位置的剩余空间。原片和原始 IMU 已保留，请重新连接存储后重试。")
@@ -49,23 +56,112 @@ enum MOVTelemetryMuxer {
             NSLog("GyroCine MOV sync: Foundation unsupported; POSIX fsync succeeded")
         }
     }
-    struct Recovery: Codable { let originalLength: UInt64; let moovOffset: UInt64 }
-    static func recoveryURL(_ url: URL) -> URL { url.appendingPathExtension("metadata-recovery.json") }
+    struct Recovery: Codable {
+        let originalLength: UInt64
+        let moovOffset: UInt64
+        let unboundedAtomOffset: UInt64?
+        init(originalLength: UInt64, moovOffset: UInt64, unboundedAtomOffset: UInt64? = nil) {
+            self.originalLength = originalLength
+            self.moovOffset = moovOffset
+            self.unboundedAtomOffset = unboundedAtomOffset
+        }
+    }
+    /// A size-zero final mdat extends to EOF. It must be bounded before new atoms are appended.
+    static func boundedFinalMdatSize(offset: UInt64, fileLength: UInt64) -> UInt32? {
+        guard offset <= fileLength, fileLength - offset >= 8,
+              fileLength - offset <= UInt32.max else { return nil }
+        return UInt32(fileLength - offset)
+    }
+    static func recoveryURL(_ url: URL) -> URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let privateDirectory = RecordingStoragePaths.diagnosticDirectory
+        try? FileManager.default.createDirectory(at: privateDirectory, withIntermediateDirectories: true)
+        if url.path.hasPrefix(documents.path + "/") {
+            return privateDirectory.appendingPathComponent(url.lastPathComponent)
+                .appendingPathExtension("metadata-recovery.json")
+        }
+        // A generated SSD URL scopes the movie itself. Keep the crash journal
+        // in the app container, where creating a sibling file is permitted.
+        let key = SHA256.hash(data: Data(url.path.utf8)).map { String(format: "%02x", $0) }.joined()
+        return privateDirectory
+            .appendingPathComponent("external-\(key).metadata-recovery.json")
+    }
     static func recoverIfNeeded(_ url: URL) throws {
         let journal = recoveryURL(url)
         guard FileManager.default.fileExists(atPath: journal.path) else { return }
         let state = try JSONDecoder().decode(Recovery.self, from: Data(contentsOf: journal))
         let file = try FileHandle(forUpdating: url)
         defer { try? file.close() }
-        guard state.moovOffset + 8 <= state.originalLength,
+        guard state.originalLength >= 8, state.moovOffset <= state.originalLength - 8,
+              state.unboundedAtomOffset.map({ $0 <= state.originalLength - 8 }) ?? true,
               try file.seekToEnd() >= state.originalLength else { throw invalid() }
         // Even a torn four-byte commit is repaired from the durable journal.
         try file.seek(toOffset: state.moovOffset + 4)
         try file.write(contentsOf: Data("moov".utf8))
+        if let atomOffset = state.unboundedAtomOffset {
+            try file.seek(toOffset: atomOffset)
+            try file.write(contentsOf: Data(repeating: 0, count: 4))
+        }
         try file.truncate(atOffset: state.originalLength)
         try synchronize(file)
         try FileManager.default.removeItem(at: journal)
     }
+    static func hasTelemetry(_ url: URL) -> Bool {
+        guard let file = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? file.close() }
+        do {
+            let end = try file.seekToEnd()
+            var offset: UInt64 = 0
+            while offset + 8 <= end {
+                try file.seek(toOffset: offset)
+                guard let header = try file.read(upToCount: 8), header.count == 8 else { return false }
+                var size = header.uint(0, 4), headerSize: UInt64 = 8
+                if size == 1 {
+                    guard let extended = try file.read(upToCount: 8), extended.count == 8 else { return false }
+                    size = extended.uint(0, 8); headerSize = 16
+                }
+                if size == 0 { size = end - offset }
+                guard size >= headerSize, size <= end - offset else { return false }
+                if String(decoding: header[4..<8], as: UTF8.self) == "moov" {
+                    guard size - headerSize < 256_000_000,
+                          let data = try file.read(upToCount: Int(size - headerSize)) else { return false }
+                    for track in try atoms(data) where track.type == "trak" {
+                        let bytes = Data(data[track.offset..<(track.offset + track.size)])
+                        let marker = bytes.range(of: Data("Sony RTMD compatibility\0".utf8)) != nil
+                            || bytes.range(of: Data("GyroflowProtobuf\0".utf8)) != nil
+                        if marker {
+                            if try telemetrySamplesArePresent(Data(bytes.dropFirst(track.header)), fileLength: end) { return true }
+                        }
+                    }
+                }
+                offset += size
+            }
+        } catch { return false }
+        return false
+    }
+    private static func telemetrySamplesArePresent(_ track: Data, fileLength: UInt64) throws -> Bool {
+        func child(_ data: Data, _ name: String) throws -> Data? {
+            guard let atom = try atoms(data).first(where: { $0.type == name }) else { return nil }
+            return Data(data[(atom.offset + atom.header)..<(atom.offset + atom.size)])
+        }
+        guard let mdia = try child(track, "mdia"), let minf = try child(mdia, "minf"),
+              let stbl = try child(minf, "stbl"), let stsd = try child(stbl, "stsd"),
+              stsd.count >= 16, stsd.uint(4, 4) == 1,
+              ["rtmd", "gyrf"].contains(String(decoding: stsd[12..<16], as: UTF8.self)),
+              let sizes = try child(stbl, "stsz"), sizes.count >= 12,
+              let offsets = try child(stbl, "co64"), offsets.count >= 8 else { return false }
+        let count = sizes.uint(8, 4), fixed = sizes.uint(4, 4)
+        guard count > 0, offsets.uint(4, 4) == count,
+              count <= UInt64((offsets.count - 8) / 8),
+              fixed > 0 || count <= UInt64((sizes.count - 12) / 4) else { return false }
+        for index in 0..<Int(count) {
+            let offset = offsets.uint(8 + index * 8, 8)
+            let size = fixed > 0 ? fixed : sizes.uint(12 + index * 4, 4)
+            guard size > 0, offset <= fileLength, size <= fileLength - offset else { return false }
+        }
+        return true
+    }
+
     struct Atom { let offset: Int; let size: Int; let header: Int; let type: String }
     static func atoms(_ data: Data) throws -> [Atom] {
         var result: [Atom] = [], offset = 0
@@ -84,6 +180,15 @@ enum MOVTelemetryMuxer {
             result.append(Atom(offset: offset, size: size, header: header, type: type)); offset += size
         }
         return result
+    }
+    static func isAVTrack(_ payload: Data) throws -> Bool {
+        guard let mdia = try atoms(payload).first(where: { $0.type == "mdia" }) else { return false }
+        let media = Data(payload[(mdia.offset + mdia.header)..<(mdia.offset + mdia.size)])
+        guard let handler = try atoms(media).first(where: { $0.type == "hdlr" }),
+              handler.size >= handler.header + 12 else { return false }
+        let start = handler.offset + handler.header + 8
+        let type = String(decoding: media[start..<(start + 4)], as: UTF8.self)
+        return type == "vide" || type == "soun"
     }
     static func invalid() -> RecorderError { .unavailable("Invalid MOV atom structure; original retained") }
     static func box(_ type: String, _ payload: Data) -> Data {
@@ -120,7 +225,7 @@ enum MOVTelemetryMuxer {
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         let length = try input.seekToEnd()
-        var offset: UInt64 = 0, moovOffset: UInt64?, moov = Data()
+        var offset: UInt64 = 0, moovOffset: UInt64?, unboundedMdatOffset: UInt64?, moov = Data()
         while offset < length {
             try input.seek(toOffset: offset)
             guard let header = try input.read(upToCount: 8), header.count == 8 else { throw invalid() }
@@ -130,7 +235,14 @@ enum MOVTelemetryMuxer {
                 guard let extra = try input.read(upToCount: 8), extra.count == 8 else { throw invalid() }
                 size = extra.uint(0, 8); headerSize = 16
             }
-            if size == 0 { throw RecorderError.unavailable("Unbounded MOV atom cannot accept metadata") }
+            if size == 0 {
+                guard type == "mdat", unboundedMdatOffset == nil,
+                      let bounded = boundedFinalMdatSize(offset: offset, fileLength: length) else {
+                    throw RecorderError.unavailable("Unbounded MOV atom \(type) at \(offset) cannot accept metadata")
+                }
+                unboundedMdatOffset = offset
+                size = UInt64(bounded)
+            }
             guard size >= headerSize, size <= length - offset else { throw invalid() }
             if type == "moov" {
                 guard moovOffset == nil, size < 256_000_000,
@@ -175,23 +287,34 @@ enum MOVTelemetryMuxer {
             + full("co64", words(UInt64(packets.count)) + offsets)
         let dinf = box("dinf", full("dref", words(1) + box("url ", Data([0, 0, 0, 1]))))
         let track = box("trak", tk + box("mdia", md + hd + box("minf", full("nmhd", Data()) + dinf + box("stbl", table))))
-        var updated = Data()
+        // The parser must see the video's rotation before our first metadata track.
+        var updated = Data(), deferredTracks = Data()
         for child in children {
-            updated += child.type == "mvhd" ? mv : Data(moov[child.offset..<(child.offset + child.size)])
-            // Gyroflow's metadata reader selects the first metadata track.
-            // MovieFileOutput also writes an Apple metadata track, so place our
-            // IMU track ahead of it while leaving the video/audio tracks intact.
-            if child.type == "mvhd" { updated += track }
+            let bytes = Data(moov[child.offset..<(child.offset + child.size)])
+            if child.type == "trak", try !isAVTrack(Data(bytes.dropFirst(child.header))) {
+                deferredTracks += bytes
+            } else {
+                updated += child.type == "mvhd" ? mv : bytes
+            }
         }
+        updated += track + deferredTracks
         updated += box("udta", note)
         stage = "读取磁盘容量"
-        let volume = try url.deletingLastPathComponent().resourceValues(forKeys: [
+        let volume = try? url.deletingLastPathComponent().resourceValues(forKeys: [
             .volumeAvailableCapacityKey
         ])
-        try checkCopyCapacity(ordinary: volume.volumeAvailableCapacity.map(Int64.init),
+        let reported = volume?.volumeAvailableCapacity.map(Int64.init)
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let external = !url.path.hasPrefix(documents.path + "/")
+        let selectedID = UserDefaults.standard.string(forKey: "externalDeviceID")
+        let deviceFree = external ? AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices
+            .first(where: { $0.isConnected && $0.uuid?.uuidString == selectedID })?.freeSize : nil
+        let available = captureVolumeCapacity(reported: reported, externalDevice: deviceFree.map(Int64.init))
+        try checkCopyCapacity(ordinary: available,
             important: nil,
             required: Int64(payloadLength + UInt64(updated.count) + 64_000_000))
-        let recovery = Recovery(originalLength: length, moovOffset: moovOffset)
+        let recovery = Recovery(originalLength: length, moovOffset: moovOffset,
+                                unboundedAtomOffset: unboundedMdatOffset)
         let journal = recoveryURL(url)
         stage = "创建恢复日志"
         try JSONEncoder().encode(recovery).write(to: journal, options: .atomic)
@@ -203,6 +326,13 @@ enum MOVTelemetryMuxer {
         let output = try FileHandle(forUpdating: url)
         do {
             // Original moov stays valid until all added data is durable and verified.
+            if let unboundedMdatOffset,
+               let bounded = boundedFinalMdatSize(offset: unboundedMdatOffset, fileLength: length) {
+                stage = "限定原始 mdat 长度"
+                try output.seek(toOffset: unboundedMdatOffset)
+                try output.write(contentsOf: Data.be(UInt64(bounded), 4))
+                try synchronize(output)
+            }
             stage = "追加元数据"
             try output.seek(toOffset: length)
             try output.write(contentsOf: words(1) + Data("mdat".utf8) + Data.be(payloadLength + 16, 8))

@@ -72,21 +72,64 @@ private enum Parameter: String, CaseIterable, Identifiable {
     }
 }
 
+private struct CompositionGrid: View {
+    var body: some View {
+        GeometryReader { geometry in
+            Path { path in
+                let width = geometry.size.width
+                let height = geometry.size.height
+                for fraction in [1.0 / 3, 2.0 / 3] {
+                    path.move(to: CGPoint(x: width * fraction, y: 0))
+                    path.addLine(to: CGPoint(x: width * fraction, y: height))
+                    path.move(to: CGPoint(x: 0, y: height * fraction))
+                    path.addLine(to: CGPoint(x: width, y: height * fraction))
+                }
+            }
+            .stroke(.white.opacity(0.48), style: StrokeStyle(lineWidth: 0.8))
+            .shadow(color: .black.opacity(0.8), radius: 1)
+        }
+    }
+}
+
+private struct HorizonLevel: View {
+    let pose: HorizonGuidePose
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Capsule().fill(.white.opacity(0.4))
+                    .frame(width: 180, height: 1)
+                    .rotationEffect(.radians(pose.reference))
+                Capsule().fill(pose.aligned ? .green : .white)
+                    .frame(width: 140, height: 2)
+                    .rotationEffect(.radians(pose.angle))
+                Circle().fill(pose.aligned ? .green : .white)
+                    .frame(width: 6, height: 6)
+            }
+            .shadow(color: .black.opacity(0.85), radius: 2)
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
+}
+
 struct CameraView: View {
     @EnvironmentObject private var camera: CameraManager
     @Environment(\.locale) private var locale
+    @AppStorage("showCompositionGrid") private var showCompositionGrid = false
+    @AppStorage("showHorizonLevel") private var showHorizonLevel = false
+    @AppStorage("storageLocation") private var storageLocation = "内部文件"
     @State private var selected: Parameter?
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
     @State private var showingMedia = false
     @State private var shutterValue = 1.0 / 120.0
-    @State private var shutterMaxValue = 1.0 / 60.0
+    @State private var shutterMaxValue = 1.0 / 200.0
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
     @State private var lastControlSend = Date.distantPast
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
-    private let shutterStops: [Double] = [4000, 2000, 1000, 500, 250, 120, 60, 30, 15, 10]
+    private let shutterStops: [Double] = [4000, 2000, 1000, 500, 250, 200, 120, 60, 30, 15, 10]
         .map { 1.0 / $0 }
 
     private var shutterRulerRange: ClosedRange<Double> {
@@ -99,6 +142,17 @@ struct CameraView: View {
         ZStack {
             Preview(session: camera.session, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
                 .ignoresSafeArea()
+            if showCompositionGrid {
+                CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
+            }
+            if showHorizonLevel {
+                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                    if let gravity = camera.previewGravity(),
+                       let pose = HorizonGuidePose(gravity: gravity) {
+                        HorizonLevel(pose: pose).ignoresSafeArea().allowsHitTesting(false)
+                    }
+                }
+            }
             if selected != nil {
                 Color.clear.contentShape(Rectangle()).ignoresSafeArea()
                     .onTapGesture { closePanel() }
@@ -127,6 +181,12 @@ struct CameraView: View {
         .sheet(isPresented: $showingSettings) { SettingsView().environmentObject(camera) }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
+            if camera.storageSetupRequired {
+                Button(t("设置 SSD", "Set up SSD")) {
+                    camera.clearError()
+                    showingSettings = true
+                }
+            }
             Button("确定") { camera.clearError() }
         } message: { Text(camera.errorText ?? "") }
         .onChange(of: camera.exposureSeconds) { _, value in if camera.exposureAuto { shutterValue = value } }
@@ -175,7 +235,8 @@ struct CameraView: View {
                     .foregroundStyle(camera.recording ? .red : .white)
                 }
                 Spacer(minLength: 3)
-                statusBadge("SSD", healthy: false)
+                statusBadge(storageLocation == "外部 SSD" ? "SSD" : t("本机", "LOCAL"),
+                            healthy: storageLocation != "外部 SSD" || camera.externalStorageConnected)
                 statusBadge("IMU", healthy: camera.imuAvailable)
             }
             Text(specification)
@@ -277,7 +338,7 @@ struct CameraView: View {
                                     .background(camera.selectedLensID == lens.id ? accent : .white.opacity(0.08), in: Circle())
                             }
                             .accessibilityIdentifier("lens.\(lens.label)")
-                            .disabled(camera.recording || camera.finalizing || camera.switchingLens)
+                            .disabled(camera.recording || camera.preparingRecording || camera.finalizing || camera.switchingLens)
                         }
                     }
                 case .shutter:
@@ -386,49 +447,50 @@ struct CameraView: View {
                 onChange(selectedValue)
             }
             if finished { dismissPanelAfterAdjustment() }
-        }
+        }.accessibilityIdentifier("parameterRuler")
     }
     private func shutterLabel(_ seconds: Double) -> String {
         seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
     }
 
     private var bottomBar: some View {
-        HStack(alignment: .center) {
-            Button { showingMedia = true } label: {
-                VStack(spacing: 5) { Image(systemName: "photo.on.rectangle").font(.system(size: 25)); Text(t("素材", "Media")).font(.caption) }
-                    .frame(maxWidth: .infinity)
-            }
-            Button { camera.toggleRecording() } label: {
-                ZStack {
-                    Circle().stroke(.white, lineWidth: 4).frame(width: 78, height: 78)
-                    RoundedRectangle(cornerRadius: camera.recording ? 5 : 32)
-                        .fill(.red).frame(width: camera.recording ? 33 : 54, height: camera.recording ? 33 : 54)
+        VStack(spacing: 8) {
+            ZStack {
+                if camera.finalizing {
+                    HStack(spacing: 7) { ProgressView().tint(.white); Text(t("正在保存…", "Saving…")) }
+                        .foregroundStyle(.white)
                 }
             }
-            .disabled(!camera.cameraReady || camera.finalizing || camera.switchingLens)
-            .accessibilityLabel(camera.finalizing ? t("正在保存", "Finalizing") : camera.recording ? t("停止录制", "Stop recording") : t("开始录制", "Record"))
-            .accessibilityIdentifier("recordToggle")
-            .frame(maxWidth: .infinity)
-            Button { showingSettings = true } label: {
-                VStack(spacing: 5) { Image(systemName: "gearshape").font(.system(size: 25)); Text(t("设置", "Settings")).font(.caption) }
-                    .frame(maxWidth: .infinity)
+            .font(.caption).frame(height: 20)
+            HStack(alignment: .center) {
+                Button { showingMedia = true } label: {
+                    VStack(spacing: 5) { Image(systemName: "photo.on.rectangle").font(.system(size: 25)); Text(t("素材", "Media")).font(.caption) }
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("mediaOpen")
+                Button { camera.toggleRecording() } label: {
+                    ZStack {
+                        Circle().stroke(.white, lineWidth: 4).frame(width: 68, height: 68)
+                        RoundedRectangle(cornerRadius: camera.recording ? 5 : 32)
+                            .fill(.red).frame(width: camera.recording ? 29 : 46, height: camera.recording ? 29 : 46)
+                    }
+                }
+                .disabled(!camera.cameraReady || camera.preparingRecording || camera.finalizing || camera.switchingLens)
+                .accessibilityLabel(camera.finalizing ? t("正在保存", "Finalizing") : camera.recording ? t("停止录制", "Stop recording") : t("开始录制", "Record"))
+                .accessibilityIdentifier("recordToggle")
+                .frame(maxWidth: .infinity)
+                Button { showingSettings = true } label: {
+                    VStack(spacing: 5) { Image(systemName: "gearshape").font(.system(size: 25)); Text(t("设置", "Settings")).font(.caption) }
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityIdentifier("settingsOpen")
             }
-            .accessibilityIdentifier("settingsOpen")
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .frame(height: 78)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
-        .frame(height: 92)
         .padding(.horizontal, 14)
         .background(LinearGradient(colors: [.clear, .black.opacity(0.22), .black.opacity(0.48)], startPoint: .top, endPoint: .bottom))
-        .overlay(alignment: .top) {
-            if camera.finalizing {
-                HStack(spacing: 7) { ProgressView().tint(.white); Text(t("正在保存…", "Saving…")) }
-                    .font(.caption).foregroundStyle(.white)
-            } else if camera.status == "Saved · IMU embedded" {
-                Text(t("已保存 · IMU 已嵌入", "Saved · IMU embedded"))
-                    .font(.caption).foregroundStyle(.green)
-                    .accessibilityIdentifier("saveStatus")
-            }
-        }
+
     }
 }

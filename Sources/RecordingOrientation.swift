@@ -42,6 +42,21 @@ struct RecordingGravity: Codable {
     }
 }
 
+/// The horizon in the portrait-locked preview's coordinates.
+struct HorizonGuidePose {
+    let angle: Double
+    let reference: Double
+    let aligned: Bool
+
+    init?(gravity: RecordingGravity) {
+        guard gravity.x.isFinite, gravity.y.isFinite,
+              hypot(gravity.x, gravity.y) > 0.35 else { return nil }
+        angle = atan2(gravity.x, -gravity.y)
+        reference = (angle / (.pi / 2)).rounded() * (.pi / 2)
+        aligned = abs(angle - reference) <= 2 * .pi / 180
+    }
+}
+
 extension RecordingOrientation {
     static func previewAngle(for interface: UIInterfaceOrientation) -> CGFloat? {
         switch interface {
@@ -108,6 +123,13 @@ final class GravityOrientationMonitor {
     func snapshot() -> RecordingDirectionTracker.Decision {
         lock.lock(); defer { lock.unlock() }
         return tracker.resolve(gravity, at: ProcessInfo.processInfo.systemUptime)
+    }
+    func currentGravity() -> RecordingGravity? {
+        lock.lock(); defer { lock.unlock() }
+        guard let gravity,
+              ProcessInfo.processInfo.systemUptime - gravity.timestamp < 0.5,
+              hypot(gravity.x, gravity.y) > 0.35 else { return nil }
+        return gravity
     }
     deinit { motion.stopDeviceMotionUpdates() }
 }

@@ -1,0 +1,22 @@
+{
+  "frames": 3655,
+  "nominal_fps": 60.0,
+  "estimated_span_seconds": 60.909999666666664,
+  "average_fps_over_span": 60.00656739455244,
+  "median_gap_ms": 16.66699999999821,
+  "max_gap_ms": 18.333999999995854,
+  "long_gaps": 0,
+  "estimated_missing_frames": 0,
+  "gap_intervals": [],
+  "file": "UITEST_G_2026-10-14-15-28-19.mov",
+  "width": 3840,
+  "height": 2160,
+  "discarded_packets": 0,
+  "health_samples": 61,
+  "thermal_states": [
+    0
+  ],
+  "pressure_levels": [
+    "AVCaptureSystemPressureLevelNominal"
+  ]
+}

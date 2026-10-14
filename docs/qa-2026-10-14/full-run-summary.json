@@ -1,0 +1,86 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "arm64",
+        "deviceId": "00008140-0008548602A2801C",
+        "deviceName": "YJJY",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22C161",
+        "osVersion": "18.2.1",
+        "platform": "iOS"
+      },
+      "expectedFailures": 0,
+      "failedTests": 7,
+      "passedTests": 17,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "GyroCine · Built with macOS 15.6.1",
+  "expectedFailures": 0,
+  "failedTests": 7,
+  "finishTime": 1791957811.495,
+  "passedTests": 17,
+  "result": "Failed",
+  "skippedTests": 0,
+  "startTime": 1791957516.562,
+  "statistics": [],
+  "testFailures": [
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 6,
+      "testIdentifierString": "IMURecordingUITests/testMediaPreviewAndPhotoImport()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testMediaPreviewAndPhotoImport",
+      "testName": "testMediaPreviewAndPhotoImport()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 7,
+      "testIdentifierString": "IMURecordingUITests/testMediaSelectionAndDeletion()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testMediaSelectionAndDeletion",
+      "testName": "testMediaSelectionAndDeletion()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 8,
+      "testIdentifierString": "IMURecordingUITests/testParameterModesAndPanelMonitoring()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testParameterModesAndPanelMonitoring",
+      "testName": "testParameterModesAndPanelMonitoring()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 9,
+      "testIdentifierString": "IMURecordingUITests/testRulersTapAndHoldFocus()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testRulersTapAndHoldFocus",
+      "testName": "testRulersTapAndHoldFocus()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 10,
+      "testIdentifierString": "IMURecordingUITests/testSonyFinalizesAfterBackgroundAndRelaunch()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testSonyFinalizesAfterBackgroundAndRelaunch",
+      "testName": "testSonyFinalizesAfterBackgroundAndRelaunch()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 11,
+      "testIdentifierString": "IMURecordingUITests/testSonyRecording()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testSonyRecording",
+      "testName": "testSonyRecording()"
+    },
+    {
+      "targetName": "GyroCineUITests",
+      "testIdentifier": 12,
+      "testIdentifierString": "IMURecordingUITests/testVideoSettingsAndRecordingLocks()",
+      "testIdentifierURL": "test://com.apple.xcode/gyro_cine/GyroCineUITests/IMURecordingUITests/testVideoSettingsAndRecordingLocks",
+      "testName": "testVideoSettingsAndRecordingLocks()"
+    }
+  ],
+  "title": "Test - GyroCine",
+  "topInsights": [],
+  "totalTestCount": 24
+}

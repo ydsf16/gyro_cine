@@ -1,0 +1,86 @@
+[
+  {
+    "file": "UITEST_G_2026-10-14-13-45-59.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "gyrf",
+      "mebx"
+    ],
+    "duration": "5.150000",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=be769a03341de28173c8f25e1100bf9d4bb8a38df3793b23ffd3d9cbca97dbde\n1,a,SHA256=43665f7cdc3dd06a7a80c1c2e28e459229dc48176050524f880c8ea03c3a1ebb"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-46-26.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "gyrf",
+      "mebx"
+    ],
+    "duration": "5.450000",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=0fb0308e846de7832dac1c48fc5d3bd5fdc7a460cce6c0666e4f3c3ef3d24891\n1,a,SHA256=038c3e69d0661925575a59c658f01b0acb01318fdb21b0987a25563ec92d3678"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-46-44.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "rtmd",
+      "mebx"
+    ],
+    "duration": "4.983333",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=0372bc9cc73a5102849a32b8cd70a4eb891aa87b0fc307c87aeccab31de5b126\n1,a,SHA256=993d8e3a50ec145d10c6913c87cf5da2b20b0168bf4bb4d67ee88052c4a9314d"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-47-10.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "rtmd",
+      "mebx"
+    ],
+    "duration": "5.000000",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=db7ecd8e9eb3bc5721b42652c6c4cab486235d3763ff159525c30446d9620201\n1,a,SHA256=2f6ada29abb5d7115cd055b7a9323079487583cd55035d7e5777ecddc9990dc5"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-48-31.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "gyrf",
+      "mebx"
+    ],
+    "duration": "5.266667",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=5d12b0df232f186049450b3d1ae062bde9214586a2158f32ef84d1a0ae3a1bd8\n1,a,SHA256=b49abb0a1c6138fdd5ad941b803ce008beb28a231bb109550d2d92a0090c7742"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-48-59.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "gyrf",
+      "mebx"
+    ],
+    "duration": "5.466667",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=8fc354022e9ec25f8eac8bfd3c4d1546eafdc780328b35a2f187a926fa7c6838\n1,a,SHA256=dc25107cb53e5d65c3a2477aa80ac233e9a7f603ac110604fe18a302b818d31e"
+  },
+  {
+    "file": "UITEST_G_2026-10-14-13-49-17.mov",
+    "tracks": [
+      "hvc1",
+      "mp4a",
+      "rtmd",
+      "mebx"
+    ],
+    "duration": "5.183333",
+    "compressed_AV_unchanged": true,
+    "stream_hashes": "0,v,SHA256=c844cbd27d85758242ebab1a45ccd5536328cdbcdd0af11b4b1c039a86c39759\n1,a,SHA256=8efb5c4c478950d6958f9295ea5b71332745505f9f9057418c1681dcc3a363d9"
+  }
+]

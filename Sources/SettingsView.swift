@@ -9,11 +9,12 @@ struct SettingsView: View {
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
     @AppStorage("outputFormat") private var outputFormat = "SonyMov"
     @AppStorage("debugEnabled") private var debugEnabled = false
-    @State private var pickingFolder = false
-    @State private var folderName = "未选择"
+    @AppStorage("showCompositionGrid") private var showCompositionGrid = false
+    @AppStorage("showHorizonLevel") private var showHorizonLevel = false
+    @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var message: String?
 
-    private var locked: Bool { camera.recording || camera.finalizing }
+    private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing }
     private var codecOptions: [VideoEncoding] {
         VideoEncoding.allCases.filter { camera.codecs.contains($0.codec) }
     }
@@ -24,9 +25,15 @@ struct SettingsView: View {
         let openGate = compatibleFormats
             .filter { $0.width >= 3000 && Double($0.width) / Double($0.height) < 1.65 }
             .max { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }
+        let wideRAW = compatibleFormats.filter {
+            $0.width >= 3840 && Double($0.width) / Double($0.height) >= 1.65
+        }
+        let raw4K = wideRAW.max { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }
+        let isRAW = camera.selectedEncoding == .proResRAW || camera.selectedEncoding == .proResRAWHQ
         let choices: [(String, Int32, Int32)] =
             (openGate.map { [("Open Gate", $0.width, $0.height)] } ?? []) +
-            [("4K", 3840, 2160), ("1080p", 1920, 1440), ("1080p", 1920, 1080)]
+            (isRAW ? (raw4K.map { [("4K", $0.width, $0.height)] } ?? []) : [("4K", 3840, 2160)]) +
+            [("1080p", 1920, 1440), ("1080p", 1920, 1080)]
         return choices.compactMap { title, width, height in
             let formats = compatibleFormats.filter { $0.width == width && $0.height == height }
             return formats.isEmpty ? nil : ResolutionOption(title: title, width: width, height: height, formats: formats)
@@ -44,30 +51,17 @@ struct SettingsView: View {
                 videoSection
                 storageSection
                 recordingSection
+                viewfinderSection
                 advancedSection
             }
             .navigationTitle(t("设置", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button(t("完成", "Done")) { dismiss() } } }
-            .fileImporter(isPresented: $pickingFolder, allowedContentTypes: [.folder]) { result in
-                switch result {
-                case .success(let url):
-                    guard url.startAccessingSecurityScopedResource() else { message = t("无法访问所选文件夹", "Cannot access the selected folder"); return }
-                    defer { url.stopAccessingSecurityScopedResource() }
-                    do {
-                        let bookmark = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-                        UserDefaults.standard.set(bookmark, forKey: "externalFolderBookmark")
-                        UserDefaults.standard.set(url.lastPathComponent, forKey: "externalFolderName")
-                        folderName = url.lastPathComponent
-                    } catch { message = "\(t("保存文件夹授权失败", "Could not save folder access"))：\(error.localizedDescription)" }
-                case .failure(let error): message = error.localizedDescription
-                }
-            }
             .alert(t("设置", "Settings"), isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button(t("确定", "OK")) { message = nil }
             } message: { Text(message ?? "") }
             .onAppear {
-                folderName = UserDefaults.standard.string(forKey: "externalFolderName") ?? t("未选择", "Not selected")
+                refreshExternalDevices()
                 if outputFormat == "Sony MOV" { outputFormat = "SonyMov" }
                 if outputFormat == "Gyroflow Project" { outputFormat = "GyroflowProto" }
             }
@@ -88,6 +82,7 @@ struct SettingsView: View {
                 }
             } label: { row(t("视频编码", "Codec"), camera.selectedEncoding.title) }
                 .tint(.primary).disabled(locked || codecOptions.isEmpty)
+                .accessibilityIdentifier("codecMenu")
             Menu {
                 ForEach(resolutions) { resolution in
                     Button {
@@ -104,6 +99,7 @@ struct SettingsView: View {
                 }
             } label: { row(t("分辨率", "Resolution"), resolutions.first(where: { $0.id == currentResolution })?.label ?? currentResolution) }
                 .tint(.primary).disabled(locked || resolutions.isEmpty)
+                .accessibilityIdentifier("resolutionMenu")
             Menu {
                 ForEach(camera.availableFPS, id: \.self) { rate in
                     Button {
@@ -111,7 +107,7 @@ struct SettingsView: View {
                     } label: {
                         if abs(camera.fps - rate) < 0.001 { Label(fpsLabel(rate), systemImage: "checkmark") }
                         else { Text(fpsLabel(rate)) }
-                    }
+                    }.accessibilityIdentifier("fpsOption.\(fpsLabel(rate))")
                 }
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
@@ -122,13 +118,25 @@ struct SettingsView: View {
         Section {
                     Menu {
                         Button(t("内部文件", "On My iPhone")) { storageLocation = "内部文件" }
-                        Button(t("外部 SSD · 待接入", "External SSD · Coming soon")) {
-                            message = t("外部 SSD 写入尚未接入录制核心。", "External SSD recording is not connected yet.")
+                        Button(t("外部 SSD", "External SSD")) {
+                            selectExternalStorage()
                         }
                     } label: { row(t("存储位置", "Storage"), storageLocation == "内部文件" ? t("内部文件", "On My iPhone") : storageLocation) }.tint(.primary)
                     .disabled(locked)
                     if storageLocation == "外部 SSD" {
-                        Button { pickingFolder = true } label: { row(t("目标文件夹", "Destination folder"), folderName) }
+                        Menu {
+                            ForEach(externalDevices, id: \.uuid) { device in
+                                Button(device.displayName ?? t("外部存储", "External storage")) {
+                                    if let id = device.uuid?.uuidString {
+                                        UserDefaults.standard.set(id, forKey: "externalDeviceID")
+                                        camera.refreshExternalStorage()
+                                    }
+                                }
+                            }
+                            Button(t("重新检测", "Refresh")) { refreshExternalDevices() }
+                        } label: {
+                            row(t("目标 SSD", "Destination SSD"), selectedExternalName)
+                        }
                             .disabled(locked)
                     }
                     Menu {
@@ -138,14 +146,56 @@ struct SettingsView: View {
                     .accessibilityIdentifier("outputFormatMenu")
                     .disabled(locked)
         } header: { Text(t("存储", "STORAGE")) } footer: {
-                    Text(t("两种 MOV 格式均内嵌 IMU。外部 SSD 写入尚未接入。",
-                           "Both MOV formats embed IMU. External SSD recording is not connected yet."))
+                    Text(t("本机视频保存在 GyroCine/Media，诊断数据保存在 GyroCine/Log；SSD 视频由系统写入 DCIM/100APPLE。",
+                           "Local videos are in GyroCine/Media, diagnostics in GyroCine/Log; SSD videos are in DCIM/100APPLE."))
+        }
+    }
+    private var selectedExternalName: String {
+        let id = UserDefaults.standard.string(forKey: "externalDeviceID")
+        return externalDevices.first(where: { $0.uuid?.uuidString == id })?.displayName
+            ?? t("未连接", "Not connected")
+    }
+    private func refreshExternalDevices() {
+        externalDevices = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.filter(\.isConnected) ?? []
+    }
+    private func selectExternalStorage() {
+        refreshExternalDevices()
+        guard !externalDevices.isEmpty else {
+            message = t("未检测到外部 SSD。请连接 SSD 后重试。", "No external SSD detected. Connect it and retry.")
+            return
+        }
+        let activate = {
+            storageLocation = "外部 SSD"
+            if !externalDevices.contains(where: { $0.uuid?.uuidString == UserDefaults.standard.string(forKey: "externalDeviceID") }),
+               let id = externalDevices.first?.uuid?.uuidString {
+                UserDefaults.standard.set(id, forKey: "externalDeviceID")
+            }
+            camera.refreshExternalStorage()
+        }
+        switch AVExternalStorageDevice.authorizationStatus {
+        case .authorized: activate()
+        case .notDetermined:
+            AVExternalStorageDevice.requestAccess { granted in
+                DispatchQueue.main.async {
+                    if granted { activate() }
+                    else { message = t("需要外部存储授权。请在系统设置中允许访问。", "Allow external storage access in Settings.") }
+                }
+            }
+        default: message = t("需要外部存储授权。请在系统设置中允许访问。", "Allow external storage access in Settings.")
         }
     }
     private var recordingSection: some View {
         Section(t("录制", "RECORDING")) {
                     lockedRow(t("记录 IMU", "Record IMU"), t("始终开启", "Always on"))
                     lockedRow(t("录制声音", "Record audio"), camera.audioAvailable ? t("始终开启", "Always on") : t("无权限", "No permission"))
+        }
+    }
+    private var viewfinderSection: some View {
+        Section(t("取景辅助", "VIEWFINDER")) {
+            Toggle(t("九宫格辅助线", "Rule of thirds grid"), isOn: $showCompositionGrid)
+                .accessibilityIdentifier("gridToggle")
+            Toggle(t("水平辅助线", "Horizon level"), isOn: $showHorizonLevel)
+                .accessibilityIdentifier("levelToggle")
         }
     }
     private var advancedSection: some View {
@@ -162,7 +212,7 @@ struct SettingsView: View {
             Text(name).foregroundStyle(.primary)
             Spacer()
             Text(value).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
-        }
+        }.contentShape(Rectangle())
     }
     private func lockedRow(_ name: String, _ value: String) -> some View {
         HStack {

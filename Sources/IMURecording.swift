@@ -90,24 +90,36 @@ enum MovieIMUFinalizer {
               let format = track.formatDescriptions.first else {
             throw RecorderError.unavailable("MOV 没有视频轨")
         }
-        let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
-        reader.add(output)
-        guard reader.startReading() else { throw reader.error ?? RecorderError.unavailable("无法读取视频帧时间") }
         var frames: [ActualVideoFrame] = []
-        while let buffer = output.copyNextSampleBuffer() {
-            for index in 0..<CMSampleBufferGetNumSamples(buffer) {
-                var timing = CMSampleTimingInfo()
-                guard CMSampleBufferGetSampleTimingInfo(buffer, at: index, timingInfoOut: &timing) == noErr,
-                      timing.presentationTimeStamp.seconds.isFinite else {
-                    throw RecorderError.unavailable("MOV 帧时间无效")
+        if let cursor = track.makeSampleCursorAtFirstSampleInDecodeOrder() {
+            // The sample cursor reads the MOV timing index without loading the
+            // compressed video payload. Its PTS matches AVAssetReader's PTS.
+            repeat {
+                let pts = cursor.presentationTimeStamp.seconds
+                guard pts.isFinite else { throw RecorderError.unavailable("MOV 帧时间无效") }
+                frames.append(.init(pts: pts))
+            } while cursor.stepInDecodeOrder(byCount: 1) == 1
+        } else {
+            // Keep compatibility with MOV variants that cannot provide cursors.
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            reader.add(output)
+            guard reader.startReading() else { throw reader.error ?? RecorderError.unavailable("无法读取视频帧时间") }
+            while let buffer = output.copyNextSampleBuffer() {
+                for index in 0..<CMSampleBufferGetNumSamples(buffer) {
+                    var timing = CMSampleTimingInfo()
+                    guard CMSampleBufferGetSampleTimingInfo(buffer, at: index, timingInfoOut: &timing) == noErr,
+                          timing.presentationTimeStamp.seconds.isFinite else {
+                        throw RecorderError.unavailable("MOV 帧时间无效")
+                    }
+                    frames.append(.init(pts: timing.presentationTimeStamp.seconds))
                 }
-                frames.append(.init(pts: timing.presentationTimeStamp.seconds))
+            }
+            guard reader.status == .completed else {
+                throw reader.error ?? RecorderError.unavailable("无法读取视频帧时间")
             }
         }
-        guard reader.status == .completed, frames.count >= 2 else {
-            throw reader.error ?? RecorderError.unavailable("MOV 视频帧不足")
-        }
+        guard frames.count >= 2 else { throw RecorderError.unavailable("MOV 视频帧不足") }
         frames.sort { $0.pts < $1.pts }
         let dims = CMVideoFormatDescriptionGetDimensions(format as! CMVideoFormatDescription)
         let code = CMFormatDescriptionGetMediaSubType(format as! CMFormatDescription)
@@ -119,13 +131,30 @@ enum MovieIMUFinalizer {
 
     static func finalize(movie: URL, rawIMU: URL, firstFrameHost: Double,
                          cameraFrames: URL, orientation: RecordingOrientation,
-                         camera: String, lens: String, mode: String, retainDebug: Bool) throws -> (Int, Double, Double) {
+                         camera: String, lens: String, mode: String, retainDebug: Bool,
+                         expectedFPS: Double? = nil,
+                         progress: ((String, Double) -> Void)? = nil) throws -> (Int, Double, Double) {
+        var checkpoint = ProcessInfo.processInfo.systemUptime
+        func completed(_ stage: String) {
+            let now = ProcessInfo.processInfo.systemUptime
+            progress?(stage, now - checkpoint)
+            checkpoint = now
+        }
         let video = try inspect(movie)
+        completed("readVideoFrameTimes")
+        if let expectedFPS, expectedFPS.isFinite, expectedFPS > 0,
+           video.duration.isFinite, video.duration > 0 {
+            let minimumFrames = max(2, Int((video.duration * expectedFPS * 0.8).rounded(.down)))
+            guard video.frames.count >= minimumFrames else {
+                throw RecorderError.unavailable("MOV 视频帧率严重不足：\(video.frames.count)/\(minimumFrames) 帧；原始文件已保留")
+            }
+        }
         guard video.rotationDegrees == orientation.degrees else {
             throw RecorderError.unavailable("MOV 方向与录制时重力方向不一致；原始文件已保留")
         }
         let first = video.frames[0].pts
         let intervals = zip(video.frames, video.frames.dropFirst()).map { $1.pts - $0.pts }.filter { $0 > 0 }
+        guard !intervals.isEmpty else { throw RecorderError.unavailable("Invalid video frame timestamps") }
         let frameDuration = intervals.sorted()[intervals.count / 2]
         let end = video.frames.last!.pts - first + frameDuration
         guard end > 0, firstFrameHost.isFinite else {
@@ -135,13 +164,17 @@ enum MovieIMUFinalizer {
         let events = try lines.map { try JSONDecoder().decode(MotionEvent.self, from: Data($0.utf8)) }
         func timeline(_ kind: MotionEvent.Kind) throws -> [MotionEvent] {
             let values = events.filter { $0.kind == kind }.sorted { $0.timestamp < $1.timestamp }
-            guard values.count >= 2, values.first!.timestamp <= firstFrameHost - margin,
-                  values.last!.timestamp >= firstFrameHost + end + margin else {
-                throw RecorderError.unavailable("IMU 没有覆盖视频首尾各 50 ms；原始 MOV 与 IMU 已保留")
+            let before = values.first.map { firstFrameHost - $0.timestamp } ?? -.infinity
+            let after = values.last.map { $0.timestamp - firstFrameHost - end } ?? -.infinity
+            guard values.count >= 2, before >= 0, after >= 0 else {
+                throw RecorderError.unavailable("IMU \(kind.rawValue) 未覆盖实际视频：片头 \(before) s、片尾 \(after) s；原始 MOV 与 IMU 已保留")
             }
             return values
         }
         let gyro = try timeline(.gyro), accel = try timeline(.accel)
+        let actualPreRoll = min(firstFrameHost - gyro[0].timestamp, firstFrameHost - accel[0].timestamp)
+        let actualPostRoll = min(gyro.last!.timestamp, accel.last!.timestamp) - firstFrameHost - end
+        completed("readIMU")
         func interpolate(_ values: [MotionEvent], _ seconds: Double) throws -> [Double] {
             let target = firstFrameHost + seconds
             var low = 0, high = values.count - 1
@@ -154,13 +187,17 @@ enum MovieIMUFinalizer {
             let f = (target - a.timestamp) / gap
             return [a.x + (b.x-a.x)*f, a.y + (b.y-a.y)*f, a.z + (b.z-a.z)*f]
         }
-        let frameEvidence = try CameraIntrinsicsRecorder.aligned(cameraFrames, video: video,
+        let alignment = try CameraIntrinsicsRecorder.alignment(cameraFrames, video: video,
             firstHost: firstFrameHost, interval: frameDuration)
+        let frameEvidence = alignment.frames
+        completed("alignCameraIntrinsics")
         let matrix = (0..<9).map { element in
             frameEvidence.reduce(0.0) { $0 + $1.matrix[element] } / Double(frameEvidence.count)
         }
+        let intrinsicSource = alignment.interpolatedCount + alignment.nearestFallbackCount == 0
+            ? "CameraIntrinsicMatrix" : "CameraIntrinsicMatrix with estimated missing frames"
         let profile: [String: Any] = ["camera_brand": "Apple", "camera_model": camera,
-            "lens_model": lens, "calibrated_by": "Apple per-frame K mean; distortion uncalibrated",
+            "lens_model": lens, "calibrated_by": "Apple sampled K mean; distortion uncalibrated",
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height],
             "output_dimension": ["w": orientation.isPortrait ? video.height : video.width,
@@ -171,8 +208,12 @@ enum MovieIMUFinalizer {
         let profileData = try JSONSerialization.data(withJSONObject: profile, options: [.sortedKeys])
         let note = try JSONSerialization.data(withJSONObject: ["source_camera": camera,
             "transport": mode, "timing": "MOV first frame PTS mapped from MovieFileOutput startPTS; optical sync unverified",
-            "pre_roll_ms": 50, "post_roll_ms": 50, "lens_profile": profile,
-            "intrinsic_source": "CameraIntrinsicMatrix", "intrinsic_frame_count": frameEvidence.count,
+            "pre_roll_ms": Int((actualPreRoll * 1000).rounded()),
+            "post_roll_ms": Int((actualPostRoll * 1000).rounded()), "lens_profile": profile,
+            "intrinsic_source": intrinsicSource, "intrinsic_frame_count": frameEvidence.count,
+            "intrinsic_interpolated_frame_count": alignment.interpolatedCount,
+            "intrinsic_nearest_fallback_frame_count": alignment.nearestFallbackCount,
+            "intrinsic_max_nearest_time_error_ms": alignment.maximumNearestError * 1000,
             "intrinsic_mean": matrix, "rotation_degrees": orientation.degrees] as [String: Any], options: [.sortedKeys])
         var packets: [Data] = [], durations: [UInt32] = []
         if mode == "SonyMov" {
@@ -206,7 +247,7 @@ enum MovieIMUFinalizer {
                 let start = frame.pts - first
                 let next = index+1 < video.frames.count ? video.frames[index+1].pts-first : end
                 let evidence = CaptureFrameEvidence(sourcePTSSeconds: frame.pts,
-                    cameraIntrinsicMatrix: frameEvidence[index].matrix, intrinsicSource: "CameraIntrinsicMatrix",
+                    cameraIntrinsicMatrix: frameEvidence[index].matrix, intrinsicSource: intrinsicSource,
                     activeVideoStabilizationMode: 0, deviceExposureDurationAtCallbackSeconds: frameEvidence[index].exposure,
                     deviceISOAtCallback: frameEvidence[index].iso)
                 var frameSamples: [EmbeddedTelemetryExporter.Sample] = []
@@ -220,6 +261,7 @@ enum MovieIMUFinalizer {
                 durations.append(UInt32(max(1, Int64((next*1e6).rounded()) - Int64((start*1e6).rounded()))))
             }
         }
+        completed("buildTelemetryPackets")
         var atoms = MOVTelemetryMuxer.box("rmin", note)
         if mode == "SonyMov" {
             let xml = "<Compatibility manufacturer=\"Sony\" modelName=\"GyroCine \(camera) compatibility\"><Lens modelName=\"Apple per-frame K\"/></Compatibility>"
@@ -227,8 +269,7 @@ enum MovieIMUFinalizer {
         }
         try MOVTelemetryMuxer.append(to: movie, kind: mode == "SonyMov" ? "rtmd" : "gyrf",
             packets: packets, durations: durations, note: atoms)
-        // Reopen the completed container before reporting success.
-        _ = try inspect(movie)
+        completed("appendAndSyncMOV")
         if !retainDebug {
             try? FileManager.default.removeItem(at: rawIMU)
             try? FileManager.default.removeItem(at: cameraFrames)
@@ -239,5 +280,93 @@ enum MovieIMUFinalizer {
 
     private static func samplesCount(_ events: [MotionEvent], _ first: Double, _ end: Double) -> Int {
         events.filter { $0.timestamp >= first && $0.timestamp <= first + end }.count + 2
+    }
+}
+
+/// Durable parameters use relative paths so reinstall/container relocation is safe.
+struct PendingIMUJob: Codable {
+    let movieName: String
+    let imuName: String
+    let framesName: String
+    let firstHost: Double
+    let orientation: RecordingOrientation
+    let camera: String
+    let lens: String
+    let mode: String
+    let retainDebug: Bool
+    var externalMovieBookmark: Data? = nil
+    var expectedVideoCodec: String? = nil
+    var expectedFPS: Double? = nil
+    var ready = false
+    var recordingFailure: String?
+    var recordingWarning: String?
+
+    func url(in directory: URL) -> URL {
+        directory.appendingPathComponent(movieName).appendingPathExtension("pending-imu.json")
+    }
+    func save(in directory: URL) throws {
+        try JSONEncoder().encode(self).write(to: url(in: directory), options: .atomic)
+    }
+    func complete(in directory: URL, progress: ((String, Double) -> Void)? = nil) throws {
+        guard [movieName, imuName, framesName].allSatisfy({ !$0.isEmpty && URL(fileURLWithPath: $0).lastPathComponent == $0 }),
+              movieName.lowercased().hasSuffix(".mov"),
+              imuName == String(movieName.dropLast(4)) + ".imu_raw.jsonl",
+              framesName == String(movieName.dropLast(4)) + ".camera_frames.jsonl" else {
+            throw RecorderError.unavailable("Invalid recovery file paths")
+        }
+        var stale = false
+        let localMovie = directory.appendingPathComponent(movieName)
+        let movie = try externalMovieBookmark.map {
+            try URL(resolvingBookmarkData: $0, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        } ?? (FileManager.default.fileExists(atPath: localMovie.path) ? localMovie :
+              FileManager.default.fileExists(atPath: RecordingStoragePaths.movieDirectory.appendingPathComponent(movieName).path)
+              ? RecordingStoragePaths.movieDirectory.appendingPathComponent(movieName)
+              : RecordingStoragePaths.legacyDirectory.appendingPathComponent(movieName))
+        guard !stale, movie.lastPathComponent == movieName else {
+            throw RecorderError.unavailable("SSD 素材授权已失效，请重新连接 SSD；原始 IMU 已保留")
+        }
+        let accessing = externalMovieBookmark != nil && movie.startAccessingSecurityScopedResource()
+        guard externalMovieBookmark == nil || accessing else {
+            throw RecorderError.unavailable("无法访问 SSD 素材，请重新连接 SSD；原始 IMU 已保留")
+        }
+        defer { if accessing { movie.stopAccessingSecurityScopedResource() } }
+        if let recordingFailure { throw RecorderError.unavailable(recordingFailure) }
+        try MOVTelemetryMuxer.recoverIfNeeded(movie)
+        if let expectedVideoCodec, ["aprn", "aprh"].contains(expectedVideoCodec) {
+            let asset = AVURLAsset(url: movie)
+            guard let track = asset.tracks(withMediaType: .video).first,
+                  let description = track.formatDescriptions.first else {
+                throw RecorderError.unavailable("RAW MOV 没有视频轨；原始文件已保留")
+            }
+            let code = CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription)
+            let actual = String(bytes: (0..<4).map { UInt8((code >> (24 - $0 * 8)) & 255) }, encoding: .ascii) ?? "unknown"
+            guard actual == expectedVideoCodec else {
+                throw RecorderError.unavailable("RAW 编码不符：期望 \(expectedVideoCodec)，实际 \(actual)；原始文件已保留")
+            }
+        }
+        // A crash after MOV commit but before job removal must not append another track.
+        if !MOVTelemetryMuxer.hasTelemetry(movie) {
+            _ = try MovieIMUFinalizer.finalize(movie: movie,
+                rawIMU: directory.appendingPathComponent(imuName), firstFrameHost: firstHost,
+                cameraFrames: directory.appendingPathComponent(framesName), orientation: orientation,
+                camera: camera, lens: lens, mode: mode, retainDebug: true,
+                expectedFPS: expectedFPS, progress: progress)
+        }
+        // The full compressed-video scan above is needed for frame PTS only once.
+        // Verify the committed metadata sample index and original AV tracks
+        // without reading multi-GB video payloads again.
+        guard MOVTelemetryMuxer.hasTelemetry(movie) else {
+            throw RecorderError.unavailable("MOV 缺少有效 IMU 元数据轨；原始文件已保留")
+        }
+        let asset = AVURLAsset(url: movie)
+        guard !asset.tracks(withMediaType: .video).isEmpty,
+              !asset.tracks(withMediaType: .audio).isEmpty else {
+            throw RecorderError.unavailable("MOV 视频或音频轨校验失败；原始文件已保留")
+        }
+        try FileManager.default.removeItem(at: url(in: directory))
+        if !retainDebug {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(imuName))
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(framesName))
+        }
     }
 }

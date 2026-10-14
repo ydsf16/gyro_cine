@@ -29,6 +29,11 @@ targets:
   GyroCine:
     type: application
     platform: iOS
+    info:
+      path: Resources/Info.plist
+      properties:
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     sources: [Sources, Resources]
     settings:
       base:
