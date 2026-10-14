@@ -18,8 +18,10 @@ Validation:
 - Three simulator unit tests pass: four gravity directions/fallback, exposure bounds
   over 24–120 fps, and one-time settings migration.
 - Device startup log verifies H.265 3840×2160/30 and maximum exposure 1/120.
-- New-device UI recording/orientation tests are pending: XCTest runner exits with
-  code 74 / IDE disconnection before executing tests (three attempts). The prior
-  Rebuild's IMU/K recordings were verified separately before this promotion.
-- RAW physical autofocus and all four physical recording orientations require device
-  acceptance; simulator orientation assertions do not establish optical behavior.
+- After USB reconnect, all four iPhone 16 XCUITests pass: frame-rate changes restore
+  A-Max, Sony recording, Proto recording, and recording after physical-lens switching.
+- All three recorded MOVs pass the independent K/IMU container validator. Actual
+  gravity at REC includes both portrait and landscape; MOV rotation is respectively
+  -90 degrees (ffprobe convention) and identity, matching the selected directions.
+- RAW physical autofocus and the two remaining physical orientations still require
+  device acceptance; no optical IMU timing calibration is claimed.
