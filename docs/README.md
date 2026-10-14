@@ -1,3 +1,5 @@
+> Historical implementation documentation. See [current project README](../README.md) for the promoted rebuild.
+
 ProRes RAW 设置与外接存储要求：[M2_REPORT.md](M2_REPORT.md)
 
 最新自动曝光上限与同步补偿：[EXPOSURE_COMPENSATION_REPORT.md](EXPOSURE_COMPENSATION_REPORT.md)

@@ -7,45 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01F2B39363E12F251C135FE6 /* LegacyGyroflowExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D7FABD172E4BF873F342DA2 /* LegacyGyroflowExporter.swift */; };
-		05424543F782AFE0A60051C9 /* CameraCapabilityScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1CEC2BD1ECD3C617E71220F /* CameraCapabilityScanner.swift */; };
-		05F2E1971B749CF841A43D28 /* GyroTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40303F69935F0B0F025E50A9 /* GyroTimeline.swift */; };
-		0DFF12EE3D86DF75519AD081 /* RecordingOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE8F79DA4EE39DA1E89782D2 /* RecordingOrientation.swift */; };
-		163328636347C275ADA687F6 /* RecorderTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C786DD342959F06CE34ED1CB /* RecorderTheme.swift */; };
-		186AA68041C9D4F838038F0D /* RecorderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB3B1E5620993E6A711EBD6 /* RecorderViewModel.swift */; };
-		23AFE161FF05D2A7BC2AB35E /* DiagnosticsCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F82C58D8F13A931FC7C7A8 /* DiagnosticsCollector.swift */; };
-		304F7C9F259F150ABD16117D /* RAWSettingsProbe.m in Sources */ = {isa = PBXBuildFile; fileRef = 465B1CE3D1E843D168B341AE /* RAWSettingsProbe.m */; };
-		32C534B4A85DE010BEDB0E82 /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5CF288D1163EC67CFF09A57 /* RecordingState.swift */; };
-		337FC0CBBCA88A74A679C666 /* RecordingDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F82B3A8DEA45A9F26D8EAD /* RecordingDiagnostics.swift */; };
-		3735908E2A223597329E1894 /* writer3frames.mov in Resources */ = {isa = PBXBuildFile; fileRef = 34983CAE5AEECB7D9550D170 /* writer3frames.mov */; };
-		3FD632EC1C6235E79953DD2E /* RecordingStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA35451FA2765A2C0CD2F3D3 /* RecordingStorageTests.swift */; };
-		40D5EDC0F01E7BD8F68E5DE5 /* MotionRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A59C662BD90EFDFCB7232D2A /* MotionRecorder.swift */; };
-		42B03872C0EE385B221C7022 /* GyroflowJSONLWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0027910DFFC2E70733BA44 /* GyroflowJSONLWriter.swift */; };
-		4665D295985357F949971D76 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FDBFB6D99B1AD5A67F7CFA1 /* ClockAligner.swift */; };
-		47F929064CEFFFA750573035 /* RecorderIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB33B5C08F73B6879FD06566 /* RecorderIdentity.swift */; };
-		5A4484C1F23AFF6A5DB6C574 /* RecordedClockMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CE172C9617E7E0A9AC3D61 /* RecordedClockMap.swift */; };
-		6B7721D78E9572FE5BB1D7E8 /* CaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FBE92233A8ADEED43C353C /* CaptureCoordinator.swift */; };
-		6F4C5887219615584F4B96E7 /* CaptureFrameCopier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3CD1C812F28FE17474CECDA /* CaptureFrameCopier.swift */; };
-		70B5A7081E6DF74DD7D2D4E6 /* gyroflow.proto in Resources */ = {isa = PBXBuildFile; fileRef = 534DD6964969E8D0E47168C4 /* gyroflow.proto */; };
-		7201B57D58C6A550216832B3 /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 539208207D8AA9C8B42B2F98 /* CaptureFrameEvidence.swift */; };
-		75B50B6CCD1022B6599D146A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2734F3753265740555C9A167 /* ContentView.swift */; };
-		7AC64FD62B7C33705C2EC51F /* ShutterSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D61AEBA4E89ADD62206D46B5 /* ShutterSetting.swift */; };
-		7C0092370BFD60E109EDCC92 /* RecordingCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE045DF4027E7C7E52A832CE /* RecordingCodec.swift */; };
-		9F5F52D4D947A2A6F1C52539 /* CaptureFrameCopierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED60C9A4231480269232BDBE /* CaptureFrameCopierTests.swift */; };
-		A352A4E85C1478FA2117FCB9 /* DeviceRecordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3880A55F127BA191ED9A3886 /* DeviceRecordingTests.swift */; };
-		A8F6F87C4D89312DABFAF473 /* RecordingOutputMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225BE8BFB42DE9B3F95A28F6 /* RecordingOutputMode.swift */; };
-		AB7A12788EF380A93A799EC0 /* RecorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE647E0E767CA21AB1AE54DE /* RecorderTests.swift */; };
-		B43AC37C8469DF8B924A6516 /* RecordingFinalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354FCA44764369A898E82A18 /* RecordingFinalizer.swift */; };
-		BD09211B280651C0FA9B905A /* CameraControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AAD5A918D7EE61194B8D579 /* CameraControls.swift */; };
-		BEAD82D1B3909CF99D963FA2 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A9F6128688A3793E315C5A /* EmbeddedTelemetryExporter.swift */; };
-		C20B952CC5B232E0A6BAF318 /* MovieFileEvidenceBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */; };
-		C91C84B12F0A581F346C0859 /* CameraControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080F90B2A73265BBC678B5AA /* CameraControlsTests.swift */; };
-		CBF4F7B2C1B095AF4704E803 /* CameraControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F874861AEE8FAB6B9557C376 /* CameraControlView.swift */; };
-		CF5E68B9C41916005C393F1B /* MOVTelemetryMuxer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DDC7C0081387622A6555643 /* MOVTelemetryMuxer.swift */; };
-		DF90D9EC1EDCD3CF62C0FE46 /* RecordingStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7707232E6E68FB7F6B218AA4 /* RecordingStorage.swift */; };
-		E34BDC6C165E9C22E280E737 /* GyroCineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7094B637E8BD43E1F5E6591 /* GyroCineApp.swift */; };
-		EE3530D5A34716BB5C533A5A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 464A02A28893A15D0AFAE22A /* Assets.xcassets */; };
-		FAB973E4C92BA8CB87AEE408 /* EmbeddedTelemetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5053C49565BC9949F1BCBC9 /* EmbeddedTelemetryTests.swift */; };
+		0E9EA1990236C5739FDB98E6 /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */; };
+		1A88DD1D0C6671CDAE1BE79C /* MediaLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */; };
+		20707B6FFCEBBF8F913A3AF1 /* MOVTelemetryMuxer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */; };
+		2118EED908F6250FAD230DC8 /* CameraIntrinsicsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A91E087623B637B08CBC743 /* CameraIntrinsicsRecorder.swift */; };
+		220235B045B0AEEAA28BE778 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0109F90EE225951234B97E3A /* CameraView.swift */; };
+		23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */; };
+		2FA4E79E6ABA5B777D44DA00 /* GyroCineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */; };
+		4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2817BCD3637009EF27D48531 /* SettingsView.swift */; };
+		5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9141D40EBE79980BEA8969DC /* Assets.xcassets */; };
+		635A301F479D884EB2F45FA9 /* IMURecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD19334D59F169EEE052CD8 /* IMURecording.swift */; };
+		77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7837A3B5E0845276712C02D9 /* Localizable.strings */; };
+		8082FD10ABEDAE1649CA9217 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */; };
+		8A4D75C717C7D2C5DCCC78E9 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2988EEEB7132649CE38D63 /* ClockAligner.swift */; };
+		8B7574C40EDE681D7840F8B1 /* MovingRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */; };
+		993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = 8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */; };
+		B07D5C4C4D09DD8B6C4A99B5 /* IMURecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034C3517079161B3003ECD09 /* IMURecordingUITests.swift */; };
+		B245DF897F1000DE9AA165E3 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85160F4187B712C627203368 /* DiagnosticLogger.swift */; };
+		C01B74C0926DD3A71AE8B5A1 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FAB22C1E5DFB0D1EBB98BC /* CameraManager.swift */; };
+		DC9D5B3B8FE2CCFA89243FC8 /* CameraModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FADDFFE59721D646980D74 /* CameraModels.swift */; };
+		E4EBB6D92D4895724AE8ACC5 /* CaptureDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABB2D1C7843C830C2F46C64 /* CaptureDefaults.swift */; };
+		EBF533A698B5EA02EABBDA2F /* DefaultsAndOrientationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57387D9F647FF4429FC12F72 /* DefaultsAndOrientationTests.swift */; };
+		F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */; };
+		FE53A691AD88959908EC5160 /* AppText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64818C6434D8910B7DDAABDF /* AppText.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,163 +50,81 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		07A9F6128688A3793E315C5A /* EmbeddedTelemetryExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTelemetryExporter.swift; sourceTree = "<group>"; };
-		080F90B2A73265BBC678B5AA /* CameraControlsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraControlsTests.swift; sourceTree = "<group>"; };
-		0D506AA0825A79A81C8487E8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		1E0027910DFFC2E70733BA44 /* GyroflowJSONLWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroflowJSONLWriter.swift; sourceTree = "<group>"; };
-		225BE8BFB42DE9B3F95A28F6 /* RecordingOutputMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOutputMode.swift; sourceTree = "<group>"; };
-		2734F3753265740555C9A167 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		0109F90EE225951234B97E3A /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		034C3517079161B3003ECD09 /* IMURecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMURecordingUITests.swift; sourceTree = "<group>"; };
+		06FAB22C1E5DFB0D1EBB98BC /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroCineApp.swift; sourceTree = "<group>"; };
+		160B0A3208CA6FF8D6FE278F /* RAWFocusTest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RAWFocusTest-Bridging-Header.h"; sourceTree = "<group>"; };
+		1ABB2D1C7843C830C2F46C64 /* CaptureDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDefaults.swift; sourceTree = "<group>"; };
+		1DD19334D59F169EEE052CD8 /* IMURecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMURecording.swift; sourceTree = "<group>"; };
 		27E0EA8F78966C357CF32A3C /* GyroCine.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GyroCine.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		2AAD5A918D7EE61194B8D579 /* CameraControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraControls.swift; sourceTree = "<group>"; };
-		34983CAE5AEECB7D9550D170 /* writer3frames.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = writer3frames.mov; sourceTree = "<group>"; };
-		354FCA44764369A898E82A18 /* RecordingFinalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFinalizer.swift; sourceTree = "<group>"; };
-		3880A55F127BA191ED9A3886 /* DeviceRecordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingTests.swift; sourceTree = "<group>"; };
-		40303F69935F0B0F025E50A9 /* GyroTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroTimeline.swift; sourceTree = "<group>"; };
+		2817BCD3637009EF27D48531 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOVTelemetryMuxer.swift; sourceTree = "<group>"; };
 		45B973097EAF522C0DABF600 /* GyroCineUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GyroCineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		464A02A28893A15D0AFAE22A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		465B1CE3D1E843D168B341AE /* RAWSettingsProbe.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RAWSettingsProbe.m; sourceTree = "<group>"; };
-		47F82B3A8DEA45A9F26D8EAD /* RecordingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDiagnostics.swift; sourceTree = "<group>"; };
-		503717654EBFEF98D63BE0B5 /* GyroCine-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GyroCine-Bridging-Header.h"; sourceTree = "<group>"; };
-		534DD6964969E8D0E47168C4 /* gyroflow.proto */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.protobuf; path = gyroflow.proto; sourceTree = "<group>"; };
-		539208207D8AA9C8B42B2F98 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
-		5D7FABD172E4BF873F342DA2 /* LegacyGyroflowExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyGyroflowExporter.swift; sourceTree = "<group>"; };
-		5FDBFB6D99B1AD5A67F7CFA1 /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
-		7707232E6E68FB7F6B218AA4 /* RecordingStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStorage.swift; sourceTree = "<group>"; };
-		7DDC7C0081387622A6555643 /* MOVTelemetryMuxer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOVTelemetryMuxer.swift; sourceTree = "<group>"; };
+		57387D9F647FF4429FC12F72 /* DefaultsAndOrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultsAndOrientationTests.swift; sourceTree = "<group>"; };
+		5A91E087623B637B08CBC743 /* CameraIntrinsicsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraIntrinsicsRecorder.swift; sourceTree = "<group>"; };
+		608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTelemetryExporter.swift; sourceTree = "<group>"; };
+		64818C6434D8910B7DDAABDF /* AppText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppText.swift; sourceTree = "<group>"; };
+		6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLibraryView.swift; sourceTree = "<group>"; };
+		6F2988EEEB7132649CE38D63 /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
+		81348E10D056049BDBFBE556 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		81FADDFFE59721D646980D74 /* CameraModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModels.swift; sourceTree = "<group>"; };
+		85160F4187B712C627203368 /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
+		891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovingRuler.swift; sourceTree = "<group>"; };
+		8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RecordingExceptionCatcher.m; sourceTree = "<group>"; };
 		8C50ACA654D416F5EB9EB508 /* GyroCineTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GyroCineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A3CD1C812F28FE17474CECDA /* CaptureFrameCopier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameCopier.swift; sourceTree = "<group>"; };
-		A5053C49565BC9949F1BCBC9 /* EmbeddedTelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTelemetryTests.swift; sourceTree = "<group>"; };
-		A59C662BD90EFDFCB7232D2A /* MotionRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionRecorder.swift; sourceTree = "<group>"; };
-		A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieFileEvidenceBuilder.swift; sourceTree = "<group>"; };
-		A9CE172C9617E7E0A9AC3D61 /* RecordedClockMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedClockMap.swift; sourceTree = "<group>"; };
-		AE647E0E767CA21AB1AE54DE /* RecorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderTests.swift; sourceTree = "<group>"; };
-		B1CE028DEC74DFCE7D504035 /* RAWSettingsProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RAWSettingsProbe.h; sourceTree = "<group>"; };
-		B5CF288D1163EC67CFF09A57 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
-		C786DD342959F06CE34ED1CB /* RecorderTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderTheme.swift; sourceTree = "<group>"; };
-		CEB3B1E5620993E6A711EBD6 /* RecorderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderViewModel.swift; sourceTree = "<group>"; };
-		D61AEBA4E89ADD62206D46B5 /* ShutterSetting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShutterSetting.swift; sourceTree = "<group>"; };
-		E1CEC2BD1ECD3C617E71220F /* CameraCapabilityScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCapabilityScanner.swift; sourceTree = "<group>"; };
-		E7094B637E8BD43E1F5E6591 /* GyroCineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroCineApp.swift; sourceTree = "<group>"; };
-		E8FBE92233A8ADEED43C353C /* CaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCoordinator.swift; sourceTree = "<group>"; };
-		EA35451FA2765A2C0CD2F3D3 /* RecordingStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStorageTests.swift; sourceTree = "<group>"; };
-		EB33B5C08F73B6879FD06566 /* RecorderIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderIdentity.swift; sourceTree = "<group>"; };
-		ED60C9A4231480269232BDBE /* CaptureFrameCopierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameCopierTests.swift; sourceTree = "<group>"; };
-		F5F82C58D8F13A931FC7C7A8 /* DiagnosticsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsCollector.swift; sourceTree = "<group>"; };
-		F874861AEE8FAB6B9557C376 /* CameraControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraControlView.swift; sourceTree = "<group>"; };
-		FE045DF4027E7C7E52A832CE /* RecordingCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCodec.swift; sourceTree = "<group>"; };
-		FE8F79DA4EE39DA1E89782D2 /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
+		9141D40EBE79980BEA8969DC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
+		DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
+		DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
+		E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
+		F685F1FA9AB76A1323DEE148 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		0656ABE3DCA26F56EF605D4A /* Fixtures */ = {
-			isa = PBXGroup;
-			children = (
-				34983CAE5AEECB7D9550D170 /* writer3frames.mov */,
-			);
-			path = Fixtures;
-			sourceTree = "<group>";
-		};
-		30D7B144EDCDBE372451D5E0 /* Features */ = {
-			isa = PBXGroup;
-			children = (
-				4883C1EAC1D4B3B5702DA939 /* CameraUI */,
-			);
-			path = Features;
-			sourceTree = "<group>";
-		};
-		3561E1F271DAEEF382E8049D /* Telemetry */ = {
-			isa = PBXGroup;
-			children = (
-				1E0027910DFFC2E70733BA44 /* GyroflowJSONLWriter.swift */,
-				458AA19C2752E3E1DC796D6A /* GyroflowSchema */,
-			);
-			path = Telemetry;
-			sourceTree = "<group>";
-		};
-		453FCCF03AEC8688E0229B2A /* Recording */ = {
-			isa = PBXGroup;
-			children = (
-				539208207D8AA9C8B42B2F98 /* CaptureFrameEvidence.swift */,
-				F5F82C58D8F13A931FC7C7A8 /* DiagnosticsCollector.swift */,
-				07A9F6128688A3793E315C5A /* EmbeddedTelemetryExporter.swift */,
-				5D7FABD172E4BF873F342DA2 /* LegacyGyroflowExporter.swift */,
-				A648BBB87B300747DCFCF917 /* MovieFileEvidenceBuilder.swift */,
-				7DDC7C0081387622A6555643 /* MOVTelemetryMuxer.swift */,
-				EB33B5C08F73B6879FD06566 /* RecorderIdentity.swift */,
-				47F82B3A8DEA45A9F26D8EAD /* RecordingDiagnostics.swift */,
-				354FCA44764369A898E82A18 /* RecordingFinalizer.swift */,
-				225BE8BFB42DE9B3F95A28F6 /* RecordingOutputMode.swift */,
-				B5CF288D1163EC67CFF09A57 /* RecordingState.swift */,
-				7707232E6E68FB7F6B218AA4 /* RecordingStorage.swift */,
-			);
-			path = Recording;
-			sourceTree = "<group>";
-		};
-		458AA19C2752E3E1DC796D6A /* GyroflowSchema */ = {
-			isa = PBXGroup;
-			children = (
-				534DD6964969E8D0E47168C4 /* gyroflow.proto */,
-			);
-			path = GyroflowSchema;
-			sourceTree = "<group>";
-		};
-		4883C1EAC1D4B3B5702DA939 /* CameraUI */ = {
-			isa = PBXGroup;
-			children = (
-				F874861AEE8FAB6B9557C376 /* CameraControlView.swift */,
-				2734F3753265740555C9A167 /* ContentView.swift */,
-				C786DD342959F06CE34ED1CB /* RecorderTheme.swift */,
-				CEB3B1E5620993E6A711EBD6 /* RecorderViewModel.swift */,
-			);
-			path = CameraUI;
-			sourceTree = "<group>";
-		};
 		71FB7A8F7E8698AF58F2D762 = {
 			isa = PBXGroup;
 			children = (
-				C85334C953652E4C376A3C0F /* App */,
-				F03D0D8BE67EAE22D469D00A /* Capture */,
-				30D7B144EDCDBE372451D5E0 /* Features */,
-				8AADD8D6006B61AD644BC0E4 /* Motion */,
-				453FCCF03AEC8688E0229B2A /* Recording */,
-				3561E1F271DAEEF382E8049D /* Telemetry */,
+				ED16BC36BCB76D3BCEB93C52 /* Resources */,
+				CEA2682A0BB22666CAB02D23 /* Sources */,
 				E5A05D9851C4CB61C24469C8 /* Tests */,
 				E9C2F5D4E2595DB165FE2AAB /* UITests */,
 				E6315DD520386174BE33B742 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		8AADD8D6006B61AD644BC0E4 /* Motion */ = {
+		CEA2682A0BB22666CAB02D23 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				5FDBFB6D99B1AD5A67F7CFA1 /* ClockAligner.swift */,
-				40303F69935F0B0F025E50A9 /* GyroTimeline.swift */,
-				A59C662BD90EFDFCB7232D2A /* MotionRecorder.swift */,
-				A9CE172C9617E7E0A9AC3D61 /* RecordedClockMap.swift */,
+				64818C6434D8910B7DDAABDF /* AppText.swift */,
+				5A91E087623B637B08CBC743 /* CameraIntrinsicsRecorder.swift */,
+				06FAB22C1E5DFB0D1EBB98BC /* CameraManager.swift */,
+				81FADDFFE59721D646980D74 /* CameraModels.swift */,
+				0109F90EE225951234B97E3A /* CameraView.swift */,
+				1ABB2D1C7843C830C2F46C64 /* CaptureDefaults.swift */,
+				E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */,
+				6F2988EEEB7132649CE38D63 /* ClockAligner.swift */,
+				85160F4187B712C627203368 /* DiagnosticLogger.swift */,
+				608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */,
+				0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */,
+				1DD19334D59F169EEE052CD8 /* IMURecording.swift */,
+				6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */,
+				891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */,
+				2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */,
+				160B0A3208CA6FF8D6FE278F /* RAWFocusTest-Bridging-Header.h */,
+				97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */,
+				8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */,
+				DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */,
+				DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */,
+				2817BCD3637009EF27D48531 /* SettingsView.swift */,
 			);
-			path = Motion;
-			sourceTree = "<group>";
-		};
-		C85334C953652E4C376A3C0F /* App */ = {
-			isa = PBXGroup;
-			children = (
-				464A02A28893A15D0AFAE22A /* Assets.xcassets */,
-				503717654EBFEF98D63BE0B5 /* GyroCine-Bridging-Header.h */,
-				E7094B637E8BD43E1F5E6591 /* GyroCineApp.swift */,
-				0D506AA0825A79A81C8487E8 /* Info.plist */,
-			);
-			path = App;
+			path = Sources;
 			sourceTree = "<group>";
 		};
 		E5A05D9851C4CB61C24469C8 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				080F90B2A73265BBC678B5AA /* CameraControlsTests.swift */,
-				ED60C9A4231480269232BDBE /* CaptureFrameCopierTests.swift */,
-				A5053C49565BC9949F1BCBC9 /* EmbeddedTelemetryTests.swift */,
-				AE647E0E767CA21AB1AE54DE /* RecorderTests.swift */,
-				EA35451FA2765A2C0CD2F3D3 /* RecordingStorageTests.swift */,
-				0656ABE3DCA26F56EF605D4A /* Fixtures */,
+				57387D9F647FF4429FC12F72 /* DefaultsAndOrientationTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -240,25 +142,18 @@
 		E9C2F5D4E2595DB165FE2AAB /* UITests */ = {
 			isa = PBXGroup;
 			children = (
-				3880A55F127BA191ED9A3886 /* DeviceRecordingTests.swift */,
+				034C3517079161B3003ECD09 /* IMURecordingUITests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
 		};
-		F03D0D8BE67EAE22D469D00A /* Capture */ = {
+		ED16BC36BCB76D3BCEB93C52 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				E1CEC2BD1ECD3C617E71220F /* CameraCapabilityScanner.swift */,
-				2AAD5A918D7EE61194B8D579 /* CameraControls.swift */,
-				E8FBE92233A8ADEED43C353C /* CaptureCoordinator.swift */,
-				A3CD1C812F28FE17474CECDA /* CaptureFrameCopier.swift */,
-				B1CE028DEC74DFCE7D504035 /* RAWSettingsProbe.h */,
-				465B1CE3D1E843D168B341AE /* RAWSettingsProbe.m */,
-				FE045DF4027E7C7E52A832CE /* RecordingCodec.swift */,
-				FE8F79DA4EE39DA1E89782D2 /* RecordingOrientation.swift */,
-				D61AEBA4E89ADD62206D46B5 /* ShutterSetting.swift */,
+				9141D40EBE79980BEA8969DC /* Assets.xcassets */,
+				7837A3B5E0845276712C02D9 /* Localizable.strings */,
 			);
-			path = Capture;
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -305,7 +200,6 @@
 			buildConfigurationList = 981EC82CD9E83FA2E7C1D70D /* Build configuration list for PBXNativeTarget "GyroCineTests" */;
 			buildPhases = (
 				C71D83DFD291ADD11BF4EF88 /* Sources */,
-				91F349879B83C3AF6849BCEC /* Resources */,
 			);
 			buildRules = (
 			);
@@ -349,6 +243,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 71FB7A8F7E8698AF58F2D762;
 			minimizedProjectReferenceProxies = 1;
@@ -358,8 +253,8 @@
 			projectRoot = "";
 			targets = (
 				8AC15E386977CB4F0EB24A8D /* GyroCine */,
-				C284CB9940FE151EA00DBE69 /* GyroCineTests */,
 				32BC747637B996C4EC97A6B8 /* GyroCineUITests */,
+				C284CB9940FE151EA00DBE69 /* GyroCineTests */,
 			);
 		};
 /* End PBXProject section */
@@ -369,16 +264,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EE3530D5A34716BB5C533A5A /* Assets.xcassets in Resources */,
-				70B5A7081E6DF74DD7D2D4E6 /* gyroflow.proto in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		91F349879B83C3AF6849BCEC /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				3735908E2A223597329E1894 /* writer3frames.mov in Resources */,
+				5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */,
+				77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -389,36 +276,25 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				05424543F782AFE0A60051C9 /* CameraCapabilityScanner.swift in Sources */,
-				CBF4F7B2C1B095AF4704E803 /* CameraControlView.swift in Sources */,
-				BD09211B280651C0FA9B905A /* CameraControls.swift in Sources */,
-				6B7721D78E9572FE5BB1D7E8 /* CaptureCoordinator.swift in Sources */,
-				6F4C5887219615584F4B96E7 /* CaptureFrameCopier.swift in Sources */,
-				7201B57D58C6A550216832B3 /* CaptureFrameEvidence.swift in Sources */,
-				4665D295985357F949971D76 /* ClockAligner.swift in Sources */,
-				75B50B6CCD1022B6599D146A /* ContentView.swift in Sources */,
-				23AFE161FF05D2A7BC2AB35E /* DiagnosticsCollector.swift in Sources */,
-				BEAD82D1B3909CF99D963FA2 /* EmbeddedTelemetryExporter.swift in Sources */,
-				E34BDC6C165E9C22E280E737 /* GyroCineApp.swift in Sources */,
-				05F2E1971B749CF841A43D28 /* GyroTimeline.swift in Sources */,
-				42B03872C0EE385B221C7022 /* GyroflowJSONLWriter.swift in Sources */,
-				01F2B39363E12F251C135FE6 /* LegacyGyroflowExporter.swift in Sources */,
-				CF5E68B9C41916005C393F1B /* MOVTelemetryMuxer.swift in Sources */,
-				40D5EDC0F01E7BD8F68E5DE5 /* MotionRecorder.swift in Sources */,
-				C20B952CC5B232E0A6BAF318 /* MovieFileEvidenceBuilder.swift in Sources */,
-				304F7C9F259F150ABD16117D /* RAWSettingsProbe.m in Sources */,
-				5A4484C1F23AFF6A5DB6C574 /* RecordedClockMap.swift in Sources */,
-				47F929064CEFFFA750573035 /* RecorderIdentity.swift in Sources */,
-				163328636347C275ADA687F6 /* RecorderTheme.swift in Sources */,
-				186AA68041C9D4F838038F0D /* RecorderViewModel.swift in Sources */,
-				7C0092370BFD60E109EDCC92 /* RecordingCodec.swift in Sources */,
-				337FC0CBBCA88A74A679C666 /* RecordingDiagnostics.swift in Sources */,
-				B43AC37C8469DF8B924A6516 /* RecordingFinalizer.swift in Sources */,
-				0DFF12EE3D86DF75519AD081 /* RecordingOrientation.swift in Sources */,
-				A8F6F87C4D89312DABFAF473 /* RecordingOutputMode.swift in Sources */,
-				32C534B4A85DE010BEDB0E82 /* RecordingState.swift in Sources */,
-				DF90D9EC1EDCD3CF62C0FE46 /* RecordingStorage.swift in Sources */,
-				7AC64FD62B7C33705C2EC51F /* ShutterSetting.swift in Sources */,
+				FE53A691AD88959908EC5160 /* AppText.swift in Sources */,
+				2118EED908F6250FAD230DC8 /* CameraIntrinsicsRecorder.swift in Sources */,
+				C01B74C0926DD3A71AE8B5A1 /* CameraManager.swift in Sources */,
+				DC9D5B3B8FE2CCFA89243FC8 /* CameraModels.swift in Sources */,
+				220235B045B0AEEAA28BE778 /* CameraView.swift in Sources */,
+				E4EBB6D92D4895724AE8ACC5 /* CaptureDefaults.swift in Sources */,
+				0E9EA1990236C5739FDB98E6 /* CaptureFrameEvidence.swift in Sources */,
+				8A4D75C717C7D2C5DCCC78E9 /* ClockAligner.swift in Sources */,
+				B245DF897F1000DE9AA165E3 /* DiagnosticLogger.swift in Sources */,
+				8082FD10ABEDAE1649CA9217 /* EmbeddedTelemetryExporter.swift in Sources */,
+				2FA4E79E6ABA5B777D44DA00 /* GyroCineApp.swift in Sources */,
+				635A301F479D884EB2F45FA9 /* IMURecording.swift in Sources */,
+				20707B6FFCEBBF8F913A3AF1 /* MOVTelemetryMuxer.swift in Sources */,
+				1A88DD1D0C6671CDAE1BE79C /* MediaLibraryView.swift in Sources */,
+				8B7574C40EDE681D7840F8B1 /* MovingRuler.swift in Sources */,
+				993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */,
+				F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */,
+				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,
+				4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -426,7 +302,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A352A4E85C1478FA2117FCB9 /* DeviceRecordingTests.swift in Sources */,
+				B07D5C4C4D09DD8B6C4A99B5 /* IMURecordingUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -434,11 +310,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C91C84B12F0A581F346C0859 /* CameraControlsTests.swift in Sources */,
-				9F5F52D4D947A2A6F1C52539 /* CaptureFrameCopierTests.swift in Sources */,
-				FAB973E4C92BA8CB87AEE408 /* EmbeddedTelemetryTests.swift in Sources */,
-				AB7A12788EF380A93A799EC0 /* RecorderTests.swift in Sources */,
-				3FD632EC1C6235E79953DD2E /* RecordingStorageTests.swift in Sources */,
+				EBF533A698B5EA02EABBDA2F /* DefaultsAndOrientationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -457,11 +329,24 @@
 		};
 /* End PBXTargetDependency section */
 
+/* Begin PBXVariantGroup section */
+		7837A3B5E0845276712C02D9 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				F685F1FA9AB76A1323DEE148 /* en */,
+				81348E10D056049BDBFBE556 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		0881C7D8CFD8181A46A10374 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -493,7 +378,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -509,22 +394,26 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GyroCine;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Record video with motion data.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record synchronized audio.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Record raw gyroscope and accelerometer samples.";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save recorded videos to your photo library.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record audio with your video.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Record motion data and determine recording orientation.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save selected recordings to your photo library.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RAWFocusTest-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.1;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
@@ -533,6 +422,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -564,7 +454,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -586,23 +476,27 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GyroCine;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Record video with motion data.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record synchronized audio.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Record raw gyroscope and accelerometer samples.";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save recorded videos to your photo library.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record audio with your video.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Record motion data and determine recording orientation.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save selected recordings to your photo library.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIRequiresFullScreen = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RAWFocusTest-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.1;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
@@ -612,16 +506,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsDocumentBrowser = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorder;
 				SDKROOT = iphoneos;
-				SWIFT_OBJC_BRIDGING_HEADER = "App/GyroCine-Bridging-Header.h";
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -630,16 +521,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsDocumentBrowser = NO;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.tinygrape.RawMotionRecorder;
 				SDKROOT = iphoneos;
-				SWIFT_OBJC_BRIDGING_HEADER = "App/GyroCine-Bridging-Header.h";
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
