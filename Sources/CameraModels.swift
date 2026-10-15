@@ -20,7 +20,7 @@ enum VideoEncoding: String, CaseIterable, Identifiable {
     }
 }
 
-enum ShutterMode { case auto, autoMax, manual }
+enum ShutterMode { case auto, autoMax, manual, angle }
 
 enum FocusChoice: String, CaseIterable, Identifiable {
     case continuous = "Continuous AF", single = "Single AF", locked = "Locked"

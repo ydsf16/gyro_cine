@@ -34,6 +34,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var exposureAuto = true
     @Published private(set) var shutterMode: ShutterMode = .autoMax
     @Published private(set) var shutterMaxSeconds: Double = 1.0 / 120.0
+    @Published private(set) var shutterAngle: Double = 180
     @Published private(set) var whiteBalanceAuto = true
     @Published private(set) var isoRange: ClosedRange<Double> = 50...3200
     @Published private(set) var exposureRange: ClosedRange<Double> = 1.0 / 1000.0...1.0 / 30.0
@@ -55,6 +56,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var chosenIndex: Int?
     private var chosenFPS: Double = 30
     private var shutterMaxCustomized = false
+    private var activeShutterAngle: Double?
     private var chosenFocus: FocusChoice = .continuous
     private var lensDevices: [String: AVCaptureDevice] = [:]
     private struct CapturePreference {
@@ -81,6 +83,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private var imuRecorder: IMURecorder?
     private var pendingRecordingJob: PendingIMUJob?
+    private var recordingSetupFailure: String?
     private var backgroundLease: UIBackgroundTaskIdentifier = .invalid // Main thread only.
     private var attemptedPendingJobs = Set<String>()
     private var failedPendingSignatures: [String: String] = [:]
@@ -771,6 +774,27 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private func resetCameraControls(_ camera: AVCaptureDevice, fps: Double) throws {
         try camera.lockForConfiguration()
         defer { camera.unlockForConfiguration() }
+        if let angle = activeShutterAngle, camera.isExposureModeSupported(.custom) {
+            let duration = CaptureDefaults.exposure(forShutterAngle: angle, fps: fps,
+                minimum: camera.activeFormat.minExposureDuration.seconds,
+                maximum: camera.activeFormat.maxExposureDuration.seconds)
+            let iso = min(max(camera.iso, camera.activeFormat.minISO), camera.activeFormat.maxISO)
+            camera.setExposureModeCustom(duration: CMTime(seconds: duration, preferredTimescale: 1_000_000),
+                                         iso: iso)
+            if camera.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                camera.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            if camera.isFocusModeSupported(.continuousAutoFocus) { camera.focusMode = .continuousAutoFocus }
+            chosenFocus = .continuous
+            logger.event("control_defaults", ["fps": fps, "shutterAngle": angle,
+                "exposureSeconds": duration, "focusMode": focusName(camera.focusMode)])
+            publish {
+                self.shutterMode = .angle; self.shutterAngle = angle; self.exposureAuto = false
+                self.whiteBalanceAuto = true; self.focusChoice = .continuous
+            }
+            return
+        }
+        activeShutterAngle = nil
         let limit = CaptureDefaults.maximumExposure(fps: fps,
             minimum: camera.activeFormat.minExposureDuration.seconds,
             maximum: camera.activeFormat.maxExposureDuration.seconds)
@@ -981,6 +1005,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     camera.setExposureModeCustom(duration: camera.exposureDuration, iso: camera.iso)
                 }
                 let mode: ShutterMode = enabled ? .auto : .manual
+                self.activeShutterAngle = nil
                 self.publish { self.exposureAuto = enabled; self.shutterMode = mode }
             } catch { self.fail("Exposure: \(error)") }
         }
@@ -1013,12 +1038,37 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let limit = min(max(seconds, minimum), maximum)
             camera.exposureMode = .continuousAutoExposure
             camera.activeMaxExposureDuration = CMTime(seconds: limit, preferredTimescale: 1_000_000)
+            activeShutterAngle = nil
             if customized { shutterMaxCustomized = true }
             logger.event("exposure_auto_max", ["limitSeconds": limit, "state": configurationSnapshot()])
             publish {
                 self.shutterMaxSeconds = limit; self.shutterMode = .autoMax; self.exposureAuto = true
             }
         } catch { fail("A-Max: \(error)") }
+    }
+    func setShutterAngle(_ angle: Double) {
+        queue.async {
+            guard let camera = self.device, camera.isExposureModeSupported(.custom) else {
+                self.fail("Shutter angle is unavailable on this camera"); return
+            }
+            do {
+                try camera.lockForConfiguration()
+                defer { camera.unlockForConfiguration() }
+                let requested = min(max(angle, 1), 360)
+                let duration = CaptureDefaults.exposure(forShutterAngle: requested, fps: self.chosenFPS,
+                    minimum: camera.activeFormat.minExposureDuration.seconds,
+                    maximum: camera.activeFormat.maxExposureDuration.seconds)
+                let iso = min(max(camera.iso, camera.activeFormat.minISO), camera.activeFormat.maxISO)
+                camera.setExposureModeCustom(duration: CMTime(seconds: duration, preferredTimescale: 1_000_000),
+                                             iso: iso)
+                self.activeShutterAngle = requested
+                self.logger.event("shutter_angle", ["angle": requested, "fps": self.chosenFPS,
+                    "exposureSeconds": duration])
+                self.publish {
+                    self.shutterMode = .angle; self.shutterAngle = requested; self.exposureAuto = false
+                }
+            } catch { self.fail("Shutter angle: \(error)") }
+        }
     }
     func setManualExposure(seconds: Double? = nil, iso: Double? = nil) {
         queue.async {
@@ -1032,6 +1082,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let duration = min(max(requested, range.lowerBound), range.upperBound)
                 let level = Float(min(max(iso ?? Double(camera.iso), Double(camera.activeFormat.minISO)), Double(camera.activeFormat.maxISO)))
                 camera.setExposureModeCustom(duration: duration, iso: level)
+                self.activeShutterAngle = nil
                 self.publish { self.exposureAuto = false; self.shutterMode = .manual }
             } catch { self.fail("Exposure: \(error)") }
         }
@@ -1338,31 +1389,52 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.logger.event("record_delegate_start", ["path": fileURL.path, "state": self.configurationSnapshot(),
                 "startPTS": startPTS.seconds, "firstHost": self.movieFirstFrameHost ?? -1,
                 "outputIsRecording": self.output.isRecording])
-            if let firstHost = self.movieFirstFrameHost, let raw = self.imuRecorder?.url, let frames = self.intrinsicURL {
-                if self.activeExternalMovieURL != nil {
-                    do {
-                        self.activeExternalMovieBookmark = try fileURL.bookmarkData(options: .minimalBookmark,
-                            includingResourceValuesForKeys: nil, relativeTo: nil)
-                    } catch {
-                        self.output.stopRecording()
-                        self.failStorage("无法保存 SSD 素材的恢复授权：\(error.localizedDescription)")
-                        return
-                    }
-                }
-                let job = PendingIMUJob(movieName: fileURL.lastPathComponent, imuName: raw.lastPathComponent,
-                    framesName: frames.lastPathComponent, firstHost: firstHost, orientation: self.recordingOrientation,
-                    camera: Self.hardwareModel(), lens: self.recordingLens,
-                    mode: UserDefaults.standard.string(forKey: "outputFormat") == "GyroflowProto" ? "GyroflowProto" : "SonyMov",
-                    retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled"),
-                    externalMovieBookmark: self.activeExternalMovieBookmark,
-                    expectedVideoCodec: self.chosenCodec?.rawValue,
-                    expectedFPS: self.chosenFPS)
+            guard let firstHost = self.movieFirstFrameHost,
+                  let raw = self.imuRecorder?.url, let frames = self.intrinsicURL else {
+                self.abortRecordingSetup("无法取得视频首帧时间或 IMU/K 文件")
+                return
+            }
+            if self.activeExternalMovieURL != nil {
                 do {
-                    try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
-                    self.pendingRecordingJob = job
-                } catch { self.output.stopRecording(); self.fail("无法保存 IMU 恢复任务：\(error.localizedDescription)") }
+                    self.activeExternalMovieBookmark = try fileURL.bookmarkData(options: .minimalBookmark,
+                        includingResourceValuesForKeys: nil, relativeTo: nil)
+                } catch {
+                    self.abortRecordingSetup("无法保存 SSD 素材的恢复授权：\(error.localizedDescription)")
+                    return
+                }
+            }
+            let job = PendingIMUJob(movieName: fileURL.lastPathComponent, imuName: raw.lastPathComponent,
+                framesName: frames.lastPathComponent, firstHost: firstHost, orientation: self.recordingOrientation,
+                camera: Self.hardwareModel(), lens: self.recordingLens,
+                mode: UserDefaults.standard.string(forKey: "outputFormat") == "GyroflowProto" ? "GyroflowProto" : "SonyMov",
+                retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled"),
+                externalMovieBookmark: self.activeExternalMovieBookmark,
+                expectedVideoCodec: self.chosenCodec?.rawValue,
+                expectedFPS: self.chosenFPS)
+            do {
+                try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
+                self.pendingRecordingJob = job
+            } catch {
+                self.abortRecordingSetup("无法保存 IMU 恢复任务：\(error.localizedDescription)")
+                return
             }
             self.publish { self.beginFinalizationLease(); self.status = "Recording"; self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
+        }
+    }
+
+    private func abortRecordingSetup(_ reason: String) {
+        recordingSetupFailure = reason
+        logger.event("record_setup_failed", ["reason": reason, "state": configurationSnapshot()])
+        publish { self.finalizing = true; self.recording = false; self.recordingStartedAt = nil }
+        if let exception = RecordingExceptionCatcher.exceptionMessage(for: { self.output.stopRecording() }) {
+            logger.event("record_setup_stop_exception", ["reason": exception])
+            try? intrinsicRecorder.stop()
+            try? imuRecorder?.stop()
+            imuRecorder = nil
+            recordingSetupFailure = nil
+            releaseExternalMovieAccess()
+            publish { self.finalizing = false; self.endFinalizationLease() }
+            fail("视频录制未完成：\(reason)；停止录制失败：\(exception)")
         }
     }
 
@@ -1469,14 +1541,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.publish { self.recording = false; self.finalizing = true; self.recordingStartedAt = nil }
             self.captureFinishing = true
             let imu = self.imuRecorder
-            if self.pendingRecordingJob == nil, let failureReason {
+            if self.pendingRecordingJob == nil {
+                let reason = self.recordingSetupFailure ?? failureReason ?? "缺少 IMU 恢复任务"
+                self.recordingSetupFailure = nil
                 try? self.intrinsicRecorder.stop()
                 try? imu?.stop()
                 self.imuRecorder = nil
                 self.captureFinishing = false
                 self.releaseExternalMovieAccess()
                 self.publish { self.finalizing = false; self.endFinalizationLease() }
-                self.fail("视频录制失败：\(failureReason)")
+                self.fail("视频录制未完成：\(reason)。原始文件已保留")
                 return
             }
             // Keep collecting the 50 ms tail before closing durable raw data.

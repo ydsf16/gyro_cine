@@ -244,6 +244,14 @@ final class DefaultsAndOrientationTests: XCTestCase {
         }
         XCTAssertEqual(CaptureDefaults.maximumExposure(fps: 240, minimum: 1/10000, maximum: 1), 1/240, accuracy: 1e-9)
         XCTAssertEqual(CaptureDefaults.maximumExposure(fps: 120, minimum: 1/150, maximum: 1), 1/150, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 180, fps: 24,
+            minimum: 1/10000, maximum: 1), 1/48, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 180, fps: 30,
+            minimum: 1/10000, maximum: 1), 1/60, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 45, fps: 60,
+            minimum: 1/10000, maximum: 1), 1/480, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 360, fps: 120,
+            minimum: 1/10000, maximum: 1), 1/120, accuracy: 1e-9)
     }
     func testSettingsMigrationRunsOnce() {
         let suite = "GyroCineTests.\(UUID())"

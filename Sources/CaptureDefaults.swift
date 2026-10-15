@@ -16,4 +16,11 @@ enum CaptureDefaults {
     static func maximumExposure(fps: Double, minimum: Double, maximum: Double) -> Double {
         min(max(1 / 200.0, minimum), maximum, 1 / fps)
     }
+
+    static func exposure(forShutterAngle angle: Double, fps: Double,
+                         minimum: Double, maximum: Double) -> Double {
+        let frameDuration = 1 / max(fps, 1)
+        return min(max(frameDuration * min(max(angle, 1), 360) / 360, minimum),
+                   maximum, frameDuration)
+    }
 }

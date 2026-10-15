@@ -47,6 +47,30 @@ final class IMURecordingUITests: XCTestCase {
         app.buttons["完成"].tap()
     }
 
+    func testShutterAngleTracksFrameRate() {
+        let app = XCUIApplication(); app.launchArguments = ["--ui-testing"]; app.launch()
+        XCTAssertTrue(app.buttons["parameter.Shutter"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        XCTAssertTrue(app.buttons["fpsMenu"].waitForExistence(timeout: 5))
+        tapFPSOption("30.0 fps", in: app)
+        app.buttons["完成"].tap()
+
+        app.buttons["parameter.Shutter"].tap()
+        XCTAssertTrue(app.buttons["180°"].waitForExistence(timeout: 3))
+        app.buttons["180°"].tap()
+        let atThirty = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "180°", "1/60")).firstMatch
+        XCTAssertTrue(atThirty.waitForExistence(timeout: 5), app.debugDescription)
+
+        app.buttons["settingsOpen"].tap()
+        XCTAssertTrue(app.buttons["fpsMenu"].waitForExistence(timeout: 5))
+        tapFPSOption("60.0 fps", in: app)
+        app.buttons["完成"].tap()
+        app.buttons["parameter.Shutter"].tap()
+        let atSixty = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "180°", "1/120")).firstMatch
+        XCTAssertTrue(atSixty.waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["A-Max"].tap()
+    }
+
     private func tapFPSOption(_ rate: String, in app: XCUIApplication) {
         let option = app.buttons["fpsOption.\(rate)"]
         for _ in 0..<3 {
