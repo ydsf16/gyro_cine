@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("debugEnabled") private var debugEnabled = false
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
+    @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var message: String?
     @State private var offerProVideoStorageSettings = false
@@ -120,7 +121,28 @@ struct SettingsView: View {
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
+            Menu {
+                Button(t("快门速度", "Shutter speed")) { chooseExposureType("speed") }
+                    .accessibilityIdentifier("exposureType.speed")
+                Button(t("快门角度", "Shutter angle")) { chooseExposureType("angle") }
+                    .accessibilityIdentifier("exposureType.angle")
+            } label: {
+                row(t("曝光类型", "Exposure type"), exposureType == "angle" ?
+                    t("快门角度", "Shutter angle") : t("快门速度", "Shutter speed"))
+            }
+            .tint(.primary).disabled(locked)
+            .accessibilityIdentifier("exposureTypeMenu")
         }
+    }
+    private func chooseExposureType(_ type: String) {
+        guard exposureType != type else { return }
+        if type == "angle", camera.shutterMode == .manual {
+            let angle = min(max(camera.exposureSeconds * camera.fps * 360, 1), 360)
+            camera.setShutterAngle(angle)
+        } else if type == "speed", camera.shutterMode == .angle {
+            camera.setManualExposure()
+        }
+        exposureType = type
     }
     private var storageSection: some View {
         Section {

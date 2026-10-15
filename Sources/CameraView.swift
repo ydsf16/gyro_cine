@@ -118,6 +118,7 @@ struct CameraView: View {
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
+    @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
@@ -125,6 +126,7 @@ struct CameraView: View {
     @State private var shutterValue = 1.0 / 120.0
     @State private var shutterMaxValue = 1.0 / 200.0
     @State private var shutterAngleValue = 180.0
+    @State private var shutterAngleMaxValue = 180.0
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
@@ -260,6 +262,12 @@ struct CameraView: View {
                         if selected == parameter {
                             closePanel()
                         } else {
+                            if parameter == .shutter {
+                                shutterValue = camera.exposureSeconds
+                                shutterMaxValue = camera.shutterMaxSeconds
+                                shutterAngleValue = camera.shutterAngle
+                                shutterAngleMaxValue = min(max(camera.shutterMaxSeconds * camera.fps * 360, 1), 360)
+                            }
                             withAnimation(.easeInOut(duration: 0.22)) { selected = parameter }
                         }
                     } label: {
@@ -301,7 +309,8 @@ struct CameraView: View {
     private func value(for parameter: Parameter) -> String {
         switch parameter {
         case .lens: camera.lenses.first(where: { $0.id == camera.selectedLensID })?.label ?? "—"
-        case .shutter: camera.exposureSeconds > 0 ? "1/\(Int((1 / camera.exposureSeconds).rounded()))" : "—"
+        case .shutter:
+            exposureType == "angle" ? shutterAngleLabel(camera.exposureSeconds) : shutterLabel(camera.exposureSeconds)
         case .iso: String(Int(camera.iso.rounded()))
         case .wb: "\(Int(camera.whiteBalanceKelvin.rounded()))K"
         case .focus:
@@ -316,7 +325,7 @@ struct CameraView: View {
     private func isAuto(_ parameter: Parameter) -> Bool {
         switch parameter {
         case .lens: false
-        case .shutter: camera.shutterMode != .manual
+        case .shutter: camera.shutterMode == .auto || camera.shutterMode == .autoMax
         case .iso: camera.exposureAuto
         case .wb: camera.whiteBalanceAuto
         case .focus: camera.focusChoice == .continuous || camera.focusChoice == .single || camera.focusChoice == .tap
@@ -330,9 +339,9 @@ struct CameraView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(parameter.title(locale: locale)).font(.system(size: 17, weight: .semibold))
                     Text(parameter == .shutter && camera.shutterMode == .autoMax
-                         ? "\(t("最长", "Max")) \(shutterLabel(camera.shutterMaxSeconds)) · \(t("实际", "Actual")) \(value(for: parameter))"
-                         : parameter == .shutter && camera.shutterMode == .angle
-                         ? "\(Int(camera.shutterAngle.rounded()))° · \(value(for: parameter))"
+                         ? "\(t("最长", "Max")) \(exposureType == "angle" ? shutterAngleLabel(camera.shutterMaxSeconds) : shutterLabel(camera.shutterMaxSeconds)) · \(t("实际", "Actual")) \(value(for: parameter))"
+                         : parameter == .shutter && exposureType == "angle"
+                         ? "\(value(for: parameter)) · \(shutterLabel(camera.exposureSeconds))"
                          : value(for: parameter))
                         .font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
                 }
@@ -354,12 +363,16 @@ struct CameraView: View {
                         }
                     }
                 case .shutter:
-                    if camera.shutterMode == .angle {
-                        movingRuler(value: $shutterAngleValue, range: shutterAngleRange,
+                    if exposureType == "angle" {
+                        movingRuler(value: camera.shutterMode == .autoMax ? $shutterAngleMaxValue : $shutterAngleValue,
+                                    range: shutterAngleRange,
                                     majorValues: [11.25, 22.5, 45, 90, 180, 270, 360],
                                     format: { "\(Int($0.rounded()))°" }) {
-                            camera.setShutterAngle($0)
+                            if camera.shutterMode == .autoMax {
+                                camera.setExposureAutoMax(seconds: $0 / (360 * max(camera.fps, 1)))
+                            } else { camera.setShutterAngle($0) }
                         }
+                        .disabled(camera.shutterMode == .auto)
                     } else {
                         movingRuler(value: camera.shutterMode == .autoMax ? $shutterMaxValue : $shutterValue,
                                     range: shutterRulerRange, mapping: .logarithmic,
@@ -405,11 +418,10 @@ struct CameraView: View {
                 shutterButton("A", mode: .auto) { camera.setExposureAuto(true) }
                 shutterButton("M", mode: .manual) {
                     shutterValue = camera.exposureSeconds
-                    camera.setExposureAuto(false)
-                }
-                shutterButton("180°", mode: .angle) {
-                    shutterAngleValue = 180
-                    camera.setShutterAngle(180)
+                    if exposureType == "angle" {
+                        shutterAngleValue = camera.shutterAngle
+                        camera.setShutterAngle(shutterAngleValue)
+                    } else { camera.setExposureAuto(false) }
                 }
             }.background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 9)))
         }
@@ -448,7 +460,8 @@ struct CameraView: View {
         Button(title) { action(); dismissPanelAfterAdjustment() }
             .font(.system(size: 12, weight: .semibold)).buttonStyle(.plain)
             .frame(width: title == "A-Max" ? 55 : title == "180°" ? 48 : 34, height: 31)
-            .background(camera.shutterMode == mode ? accent : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .background((mode == .manual && camera.shutterMode == .angle) || camera.shutterMode == mode ? accent : .clear,
+                        in: RoundedRectangle(cornerRadius: 8))
     }
     private func focusButton(_ title: String, choice: FocusChoice) -> some View {
         Button(title) {
@@ -475,6 +488,9 @@ struct CameraView: View {
     }
     private func shutterLabel(_ seconds: Double) -> String {
         seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
+    }
+    private func shutterAngleLabel(_ seconds: Double) -> String {
+        seconds > 0 ? "\(Int((seconds * camera.fps * 360).rounded()))°" : "—"
     }
 
     private var bottomBar: some View {

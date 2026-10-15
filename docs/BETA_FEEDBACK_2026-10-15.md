@@ -11,7 +11,7 @@ Baseline: `80417ff` (`baseline/gyrocine-20261015.1`). Build 1.0 (20261015.1) is 
 | Quick video specs on camera screen | Existing Settings menus support codec/raster/FPS. Moving specs to the HUD conflicts with the current low-frequency settings design; defer UI change until the owner chooses a compact interaction. |
 | LUT import / baked LUT for H.265 or H.264 | New color pipeline and export behavior; defer until capture/playback reliability is established. H.264 recording is not an existing format. |
 | Flash crashes | Safe white-balance readout is in the baseline. Compare only symbolicated crashes from the new build; old reports alone cannot establish a separate playback defect. |
-| 180° shutter angle follows FPS | Added as an explicit Shutter mode. Default A-Max 1/200 s remains. Angle mode is manual exposure with current ISO. |
+| 180° shutter angle follows FPS | Settings now selects shutter speed or angle; the Shutter panel retains A-Max/A/M and changes units. Manual 180° tracks FPS. Default A-Max 1/200 s remains. Angle M uses current ISO. |
 | Save exposure compensation / white-balance profile | Requires an agreed metadata format and downstream reader validation; leave current capture metadata unchanged. |
 | A/B focus presets | Deferred UX feature. |
 | Lower shutter angles | Angle ruler includes values down to the camera's supported minimum. Smaller angle gives faster shutter and less motion blur. |
@@ -21,4 +21,5 @@ Baseline: `80417ff` (`baseline/gyrocine-20261015.1`). Build 1.0 (20261015.1) is 
 - Generic iOS Debug build passed after the baseline.
 - `DefaultsAndOrientationTests` passed on iOS 26.3.1 Simulator, including angle-to-exposure calculations.
 - The new shutter-angle XCUITest compiled for iPhone 16, but Xcode could not launch it because the device was locked. No on-device result was inferred.
+- After moving exposure type to Settings, the revised XCUITest compiled. An iPhone 17 Pro run could not install the test runner because the device connection closed (`IXRemoteErrorDomain` code 6); no shutter behavior was observed on that device.
 - Physical RAW/120, playback, stabilization and on-device angle behavior remain unverified for this change.

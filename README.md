@@ -14,9 +14,10 @@ internal storage, Sony MOV and Debug off. Existing recordings are preserved.
 Camera specifications continue to persist after that one-time reset.
 Changing codec, resolution, frame rate or physical lens restores A-Max (maximum exposure
 1/200 s, clamped to device limits), auto ISO/white balance and continuous autofocus.
-The Shutter panel also offers an optional shutter-angle mode. In that mode, 180° gives
-1/(2×fps), and changing frame rate recalculates the shutter duration. Angle mode fixes
-ISO at its current value; the A-Max default remains unchanged.
+Settings > Exposure type selects shutter speed or shutter angle. The Shutter panel uses
+the corresponding units while retaining A-Max/A/M. Manual 180° gives 1/(2×fps), and
+changing frame rate recalculates its duration. Manual angle fixes ISO at its current
+value; the A-Max default remains unchanged.
 
 Recording direction comes from fused gravity at REC. It is frozen for that clip. When the
 phone lies flat, retain the last unambiguous direction; on a flat cold launch, use portrait.
