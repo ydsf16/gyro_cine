@@ -33,7 +33,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var whiteBalanceKelvin: Float = 5600
     @Published private(set) var exposureAuto = true
     @Published private(set) var shutterMode: ShutterMode = .autoMax
-    @Published private(set) var shutterMaxSeconds: Double = 1.0 / 120.0
+    @Published private(set) var shutterMaxSeconds: Double = 1.0 / 60.0
     @Published private(set) var shutterAngle: Double = 180
     @Published private(set) var whiteBalanceAuto = true
     @Published private(set) var isoRange: ClosedRange<Double> = 50...3200
@@ -1010,9 +1010,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             } catch { self.fail("Exposure: \(error)") }
         }
     }
-    func activateExposureAutoMax() {
+    func activateExposureAutoMax(resetToDefault: Bool = false) {
         queue.async {
             guard let camera = self.device else { return }
+            if resetToDefault { self.shutterMaxCustomized = false }
             let requested = self.shutterMaxCustomized ? self.shutterMaxSeconds :
                 CaptureDefaults.maximumExposure(fps: self.chosenFPS,
                     minimum: camera.activeFormat.minExposureDuration.seconds,

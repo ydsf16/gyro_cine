@@ -13,11 +13,11 @@ First launch after migration resets capture preferences to H.265, nearest suppor
 internal storage, Sony MOV and Debug off. Existing recordings are preserved.
 Camera specifications continue to persist after that one-time reset.
 Changing codec, resolution, frame rate or physical lens restores A-Max (maximum exposure
-1/200 s, clamped to device limits), auto ISO/white balance and continuous autofocus.
+equivalent to 180°, or 1/(2×fps), clamped to device limits), auto ISO/white balance and continuous autofocus.
 Settings > Exposure type selects shutter speed or shutter angle. The Shutter panel uses
 the corresponding units while retaining A-Max/A/M. Manual 180° gives 1/(2×fps), and
 changing frame rate recalculates its duration. Manual angle fixes ISO at its current
-value; the A-Max default remains unchanged.
+value; selecting an exposure type resets A-Max to the 180° / 1/(2×fps) default.
 
 Recording direction comes from fused gravity at REC. It is frozen for that clip. When the
 phone lies flat, retain the last unambiguous direction; on a flat cold launch, use portrait.

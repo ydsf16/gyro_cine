@@ -240,9 +240,10 @@ final class DefaultsAndOrientationTests: XCTestCase {
     }
     func testExposureDefaultsAcrossFrameRates() {
         for fps in [24.0, 25, 29.97, 30, 59.94, 60, 120] {
-            XCTAssertEqual(CaptureDefaults.maximumExposure(fps: fps, minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
+            XCTAssertEqual(CaptureDefaults.maximumExposure(fps: fps, minimum: 1/10000, maximum: 1),
+                           1 / (2 * fps), accuracy: 1e-9)
         }
-        XCTAssertEqual(CaptureDefaults.maximumExposure(fps: 240, minimum: 1/10000, maximum: 1), 1/240, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.maximumExposure(fps: 240, minimum: 1/10000, maximum: 1), 1/480, accuracy: 1e-9)
         XCTAssertEqual(CaptureDefaults.maximumExposure(fps: 120, minimum: 1/150, maximum: 1), 1/150, accuracy: 1e-9)
         XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 180, fps: 24,
             minimum: 1/10000, maximum: 1), 1/48, accuracy: 1e-9)

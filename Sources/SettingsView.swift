@@ -136,13 +136,8 @@ struct SettingsView: View {
     }
     private func chooseExposureType(_ type: String) {
         guard exposureType != type else { return }
-        if type == "angle", camera.shutterMode == .manual {
-            let angle = min(max(camera.exposureSeconds * camera.fps * 360, 1), 360)
-            camera.setShutterAngle(angle)
-        } else if type == "speed", camera.shutterMode == .angle {
-            camera.setManualExposure()
-        }
         exposureType = type
+        camera.activateExposureAutoMax(resetToDefault: true)
     }
     private var storageSection: some View {
         Section {

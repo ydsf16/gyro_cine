@@ -23,7 +23,7 @@ final class IMURecordingUITests: XCTestCase {
         app.buttons["M"].tap()
         app.buttons["parameter.Shutter"].tap()
         Thread.sleep(forTimeInterval: 0.5)
-        for (rate, denominator) in [("60.0 fps", "1/200"), ("30.0 fps", "1/200")] {
+        for (rate, denominator) in [("60.0 fps", "1/120"), ("30.0 fps", "1/60")] {
             app.buttons["settingsOpen"].tap()
             if !app.buttons["fpsMenu"].waitForExistence(timeout: 2) {
                 app.buttons["settingsOpen"].tap()
@@ -47,34 +47,57 @@ final class IMURecordingUITests: XCTestCase {
         app.buttons["完成"].tap()
     }
 
-    func testShutterAngleTracksFrameRate() {
+    func testAutoMaxExposureTypeTracksFrameRate() {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication(); app.launchArguments = ["--ui-testing"]; app.launch()
         XCTAssertTrue(app.buttons["parameter.Shutter"].waitForExistence(timeout: 20))
         app.buttons["settingsOpen"].tap()
         XCTAssertTrue(app.buttons["fpsMenu"].waitForExistence(timeout: 5))
         tapFPSOption("30.0 fps", in: app)
-        app.buttons["exposureTypeMenu"].tap()
-        app.buttons["exposureType.angle"].tap()
+        tapExposureType("angle", in: app)
         app.buttons["完成"].tap()
 
-        app.buttons["parameter.Shutter"].tap()
-        XCTAssertTrue(app.buttons["M"].waitForExistence(timeout: 3))
-        app.buttons["M"].tap()
-        let atThirty = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "180°", "1/60")).firstMatch
-        XCTAssertTrue(atThirty.waitForExistence(timeout: 5), app.debugDescription)
+        showShutterPanel(in: app)
+        let angleDefault = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "最长", "180°")).firstMatch
+        XCTAssertTrue(angleDefault.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["A-Max"].exists)
 
         app.buttons["settingsOpen"].tap()
         XCTAssertTrue(app.buttons["fpsMenu"].waitForExistence(timeout: 5))
         tapFPSOption("60.0 fps", in: app)
         app.buttons["完成"].tap()
-        app.buttons["parameter.Shutter"].tap()
-        let atSixty = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "180°", "1/120")).firstMatch
+        showShutterPanel(in: app)
+        let atSixty = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "最长", "180°")).firstMatch
         XCTAssertTrue(atSixty.waitForExistence(timeout: 5), app.debugDescription)
-        app.buttons["A-Max"].tap()
         app.buttons["settingsOpen"].tap()
-        app.buttons["exposureTypeMenu"].tap()
-        app.buttons["exposureType.speed"].tap()
+        tapExposureType("speed", in: app)
         app.buttons["完成"].tap()
+        showShutterPanel(in: app)
+        let speedDefault = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "最长", "1/120")).firstMatch
+        XCTAssertTrue(speedDefault.waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    private func showShutterPanel(in app: XCUIApplication) {
+        if !app.buttons["A-Max"].exists { app.buttons["parameter.Shutter"].tap() }
+        XCTAssertTrue(app.buttons["A-Max"].waitForExistence(timeout: 3))
+    }
+
+    private func tapExposureType(_ type: String, in app: XCUIApplication) {
+        let menu = app.buttons["exposureTypeMenu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        for _ in 0..<4 where !menu.isHittable || !menu.frame.midY.isFinite {
+            app.swipeUp()
+        }
+        XCTAssertTrue(menu.isHittable, app.debugDescription)
+        let frame = menu.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
+        let option = app.buttons["exposureType.\(type)"]
+        XCTAssertTrue(option.waitForExistence(timeout: 5), app.debugDescription)
+        let optionFrame = option.frame
+        XCTAssertTrue(optionFrame.midX.isFinite && optionFrame.midY.isFinite, app.debugDescription)
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: optionFrame.midX, dy: optionFrame.midY)).tap()
     }
 
     private func tapFPSOption(_ rate: String, in app: XCUIApplication) {

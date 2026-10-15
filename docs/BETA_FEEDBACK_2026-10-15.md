@@ -11,7 +11,7 @@ Baseline: `80417ff` (`baseline/gyrocine-20261015.1`). Build 1.0 (20261015.1) is 
 | Quick video specs on camera screen | Existing Settings menus support codec/raster/FPS. Moving specs to the HUD conflicts with the current low-frequency settings design; defer UI change until the owner chooses a compact interaction. |
 | LUT import / baked LUT for H.265 or H.264 | New color pipeline and export behavior; defer until capture/playback reliability is established. H.264 recording is not an existing format. |
 | Flash crashes | Safe white-balance readout is in the baseline. Compare only symbolicated crashes from the new build; old reports alone cannot establish a separate playback defect. |
-| 180° shutter angle follows FPS | Settings now selects shutter speed or angle; the Shutter panel retains A-Max/A/M and changes units. Manual 180° tracks FPS. Default A-Max 1/200 s remains. Angle M uses current ISO. |
+| 180° shutter angle follows FPS | Settings selects shutter speed or angle; the Shutter panel retains A-Max/A/M and changes units. Default A-Max is 180° or 1/(2×fps), within device limits; selecting either type resets to this default. Manual angle tracks FPS and uses current ISO. |
 | Save exposure compensation / white-balance profile | Requires an agreed metadata format and downstream reader validation; leave current capture metadata unchanged. |
 | A/B focus presets | Deferred UX feature. |
 | Lower shutter angles | Angle ruler includes values down to the camera's supported minimum. Smaller angle gives faster shutter and less motion blur. |
@@ -22,4 +22,5 @@ Baseline: `80417ff` (`baseline/gyrocine-20261015.1`). Build 1.0 (20261015.1) is 
 - `DefaultsAndOrientationTests` passed on iOS 26.3.1 Simulator, including angle-to-exposure calculations.
 - The new shutter-angle XCUITest compiled for iPhone 16, but Xcode could not launch it because the device was locked. No on-device result was inferred.
 - After moving exposure type to Settings, the revised XCUITest compiled. An iPhone 17 Pro run could not install the test runner because the device connection closed (`IXRemoteErrorDomain` code 6); no shutter behavior was observed on that device.
-- Physical RAW/120, playback, stabilization and on-device angle behavior remain unverified for this change.
+- 2026-10-15: A-Max default changed to 180° / 1/(2×fps). The focused simulator calculation test passed. The updated app installed and launched on iPhone 16 (iOS 18.2.1); `testAutoMaxExposureTypeTracksFrameRate` passed on that phone (1 test, 0 failures). Its capture log records 30 fps at a 0.016667 s limit and 60 fps at a 0.008333 s limit. The UI test checked the angle and speed labels and reset to A-Max when changing exposure type.
+- Physical RAW/120, playback, stabilization and manual-angle interaction remain unverified for this change. The A-Max check did not record a MOV.

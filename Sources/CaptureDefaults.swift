@@ -14,7 +14,7 @@ enum CaptureDefaults {
         preferences.set(version, forKey: "rebuildDefaultsVersion")
     }
     static func maximumExposure(fps: Double, minimum: Double, maximum: Double) -> Double {
-        min(max(1 / 200.0, minimum), maximum, 1 / fps)
+        exposure(forShutterAngle: 180, fps: fps, minimum: minimum, maximum: maximum)
     }
 
     static func exposure(forShutterAngle angle: Double, fps: Double,
