@@ -6,7 +6,7 @@ settings:
   base:
     SWIFT_VERSION: '5.0'
     MARKETING_VERSION: '1.0'
-    CURRENT_PROJECT_VERSION: '20261015.1'
+    CURRENT_PROJECT_VERSION: '20261017.1'
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     INFOPLIST_KEY_NSMotionUsageDescription: 'Record motion data and determine recording orientation.'
     SWIFT_OBJC_BRIDGING_HEADER: Sources/RAWFocusTest-Bridging-Header.h

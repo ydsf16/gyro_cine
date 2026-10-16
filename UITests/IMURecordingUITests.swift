@@ -14,6 +14,31 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    /// Runs against Release without any RAW experiment launch flags.
+    func testReleaseDedicatedRAWRecording() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageLocation", "专用视频存储", "-outputFormat", "SonyMov"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        app.buttons["codecMenu"].tap()
+        app.buttons["ProRes RAW"].tap()
+        app.buttons["完成"].tap()
+        let record = app.buttons["recordToggle"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: record)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
+        record.tap()
+        let started = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "停止录制"), object: record)
+        XCTAssertEqual(XCTWaiter.wait(for: [started], timeout: 20), .completed, app.debugDescription)
+        Thread.sleep(forTimeInterval: 5)
+        record.tap()
+        let saved = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "IMU")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 30))
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS %@)", "停止录制"), object: record)
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 30), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+    }
+
     func testFrameRateRestoresAutoMax() {
         let app = XCUIApplication()
         app.launch()

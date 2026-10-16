@@ -1,7 +1,6 @@
-#if DEBUG
 import AVFoundation
 
-/// Opt-in RAW, audio and metadata integration experiment. All state lives on the camera queue.
+/// Dedicated-storage RAW, audio and metadata recorder. All state lives on the camera queue.
 @available(iOS 27.0, *)
 final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let dataOutput: AVCaptureVideoDataOutput
@@ -172,7 +171,11 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             return
         }
         guard writer.status == .writing else { finish(writer.error ?? failure("Writer 意外停止")); return }
+        #if DEBUG
         let simulateBlockedVideo = ProcessInfo.processInfo.arguments.contains("--writer-block-video") && frames >= 5 && !stopping
+        #else
+        let simulateBlockedVideo = false
+        #endif
         while !simulateBlockedVideo && !pending.isEmpty && input.isReadyForMoreMediaData {
             let sample = pending.removeFirst()
             let pts = CMSampleBufferGetPresentationTimeStamp(sample)
@@ -314,10 +317,12 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
                     // AVFoundation delivers lock callbacks FIFO. An earlier request's
                     // real completion still proves this unchanged preview is locked.
                     guard self.valid, !self.ready else { return }
+                    #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--wb-drop-all-completions") ||
                         (attempt == 1 && ProcessInfo.processInfo.arguments.contains("--wb-drop-first-completion")) {
                         self.log("raw_preview_test_completion_dropped", [:]); return
                     }
+                    #endif
                     self.markReady(time, source: "completion", attempt: attempt)
                 }
             }
@@ -334,4 +339,3 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     }
 
 }
-#endif

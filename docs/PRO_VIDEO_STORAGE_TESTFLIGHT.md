@@ -137,3 +137,13 @@ Evidence: `artifacts/prostorage-20261016/wb-buffer/`.
 ### 2026-10-16 WB/readiness and responsiveness follow-up
 
 The RAW experiment now supports a separately logged stable locked-gain readback when three WB completion requests do not return: eight live frames with matching current in-use gains, locked/non-adjusting state, and increasing PTS. The exact completion timestamp is not fabricated. Failure invalidates the preview for the next attempt. See `RAW_HQ_THREAD_REVIEW_2026-10-16.md` for the HQ matrix, fault injection, queue changes and remaining isolated capture drop risk. This remains a DEBUG experiment.
+
+## Release promotion — 2026-10-17, 1.0 (20261017.1)
+
+Dedicated-storage RAW/RAW HQ now selects AVAssetWriter on iOS 27+ in both Debug and Release, without an opt-in user default. H265 and external-SSD recording retain MovieFileOutput. Test auto-recording, naming, forced orientation, buffer blocking and dropped-WB-completion injection remain DEBUG-only. Older iOS versions keep availability guards and cannot enter this path.
+
+Release build and archive passed; App Store Connect upload succeeded on October 17 at 00:32 CST. The binary keeps the existing bundle ID and version 1.0, build 20261017.1. Export compliance key remains false. No App Store public-release submission was made.
+
+The earlier Debug recordings establish RAW capture/IMU/K and Gyroflow import evidence (including IMG_0008, 36,828,613,621 bytes, approximately 103 seconds). They are not a Release device regression. Release UI test compilation initially required ENABLE_TESTABILITY=YES; the subsequent runner exited with code 74 before connecting. The user then removed the phone and device tests were stopped. Release recording remains pending physical verification.
+
+Added testReleaseDedicatedRAWRecording for the next connected-device regression. No automatic raw experiment flags are passed by that test. Known risks: intermittent 0.5x Open Gate HQ60 capture drops; camera/codec/FPS support differs by device; no promise of 120fps across lenses.
