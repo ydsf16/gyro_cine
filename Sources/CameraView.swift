@@ -249,7 +249,8 @@ struct CameraView: View {
                             healthy: storageLocation == "外部 SSD" ? camera.externalStorageConnected :
                                 storageLocation == "专用视频存储" ?
                                     (ProVideoStorageBridge.isSupported() && ProVideoStorageBridge.remainingCapacity() > 0) : true)
-                statusBadge("IMU", healthy: camera.imuAvailable)
+                statusBadge(camera.telemetryEmbeddable ? "IMU" : "!IMU",
+                            healthy: camera.imuAvailable && camera.telemetryEmbeddable)
             }
             Text(specification)
                 .font(.system(size: 13, weight: .medium))

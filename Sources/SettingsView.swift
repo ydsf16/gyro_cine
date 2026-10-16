@@ -43,6 +43,21 @@ struct SettingsView: View {
     }
     private var currentFormat: FormatInfo? { camera.formats.first { $0.index == camera.selectedFormatIndex } }
     private var currentResolution: String { currentFormat.map { "\($0.width)×\($0.height)" } ?? "—" }
+    private var intrinsicFormatNotice: String? {
+        guard let current = currentFormat else { return nil }
+        if !current.supportsIntrinsics {
+            return t("当前格式不提供真实相机内参 K；可录制视频和声音，但无法嵌入 Gyroflow IMU。素材会标记 !IMU。",
+                     "This format does not provide measured camera K. Video and audio can be recorded, but Gyroflow IMU cannot be embedded; the clip will be marked !IMU.")
+        }
+        let widest = compatibleFormats.filter {
+            $0.width == current.width && $0.height == current.height && $0.supports(camera.fps)
+        }.map { Double($0.format.videoFieldOfView) }.max() ?? Double(current.format.videoFieldOfView)
+        if widest - Double(current.format.videoFieldOfView) > 5 {
+            return t("当前格式采用裁切视角以记录真实 K（视角约 \(Int(current.format.videoFieldOfView.rounded()))°）。",
+                     "This format uses a cropped view to record measured K (about \(Int(current.format.videoFieldOfView.rounded()))°).")
+        }
+        return nil
+    }
     private func t(_ chinese: String, _ english: String) -> String {
         AppText.value(chinese, english, locale: locale)
     }
@@ -132,6 +147,9 @@ struct SettingsView: View {
             }
             .tint(.primary).disabled(locked)
             .accessibilityIdentifier("exposureTypeMenu")
+            if let intrinsicFormatNotice {
+                Text(intrinsicFormatNotice).font(.footnote).foregroundStyle(.secondary)
+            }
         }
     }
     private func chooseExposureType(_ type: String) {

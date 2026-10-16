@@ -254,6 +254,27 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(CaptureDefaults.exposure(forShutterAngle: 360, fps: 120,
             minimum: 1/10000, maximum: 1), 1/120, accuracy: 1e-9)
     }
+    func testManualExposureClampsToNewFrameAndSensorLimits() {
+        XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/60, fps: 120,
+            minimum: 1/10000, maximum: 1), 1/120, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/1000, fps: 30,
+            minimum: 1/500, maximum: 1), 1/500, accuracy: 1e-9)
+        XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/200, fps: 30,
+            minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
+    }
+    func testVideoCadenceRejectsLongGapsAndHeavyFrameLoss() throws {
+        let healthy = (0..<600).map { ActualVideoFrame(pts: Double($0) / 60) }
+        XCTAssertFalse(VideoCadenceHealth(frames: healthy, fps: 60).isSeverelyDiscontinuous)
+        let interrupted = healthy.filter { $0.pts < 3 || $0.pts > 3.25 }
+        let result = VideoCadenceHealth(frames: interrupted, fps: 60)
+        XCTAssertTrue(result.isSeverelyDiscontinuous)
+        XCTAssertGreaterThan(result.maximumGap, 0.25)
+        XCTAssertThrowsError(try result.validate(fps: 60))
+        let recurringLoss = healthy.enumerated().compactMap { $0.offset.isMultiple(of: 10) ? nil : $0.element }
+        let recurring = VideoCadenceHealth(frames: recurringLoss, fps: 60)
+        XCTAssertLessThan(recurring.maximumGap, 0.1)
+        XCTAssertTrue(recurring.isSeverelyDiscontinuous)
+    }
     func testSettingsMigrationRunsOnce() {
         let suite = "GyroCineTests.\(UUID())"
         let preferences = UserDefaults(suiteName: suite)!

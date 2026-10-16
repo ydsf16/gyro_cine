@@ -23,4 +23,8 @@ enum CaptureDefaults {
         return min(max(frameDuration * min(max(angle, 1), 360) / 360, minimum),
                    maximum, frameDuration)
     }
+    static func clampedManualExposure(_ seconds: Double, fps: Double,
+                                       minimum: Double, maximum: Double) -> Double {
+        min(max(seconds, minimum), maximum, 1 / max(fps, 1))
+    }
 }

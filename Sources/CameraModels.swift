@@ -42,8 +42,9 @@ struct FormatInfo: Identifiable {
     let fpsDescription: String
     let autofocus: String
     var compatibleCodecs: Set<String> = []
+    var supportsIntrinsics = false
     var id: Int { index }
-    var label: String { "[\(index)] \(width)×\(height) | \(fourCC) | \(fpsDescription) fps | \(autofocus)" }
+    var label: String { "[\(index)] \(width)×\(height) | \(fourCC) | \(fpsDescription) fps | \(autofocus) | K \(supportsIntrinsics ? "✓" : "—")" }
 
     init(index: Int, format: AVCaptureDevice.Format) {
         self.index = index; self.format = format
@@ -70,6 +71,7 @@ struct FormatInfo: Identifiable {
     var dictionary: [String: Any] {
         ["index": index, "width": width, "height": height, "pixelFormat": fourCC,
          "fpsRanges": format.videoSupportedFrameRateRanges.map { ["min": $0.minFrameRate, "max": $0.maxFrameRate] },
-         "autoFocusSystem": autofocus, "compatibleCodecs": compatibleCodecs.sorted()]
+         "autoFocusSystem": autofocus, "fieldOfViewDegrees": format.videoFieldOfView,
+         "supportsIntrinsics": supportsIntrinsics, "compatibleCodecs": compatibleCodecs.sorted()]
     }
 }

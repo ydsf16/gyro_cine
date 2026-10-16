@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (BOOL)isBusy;
 + (int64_t)remainingCapacity;
 + (BOOL)isOutputSupported:(AVCaptureMovieFileOutput *)output;
++ (NSDictionary<NSString *, id> *)diagnosticsForOutput:(AVCaptureMovieFileOutput *)output;
 + (nullable NSString *)configureOutput:(AVCaptureMovieFileOutput *)output enabled:(BOOL)enabled;
 + (void)openSettings;
 @end

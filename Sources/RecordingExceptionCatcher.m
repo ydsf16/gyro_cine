@@ -78,6 +78,22 @@
     return supports(output, selector);
 }
 
++ (NSDictionary<NSString *, id> *)diagnosticsForOutput:(AVCaptureMovieFileOutput *)output {
+    SEL getter = NSSelectorFromString(@"usesProVideoStorage");
+    BOOL enabled = NO;
+    if ([output respondsToSelector:getter]) {
+        BOOL (*getEnabled)(id, SEL) = (void *)[output methodForSelector:getter];
+        enabled = getEnabled(output, getter);
+    }
+    return @{@"deviceSupported": @([self isSupported]),
+             @"outputSupported": @([self isOutputSupported:output]),
+             @"outputSupportSelectorPresent": @([output respondsToSelector:NSSelectorFromString(@"isProVideoStorageSupported")]),
+             @"outputSetterPresent": @([output respondsToSelector:NSSelectorFromString(@"setUsesProVideoStorage:")]),
+             @"usesProVideoStorage": @(enabled),
+             @"remainingBytes": @([self remainingCapacity]),
+             @"busy": @([self isBusy])};
+}
+
 + (NSString *)configureOutput:(AVCaptureMovieFileOutput *)output enabled:(BOOL)enabled {
     SEL selector = NSSelectorFromString(@"setUsesProVideoStorage:");
     if (![output respondsToSelector:selector]) {

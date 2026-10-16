@@ -24,6 +24,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var switchingLens = false
     @Published private(set) var audioAvailable = false
     @Published private(set) var imuAvailable = false
+    @Published private(set) var telemetryEmbeddable = true
     @Published private(set) var externalStorageConnected = false
     @Published private(set) var cameraReady = false
     @Published private(set) var finalizing = false
@@ -48,6 +49,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private let intrinsicOutput = AVCaptureVideoDataOutput()
     private let intrinsicRecorder = CameraIntrinsicsRecorder()
     private var intrinsicURL: URL?
+    private var intrinsicsUnavailableReason: String?
     private var device: AVCaptureDevice?
     private var formatObjects: [FormatInfo] = []
     private var supportedCodecs: [AVVideoCodecType] = []
@@ -57,6 +59,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var chosenFPS: Double = 30
     private var shutterMaxCustomized = false
     private var activeShutterAngle: Double?
+    private var manualExposureIntent: ManualExposurePreference?
     private var chosenFocus: FocusChoice = .continuous
     private var lensDevices: [String: AVCaptureDevice] = [:]
     private struct CapturePreference {
@@ -64,6 +67,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let width: Int32
         let height: Int32
         let fps: Double
+    }
+    private struct ManualExposurePreference {
+        let seconds: Double
+        let iso: Double
+        let angle: Double?
+    }
+    private func manualExposurePreference(_ camera: AVCaptureDevice) -> ManualExposurePreference? {
+        if let manualExposureIntent { return manualExposureIntent }
+        guard camera.exposureMode == .custom else { return nil }
+        return ManualExposurePreference(seconds: camera.exposureDuration.seconds,
+                                        iso: Double(camera.iso), angle: activeShutterAngle)
     }
     private var observations: [NSKeyValueObservation] = []
     private var sampleTimer: DispatchSourceTimer?
@@ -261,6 +275,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                                    "restoreAuto": restoreAutoWhiteBalanceAfterRecording])
         publish { self.whiteBalanceAuto = false }
     }
+    private func logProVideoStorage(_ stage: String) {
+        guard UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储" else { return }
+        logger.event("pro_video_storage_diagnostic", ["stage": stage,
+            "storage": ProVideoStorageBridge.diagnostics(for: output),
+            "sessionRunning": session.isRunning, "recording": output.isRecording,
+            "movieRotation": output.connection(with: .video)?.videoRotationAngle ?? -1,
+            "state": configurationSnapshot(),
+            "os": ProcessInfo.processInfo.operatingSystemVersionString,
+            "buildSDK": Bundle.main.object(forInfoDictionaryKey: "DTSDKName") ?? "unknown"])
+    }
+
     private func prepareRAWRecordingPipeline() throws {
         guard chosenCodec?.rawValue == "aprn" || chosenCodec?.rawValue == "aprh",
               let camera = device else { return }
@@ -276,8 +301,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         camera.unlockForConfiguration()
         publish { self.whiteBalanceAuto = false }
         logger.event("raw_pipeline_prepare_begin", ["format": chosenIndex ?? -1, "fps": chosenFPS])
+        logProVideoStorage("raw_before_stop")
         session.stopRunning()
+        logProVideoStorage("raw_stopped")
         session.startRunning()
+        logProVideoStorage("raw_started")
         guard session.isRunning else { throw RecorderError.unavailable("RAW 相机会话重启失败") }
         enableIntrinsicDelivery()
         rawPreparedSignature = currentRAWSignature
@@ -351,6 +379,75 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         queue.asyncAfter(deadline: .now() + stopDelay) {
             if self.output.isRecording { self.toggleRecording() }
             else { self.logger.event("raw_smoke_failed", ["reason": "MovieFileOutput never entered recording state"]) }
+        }
+    }
+
+    private func runHEVCCadenceSmoke() {
+        let at240 = ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke")
+        let at120 = ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")
+        let width: Int32 = at120 || at240 ? 1920 : 3840
+        let height: Int32 = at120 || at240 ? 1080 : 2160
+        let rate = at240 ? 240.0 : (at120 ? 120.0 : 60.0)
+        guard let target = formatObjects.filter({
+            $0.width == width && $0.height == height && $0.supports(rate) &&
+            $0.compatibleCodecs.contains(VideoEncoding.hevc.codec.rawValue)
+        }).max(by: { ($0.format.autoFocusSystem == .none ? 0 : 1,
+                     $0.supportsIntrinsics ? 1 : 0, -$0.index) <
+                     ($1.format.autoFocusSystem == .none ? 0 : 1,
+                     $1.supportsIntrinsics ? 1 : 0, -$1.index) }) else {
+            logger.event("hevc_smoke_failed", ["reason": "No compatible HEVC format", "fps": rate])
+            return
+        }
+        chosenEncoding = .hevc; chosenCodec = VideoEncoding.hevc.codec; chosenFPS = rate
+        guard applyFormat(target.index, reason: "hevc_cadence_smoke") else { return }
+        logger.event("hevc_smoke_configuration", ["format": target.index, "width": width,
+                                                   "height": height, "fps": rate])
+        toggleRecording()
+    }
+
+    private func runKCapabilityProbe() {
+        for info in formatObjects where info.width == 1920 && info.height == 1080 &&
+            info.compatibleCodecs.contains(VideoEncoding.hevc.codec.rawValue) &&
+            (info.supports(60) || info.supports(120)) {
+            chosenEncoding = .hevc; chosenCodec = VideoEncoding.hevc.codec
+            chosenFPS = info.supports(120) ? 120 : 60
+            guard applyFormat(info.index, reason: "k_capability_probe") else { continue }
+            let connection = intrinsicOutput.connection(with: .video)
+            logger.event("k_capability_probe", ["format": info.index, "fps": chosenFPS,
+                "pixelFormat": info.dictionary["pixelFormat"] ?? "unknown",
+                "fovDegrees": info.format.videoFieldOfView,
+                "intrinsicsSupported": connection?.isCameraIntrinsicMatrixDeliverySupported ?? false,
+                "intrinsicsEnabled": connection?.isCameraIntrinsicMatrixDeliveryEnabled ?? false,
+                "previewSized": intrinsicOutput.deliversPreviewSizedOutputBuffers])
+        }
+    }
+
+    private func runExposureRetentionSmoke() {
+        guard let camera = device,
+              let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }),
+              let target = formatObjects.first(where: {
+                  $0.width == 1920 && $0.height == 1080 && $0.supports(30) &&
+                  $0.compatibleCodecs.contains(VideoEncoding.hevc.codec.rawValue)
+              }) else { logger.event("exposure_smoke_failed", ["reason": "Missing camera or HEVC format"]); return }
+        chosenEncoding = .hevc; chosenCodec = VideoEncoding.hevc.codec; chosenFPS = 30
+        guard applyFormat(target.index, reason: "exposure_smoke") else { return }
+        setManualExposure(seconds: 1/50, iso: 400)
+        if ProcessInfo.processInfo.arguments.contains("--exposure-angle-smoke") { setShutterAngle(180) }
+        queue.async { self.logger.event("exposure_smoke_before", self.configurationSnapshot()) }
+        chooseLens(wide.uniqueID)
+        queue.async {
+            self.queue.asyncAfter(deadline: .now() + 1) {
+                self.logger.event("exposure_smoke_after_lens", self.configurationSnapshot())
+                self.chooseFPS(120)
+                self.queue.async {
+                    self.logger.event("exposure_smoke_after_fps", self.configurationSnapshot())
+                    self.queue.asyncAfter(deadline: .now() + 1) {
+                        self.logger.event("exposure_smoke_settled", self.configurationSnapshot())
+                        self.logger.event("exposure_smoke_complete", ["startingLens": camera.uniqueID,
+                                                                      "endingLens": self.device?.uniqueID ?? "none"])
+                    }
+                }
+            }
         }
     }
 
@@ -488,12 +585,27 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             discoverCapabilities(camera)
             startSampling(camera)
             session.startRunning()
-            publish { self.status = "Camera ready"; self.cameraReady = self.session.isRunning }
+            let telemetryEmbeddable = intrinsicOutput.connection(with: .video)?
+                .isCameraIntrinsicMatrixDeliveryEnabled ?? false
+            publish {
+                self.status = "Camera ready"; self.cameraReady = self.session.isRunning
+                self.telemetryEmbeddable = telemetryEmbeddable
+            }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--raw-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") { runRAWSSDSmoke() }
+            if ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") { runHEVCCadenceSmoke() }
+            if ProcessInfo.processInfo.arguments.contains("--k-capability-probe") { runKCapabilityProbe() }
+            if ProcessInfo.processInfo.arguments.contains("--k-wide-lens-probe"),
+               let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }) {
+                chooseLens(wide.uniqueID)
+            }
+            if ProcessInfo.processInfo.arguments.contains("--exposure-retention-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--exposure-angle-smoke") { runExposureRetentionSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--inspect-hotplug") { inspectHotplugMovie() }
             #endif
         } catch { fail("Camera setup: \(error)") }
@@ -519,6 +631,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let currentFormat = self.chosenIndex.flatMap { self.formatObjects.indices.contains($0) ? self.formatObjects[$0] : nil }
             let preference = CapturePreference(encoding: self.chosenEncoding,
                 width: currentFormat?.width ?? 3840, height: currentFormat?.height ?? 2160, fps: self.chosenFPS)
+            let manualExposure = self.manualExposurePreference(current)
             let previousFormats = self.formatObjects
             let previousCodecs = self.supportedCodecs
             let previousIndex = self.chosenIndex
@@ -546,7 +659,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.device = next
                 self.installFocusObservers(next)
                 self.startSampling(next)
-                guard self.discoverCapabilities(next, preference: preference) else {
+                guard self.discoverCapabilities(next, preference: preference, manualExposure: manualExposure) else {
                     throw CameraError.unsupportedFocus("No compatible configuration on selected lens")
                 }
                 self.logger.event("lens_switch_result", ["success": true, "after": self.configurationSnapshot()])
@@ -575,7 +688,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         self.chosenEncoding = preference.encoding; self.chosenCodec = preference.encoding.codec
                         self.chosenIndex = previousIndex; self.chosenFPS = preference.fps
                         self.installFocusObservers(current); self.startSampling(current)
-                        if let previousIndex { _ = self.applyFormat(previousIndex, reason: "lens_rollback") }
+                        if let previousIndex { _ = self.applyFormat(previousIndex, reason: "lens_rollback", manualExposure: manualExposure) }
                         self.publish { self.formats = previousFormats; self.codecs = previousCodecs; self.selectedLensID = current.uniqueID }
                     }
                 }
@@ -586,7 +699,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    @discardableResult private func discoverCapabilities(_ camera: AVCaptureDevice, preference: CapturePreference? = nil) -> Bool {
+    @discardableResult private func discoverCapabilities(_ camera: AVCaptureDevice, preference: CapturePreference? = nil,
+                                                         manualExposure: ManualExposurePreference? = nil) -> Bool {
         let oldFormat = camera.activeFormat
         let oldMin = camera.activeVideoMinFrameDuration
         let oldMax = camera.activeVideoMaxFrameDuration
@@ -611,6 +725,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 camera.unlockForConfiguration()
                 let available = output.availableVideoCodecTypes
                 info.compatibleCodecs = Set(available.map(\.rawValue))
+                info.supportsIntrinsics = intrinsicOutput.connection(with: .video)?
+                    .isCameraIntrinsicMatrixDeliverySupported ?? false
                 for codec in available where !union.contains(codec) { union.append(codec) }
                 logger.event("format_probe", ["index": index, "availableCodecs": available.map(\.rawValue)])
             } catch {
@@ -654,6 +770,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if let chosenIndex, let rememberedFPS = preferences.object(forKey: fpsKey) as? Double,
                found[chosenIndex].supports(rememberedFPS) { chosenFPS = rememberedFPS }
         }
+        if let index = chosenIndex {
+            chosenIndex = preferredIntrinsicFormatIndex(near: index, fps: chosenFPS,
+                                                        codec: encoding.codec, in: found)
+        }
         let report: [String: Any] = ["sessionID": logger.sessionID, "model": Self.hardwareModel(),
                                      "iOS": UIDevice.current.systemVersion, "cameraID": camera.uniqueID,
                                      "cameraName": camera.localizedName, "allCodecs": union.map(\.rawValue),
@@ -673,7 +793,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.selectedFormatIndex = self.chosenIndex
         }
         guard let index = chosenIndex else { fail("No compatible format on selected lens"); return false }
-        let applied = applyFormat(index, reason: preference == nil ? "initial_selection" : "lens_switch")
+        let applied = applyFormat(index, reason: preference == nil ? "initial_selection" : "lens_switch",
+                                  manualExposure: manualExposure)
         if applied, let preference {
             logger.event("lens_configuration_fallback", ["requested": [preference.encoding.title, "\(preference.width)×\(preference.height)", preference.fps],
                                                        "chosen": configurationSnapshot()])
@@ -707,9 +828,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    func chooseFormat(_ index: Int) { queue.async { self.applyFormat(index, reason: "format_change") } }
+    func chooseFormat(_ index: Int) {
+        queue.async {
+            guard let codec = self.chosenCodec else { return }
+            let selected = self.preferredIntrinsicFormatIndex(near: index, fps: self.chosenFPS,
+                                                               codec: codec, in: self.formatObjects)
+            self.applyFormat(selected, reason: "format_change")
+        }
+    }
 
-    @discardableResult private func applyFormat(_ index: Int, reason: String) -> Bool {
+    @discardableResult private func applyFormat(_ index: Int, reason: String,
+                                                manualExposure: ManualExposurePreference? = nil) -> Bool {
         guard !output.isRecording, !recordingStarting, !captureFinishing else { fail("Format cannot change during recording"); return false }
         guard let camera = device, let codec = chosenCodec, formatObjects.indices.contains(index) else { fail("Invalid format selection"); return false }
         let info = formatObjects[index]
@@ -718,10 +847,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let previousFormat = camera.activeFormat
         let previousMin = camera.activeVideoMinFrameDuration
         let previousMax = camera.activeVideoMaxFrameDuration
+        let exposureToRestore = manualExposure ?? (reason == "fps_change" ? manualExposurePreference(camera) : nil)
         logger.event("configuration_request", ["kind": reason, "requestedCodec": codec.rawValue, "requestedFormat": index, "before": before])
         do {
             session.beginConfiguration()
             defer { session.commitConfiguration() }
+            logProVideoStorage("format_before_sensor_change")
             try camera.lockForConfiguration()
             camera.activeFormat = info.format
             let targetFPS = info.supports(chosenFPS) ? chosenFPS : nearestFPS(to: chosenFPS, in: info)
@@ -737,7 +868,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.setOutputSettings(settings, for: connection)
             }) { throw CameraError.unsupportedFocus("Encoding settings: \(exception)") }
-            try resetCameraControls(camera, fps: targetFPS)
+            logProVideoStorage("format_after_encoder_change")
+            try resetCameraControls(camera, fps: targetFPS, manualExposure: exposureToRestore)
             chosenIndex = index; chosenFPS = targetFPS
             if reason != "initial_selection" {
                 let preferences = UserDefaults.standard
@@ -748,9 +880,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             logger.event("configuration_result", ["kind": reason, "success": true, "after": configurationSnapshot()])
             scheduleRAWPipelinePreparation()
+            let telemetryEmbeddable = intrinsicOutput.connection(with: .video)?
+                .isCameraIntrinsicMatrixDeliveryEnabled ?? false
             publish {
                 self.selectedCodec = codec; self.selectedEncoding = self.chosenEncoding
                 self.selectedFormatIndex = index; self.fps = targetFPS
+                self.telemetryEmbeddable = telemetryEmbeddable
                 self.isoRange = Double(camera.activeFormat.minISO)...Double(camera.activeFormat.maxISO)
                 self.exposureRange = CMTimeGetSeconds(camera.activeFormat.minExposureDuration)...CMTimeGetSeconds(camera.activeFormat.maxExposureDuration)
                 self.errorText = nil
@@ -770,31 +905,44 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    /// Video-spec or physical-lens changes start from consistent automatic controls.
-    private func resetCameraControls(_ camera: AVCaptureDevice, fps: Double) throws {
+    /// Preserve manual exposure across lens and FPS changes, respecting the new sensor's limits.
+    private func resetCameraControls(_ camera: AVCaptureDevice, fps: Double,
+                                     manualExposure: ManualExposurePreference? = nil) throws {
         try camera.lockForConfiguration()
         defer { camera.unlockForConfiguration() }
-        if let angle = activeShutterAngle, camera.isExposureModeSupported(.custom) {
-            let duration = CaptureDefaults.exposure(forShutterAngle: angle, fps: fps,
+        if let manualExposure, camera.isExposureModeSupported(.custom) {
+            let duration = manualExposure.angle.map {
+                CaptureDefaults.exposure(forShutterAngle: $0, fps: fps,
+                    minimum: camera.activeFormat.minExposureDuration.seconds,
+                    maximum: camera.activeFormat.maxExposureDuration.seconds)
+            } ?? CaptureDefaults.clampedManualExposure(manualExposure.seconds, fps: fps,
                 minimum: camera.activeFormat.minExposureDuration.seconds,
                 maximum: camera.activeFormat.maxExposureDuration.seconds)
-            let iso = min(max(camera.iso, camera.activeFormat.minISO), camera.activeFormat.maxISO)
+            let iso = Float(min(max(manualExposure.iso, Double(camera.activeFormat.minISO)),
+                                Double(camera.activeFormat.maxISO)))
             camera.setExposureModeCustom(duration: CMTime(seconds: duration, preferredTimescale: 1_000_000),
                                          iso: iso)
+            manualExposureIntent = ManualExposurePreference(seconds: duration, iso: Double(iso),
+                                                            angle: manualExposure.angle)
+            activeShutterAngle = manualExposure.angle
             if camera.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
                 camera.whiteBalanceMode = .continuousAutoWhiteBalance
             }
             if camera.isFocusModeSupported(.continuousAutoFocus) { camera.focusMode = .continuousAutoFocus }
             chosenFocus = .continuous
-            logger.event("control_defaults", ["fps": fps, "shutterAngle": angle,
-                "exposureSeconds": duration, "focusMode": focusName(camera.focusMode)])
+            logger.event("manual_exposure_restored", ["fps": fps, "requestedSeconds": manualExposure.seconds,
+                "exposureSeconds": duration, "requestedISO": manualExposure.iso, "iso": iso,
+                "shutterAngle": manualExposure.angle as Any? ?? NSNull()])
             publish {
-                self.shutterMode = .angle; self.shutterAngle = angle; self.exposureAuto = false
+                self.shutterMode = manualExposure.angle == nil ? .manual : .angle
+                if let angle = manualExposure.angle { self.shutterAngle = angle }
+                self.exposureAuto = false
                 self.whiteBalanceAuto = true; self.focusChoice = .continuous
             }
             return
         }
         activeShutterAngle = nil
+        manualExposureIntent = nil
         let limit = CaptureDefaults.maximumExposure(fps: fps,
             minimum: camera.activeFormat.minExposureDuration.seconds,
             maximum: camera.activeFormat.maxExposureDuration.seconds)
@@ -823,7 +971,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                   self.formatObjects.indices.contains(index), let codec = self.chosenCodec else {
                 self.fail("No active video format"); return
             }
-            if !self.formatObjects[index].supports(value) {
+            let preferredIndex = self.preferredIntrinsicFormatIndex(near: index, fps: value,
+                                                                    codec: codec, in: self.formatObjects)
+            if !self.formatObjects[index].supports(value) || preferredIndex != index {
                 let current = self.formatObjects[index]
                 let candidates = self.formatObjects.filter {
                     $0.width == current.width && $0.height == current.height &&
@@ -831,8 +981,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 guard let alternate = candidates.min(by: {
                     ($0.format.autoFocusSystem == .none ? 1 : 0,
+                     $0.supportsIntrinsics ? 0 : 1,
+                     $0.fourCC == "420v" ? 0 : 1,
                      abs($0.index - index)) <
                     ($1.format.autoFocusSystem == .none ? 1 : 0,
+                     $1.supportsIntrinsics ? 0 : 1,
+                     $1.fourCC == "420v" ? 0 : 1,
                      abs($1.index - index))
                 }) else {
                     self.fail("FPS \(value) is unsupported at the selected resolution"); return
@@ -847,6 +1001,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let before = self.configurationSnapshot()
             let previousMin = camera.activeVideoMinFrameDuration
             let previousMax = camera.activeVideoMaxFrameDuration
+            let manualExposure = self.manualExposurePreference(camera)
             self.logger.event("fps_request", ["requested": value, "before": before])
             do {
                 try camera.lockForConfiguration()
@@ -866,7 +1021,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         self.output.setOutputSettings(settings, for: connection)
                     }) { throw CameraError.unsupportedFocus("Encoding settings: \(exception)") }
                 }
-                try self.resetCameraControls(camera, fps: value)
+                try self.resetCameraControls(camera, fps: value,
+                                             manualExposure: manualExposure)
                 self.chosenFPS = value
                 UserDefaults.standard.set(value, forKey: "capture.fps.\(camera.uniqueID)")
                 self.logger.event("fps_result", ["success": true, "after": self.configurationSnapshot()])
@@ -886,6 +1042,26 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             ?? 30
     }
 
+    /// Keep the requested raster, frame rate, codec and autofocus capability.
+    /// Some device formats differ only by pixel range/crop, while just one
+    /// delivers measured K. Prefer video-range YUV when both deliver K.
+    private func preferredIntrinsicFormatIndex(near index: Int, fps: Double,
+                                               codec: AVVideoCodecType, in formats: [FormatInfo]) -> Int {
+        guard formats.indices.contains(index), !formats[index].supportsIntrinsics else { return index }
+        let current = formats[index]
+        let options = formats.filter {
+            $0.width == current.width && $0.height == current.height &&
+            $0.supports(fps) && $0.compatibleCodecs.contains(codec.rawValue) &&
+            $0.format.autoFocusSystem == current.format.autoFocusSystem && $0.supportsIntrinsics
+        }
+        return options.min {
+            ($0.fourCC == "420v" ? 0 : 1,
+             abs(Double($0.format.videoFieldOfView - current.format.videoFieldOfView)), $0.index) <
+            ($1.fourCC == "420v" ? 0 : 1,
+             abs(Double($1.format.videoFieldOfView - current.format.videoFieldOfView)), $1.index)
+        }?.index ?? index
+    }
+
     private func closestFormatIndex(in formats: [FormatInfo], codec: AVVideoCodecType,
                                     preference: CapturePreference) -> Int? {
         let targetArea = max(1.0, Double(preference.width) * Double(preference.height))
@@ -896,6 +1072,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let fps = nearestFPS(to: preference.fps, in: info)
             return abs(log(area / targetArea)) * 100 + abs(aspect - targetAspect) * 60
                 + abs(fps - preference.fps) * 2 + (info.format.autoFocusSystem == .none ? 200 : 0)
+                + (info.supportsIntrinsics ? 0 : 10)
         }
         return formats.indices.filter { formats[$0].compatibleCodecs.contains(codec.rawValue) }
             .min { score(formats[$0]) < score(formats[$1]) }
@@ -941,6 +1118,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "maxFrameDurationSeconds": CMTimeGetSeconds(camera.activeVideoMaxFrameDuration),
                 "focusMode": focusName(camera.focusMode), "adjustingFocus": camera.isAdjustingFocus,
                 "lensPosition": camera.lensPosition,
+                "exposureMode": camera.exposureMode.rawValue, "exposureSeconds": camera.exposureDuration.seconds,
+                "iso": camera.iso, "shutterAngle": activeShutterAngle as Any? ?? NSNull(),
+                "requestedExposureSeconds": manualExposureIntent?.seconds as Any? ?? NSNull(),
+                "requestedISO": manualExposureIntent?.iso as Any? ?? NSNull(),
                 "outputSettings": output.connection(with: .video).map { output.outputSettings(for: $0) } ?? [:]]
     }
 
@@ -1000,9 +1181,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     guard camera.isExposureModeSupported(.continuousAutoExposure) else { throw CameraError.unsupportedFocus("Auto exposure") }
                     camera.activeMaxExposureDuration = .invalid
                     camera.exposureMode = .continuousAutoExposure
+                    self.manualExposureIntent = nil
                 } else {
                     guard camera.isExposureModeSupported(.custom) else { throw CameraError.unsupportedFocus("Manual exposure") }
                     camera.setExposureModeCustom(duration: camera.exposureDuration, iso: camera.iso)
+                    self.manualExposureIntent = ManualExposurePreference(
+                        seconds: camera.exposureDuration.seconds, iso: Double(camera.iso), angle: nil)
                 }
                 let mode: ShutterMode = enabled ? .auto : .manual
                 self.activeShutterAngle = nil
@@ -1040,6 +1224,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             camera.exposureMode = .continuousAutoExposure
             camera.activeMaxExposureDuration = CMTime(seconds: limit, preferredTimescale: 1_000_000)
             activeShutterAngle = nil
+            manualExposureIntent = nil
             if customized { shutterMaxCustomized = true }
             logger.event("exposure_auto_max", ["limitSeconds": limit, "state": configurationSnapshot()])
             publish {
@@ -1059,10 +1244,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let duration = CaptureDefaults.exposure(forShutterAngle: requested, fps: self.chosenFPS,
                     minimum: camera.activeFormat.minExposureDuration.seconds,
                     maximum: camera.activeFormat.maxExposureDuration.seconds)
-                let iso = min(max(camera.iso, camera.activeFormat.minISO), camera.activeFormat.maxISO)
+                let iso = Float(min(max(self.manualExposureIntent?.iso ?? Double(camera.iso),
+                                        Double(camera.activeFormat.minISO)), Double(camera.activeFormat.maxISO)))
                 camera.setExposureModeCustom(duration: CMTime(seconds: duration, preferredTimescale: 1_000_000),
                                              iso: iso)
                 self.activeShutterAngle = requested
+                self.manualExposureIntent = ManualExposurePreference(seconds: duration, iso: Double(iso), angle: requested)
                 self.logger.event("shutter_angle", ["angle": requested, "fps": self.chosenFPS,
                     "exposureSeconds": duration])
                 self.publish {
@@ -1079,11 +1266,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 defer { camera.unlockForConfiguration() }
                 let upper = min(camera.activeFormat.maxExposureDuration, CMTime(seconds: 1 / self.chosenFPS, preferredTimescale: 1_000_000))
                 let range = camera.activeFormat.minExposureDuration...max(camera.activeFormat.minExposureDuration, upper)
-                let requested = CMTime(seconds: seconds ?? CMTimeGetSeconds(camera.exposureDuration), preferredTimescale: 1_000_000)
+                let requested = CMTime(seconds: seconds ?? self.manualExposureIntent?.seconds ??
+                    CMTimeGetSeconds(camera.exposureDuration), preferredTimescale: 1_000_000)
                 let duration = min(max(requested, range.lowerBound), range.upperBound)
-                let level = Float(min(max(iso ?? Double(camera.iso), Double(camera.activeFormat.minISO)), Double(camera.activeFormat.maxISO)))
+                let level = Float(min(max(iso ?? self.manualExposureIntent?.iso ?? Double(camera.iso),
+                                          Double(camera.activeFormat.minISO)), Double(camera.activeFormat.maxISO)))
                 camera.setExposureModeCustom(duration: duration, iso: level)
                 self.activeShutterAngle = nil
+                self.manualExposureIntent = ManualExposurePreference(seconds: duration.seconds, iso: Double(level), angle: nil)
                 self.publish { self.exposureAuto = false; self.shutterMode = .manual }
             } catch { self.fail("Exposure: \(error)") }
         }
@@ -1230,7 +1420,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.restoreRAWWhiteBalance()
                 self.fail("相机不支持当前重力方向"); return
             }
+            self.logProVideoStorage("record_before_rotation")
             connection.videoRotationAngle = CGFloat(direction.orientation.degrees)
+            self.logProVideoStorage("record_after_rotation")
             self.recordingOrientation = direction.orientation
             self.logger.event("recording_direction", ["degrees": direction.orientation.degrees,
                 "source": direction.source, "gravityX": direction.gravity?.x ?? 0,
@@ -1241,6 +1433,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
             let arguments = ProcessInfo.processInfo.arguments
             let isTest = arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
+                arguments.contains("--hevc-4k60-smoke") || arguments.contains("--hevc-1080p120-smoke") ||
+                arguments.contains("--hevc-1080p240-smoke") ||
                 arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
                 arguments.contains("--raw-hotplug-smoke")
             let baseName = isTest ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
@@ -1271,7 +1465,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if let message = ProVideoStorageBridge.configureOutput(self.output,
                 enabled: storageLocation == "专用视频存储") {
                 self.restoreRAWWhiteBalance()
-                self.failStorage("\(message)。请更换存储位置或视频规格")
+                self.logProVideoStorage("record_storage_rejected")
+                let supported = ProVideoStorageBridge.isOutputSupported(self.output)
+                let format = self.device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+                let size = format.map { "\($0.width)×\($0.height)" } ?? "unknown"
+                self.failStorage("\(message)\n\(codec.rawValue) · \(size) · \(self.chosenFPS) fps\n设备支持：\(ProVideoStorageBridge.isSupported())\n录制输出支持：\(supported)\n剩余容量：\(ProVideoStorageBridge.remainingCapacity() / 1_000_000_000) GB\n诊断已保存到 Log")
                 return
             }
             self.logger.event("record_storage_selected", ["location": storageLocation,
@@ -1307,6 +1505,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             self.imuRecorder = imu
             self.movieFirstFrameHost = nil
+            self.intrinsicURL = nil
+            self.intrinsicsUnavailableReason = nil
             do {
                 let dc = self.intrinsicOutput.connection(with: .video)
                 let mc = self.output.connection(with: .video)
@@ -1318,7 +1518,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     "dataMirrored": dc?.isVideoMirrored ?? false, "movieMirrored": mc?.isVideoMirrored ?? false])
                 guard let camera = self.device,
                       let dataConnection = self.intrinsicOutput.connection(with: .video),
-                      dataConnection.isCameraIntrinsicMatrixDeliveryEnabled,
                       let movieConnection = self.output.connection(with: .video),
                       movieConnection.activeVideoStabilizationMode == .off,
                       dataConnection.activeVideoStabilizationMode == .off,
@@ -1327,7 +1526,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     throw RecorderError.unavailable("当前配置无法提供与视频一致的真实 K")
                 }
                 let evidenceURL = directory.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".camera_frames.jsonl")
-                try self.intrinsicRecorder.start(at: evidenceURL, clock: self.session.synchronizationClock, camera: camera)
+                if dataConnection.isCameraIntrinsicMatrixDeliveryEnabled {
+                    try self.intrinsicRecorder.start(at: evidenceURL, clock: self.session.synchronizationClock, camera: camera)
+                } else if self.chosenFPS >= 100 && !dataConnection.isCameraIntrinsicMatrixDeliverySupported {
+                    self.intrinsicsUnavailableReason = "该高帧率格式不提供逐帧相机内参 K"
+                    self.logger.event("intrinsics_unavailable_record_video", ["fps": self.chosenFPS,
+                        "format": self.chosenIndex ?? -1, "reason": self.intrinsicsUnavailableReason ?? ""])
+                } else {
+                    throw RecorderError.unavailable("当前配置无法提供与视频一致的真实 K")
+                }
                 self.intrinsicURL = evidenceURL
             } catch {
                 try? imu.stop(); self.imuRecorder = nil
@@ -1411,7 +1618,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled"),
                 externalMovieBookmark: self.activeExternalMovieBookmark,
                 expectedVideoCodec: self.chosenCodec?.rawValue,
-                expectedFPS: self.chosenFPS)
+                expectedFPS: self.chosenFPS,
+                intrinsicsUnavailableReason: self.intrinsicsUnavailableReason)
             do {
                 try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                 self.pendingRecordingJob = job
@@ -1420,6 +1628,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             self.publish { self.beginFinalizationLease(); self.status = "Recording"; self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") {
+                let smokeSeconds: Double = ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") ? 10 : 20
+                self.queue.asyncAfter(deadline: .now() + smokeSeconds) {
+                    if self.output.isRecording { self.toggleRecording() }
+                }
+            }
+            #endif
         }
     }
 
@@ -1480,7 +1698,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.logger.event("imu_finalize_stage", ["movie": job.movieName,
                         "stage": stage, "seconds": seconds])
                 }
-                logger.event("imu_pending_completed", ["movie": job.movieName])
+                logger.event(job.intrinsicsUnavailableReason == nil ? "imu_pending_completed" : "video_only_completed",
+                             ["movie": job.movieName, "reason": job.intrinsicsUnavailableReason ?? ""])
                 #if DEBUG
                 writeRAWSSDSmokeResult(job, directory: directory)
                 #endif
@@ -1493,7 +1712,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     "seconds": ProcessInfo.processInfo.systemUptime - finalizationStart])
                 publish {
                     self.finalizing = false
-                    self.status = job.recordingWarning != nil ? "SSD 中断 · 可读片段已保存" : "Saved · IMU embedded"
+                    self.status = job.recordingWarning != nil ? "SSD 中断 · 可读片段已保存" :
+                        job.intrinsicsUnavailableReason != nil ? "视频已保存 · 当前帧率无 K，IMU 未嵌入" : "Saved · IMU embedded"
                     self.endFinalizationLease()
                 }
             } catch {
@@ -1501,13 +1721,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let deferred = !canFinalizeNow
                 let reason = String(describing: error)
                 let permanent = ["50 ms", "30 ms", "逐帧 K", "没有与 MOV 像素尺寸一致的有效 K 数据",
-                                 "视频帧不足", "视频帧率严重不足",
+                                 "视频帧不足", "视频帧率严重不足", "视频帧时间异常",
                                  "Invalid recovery file paths"].contains { reason.contains($0) }
                 if !deferred && permanent { failedPendingSignatures[file.path] = signature }
                 publish {
                     self.finalizing = false
-                    self.status = permanent ? "Camera ready" : "等待返回 App 补写 IMU"
+                    self.status = reason.contains("视频帧时间异常") || reason.contains("视频帧率严重不足")
+                        ? "视频帧异常 · 请检查原片" : permanent ? "Camera ready" : "等待返回 App 补写 IMU"
                     self.endFinalizationLease()
+                }
+                if reason.contains("视频帧时间异常") || reason.contains("视频帧率严重不足") {
+                    fail(reason)
                 }
                 if deferred { break }
             }
@@ -1558,7 +1782,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.queue.asyncAfter(deadline: .now() + 0.12) {
                 self.imuRecorder = nil
                 do {
-                    let framesStop = Result { try self.intrinsicRecorder.stop() }
+                    let framesStop = Result { if self.intrinsicsUnavailableReason == nil { try self.intrinsicRecorder.stop() } }
                     var cadence = self.intrinsicRecorder.diagnostics()
                     cadence["file"] = fileURL.lastPathComponent
                     self.logger.event("intrinsics_capture_health", cadence)

@@ -11,6 +11,29 @@ struct MotionEvent: Codable {
     let z: Double
 }
 
+struct VideoCadenceHealth {
+    let maximumGap: Double
+    let missingFrames: Int
+    let expectedFrames: Int
+    var isSeverelyDiscontinuous: Bool { maximumGap > 0.1 || missingFrames > max(3, expectedFrames / 20) }
+
+    init(frames: [ActualVideoFrame], fps: Double) {
+        let times = frames.map(\.pts).filter(\.isFinite).sorted()
+        let gaps = zip(times, times.dropFirst()).map { $1 - $0 }.filter { $0 > 0 }
+        maximumGap = gaps.max() ?? 0
+        missingFrames = gaps.reduce(0) { $0 + max(0, Int(($1 * fps).rounded()) - 1) }
+        expectedFrames = max(times.count + missingFrames, 1)
+    }
+
+    func validate(fps: Double) throws {
+        guard !isSeverelyDiscontinuous else {
+            throw RecorderError.unavailable(String(format:
+                "视频帧时间异常：%.0f fps 最大间隔 %.0f ms，估计缺少 %d 帧；原始 MOV 与 IMU 已保留",
+                fps, maximumGap * 1000, missingFrames))
+        }
+    }
+}
+
 /// Captures raw, monotonic CoreMotion samples before and after MovieFileOutput runs.
 final class IMURecorder {
     private let manager = CMMotionManager()
@@ -148,6 +171,7 @@ enum MovieIMUFinalizer {
             guard video.frames.count >= minimumFrames else {
                 throw RecorderError.unavailable("MOV 视频帧率严重不足：\(video.frames.count)/\(minimumFrames) 帧；原始文件已保留")
             }
+            try VideoCadenceHealth(frames: video.frames, fps: expectedFPS).validate(fps: expectedFPS)
         }
         guard video.rotationDegrees == orientation.degrees else {
             throw RecorderError.unavailable("MOV 方向与录制时重力方向不一致；原始文件已保留")
@@ -172,6 +196,10 @@ enum MovieIMUFinalizer {
             return values
         }
         let gyro = try timeline(.gyro), accel = try timeline(.accel)
+        let cadence = VideoCadenceHealth(frames: video.frames, fps: expectedFPS ?? 1 / frameDuration)
+        func maximumSampleGap(_ values: [MotionEvent]) -> Double {
+            zip(values, values.dropFirst()).map { $1.timestamp - $0.timestamp }.max() ?? 0
+        }
         let actualPreRoll = min(firstFrameHost - gyro[0].timestamp, firstFrameHost - accel[0].timestamp)
         let actualPostRoll = min(gyro.last!.timestamp, accel.last!.timestamp) - firstFrameHost - end
         completed("readIMU")
@@ -214,7 +242,11 @@ enum MovieIMUFinalizer {
             "intrinsic_interpolated_frame_count": alignment.interpolatedCount,
             "intrinsic_nearest_fallback_frame_count": alignment.nearestFallbackCount,
             "intrinsic_max_nearest_time_error_ms": alignment.maximumNearestError * 1000,
-            "intrinsic_mean": matrix, "rotation_degrees": orientation.degrees] as [String: Any], options: [.sortedKeys])
+            "intrinsic_mean": matrix, "rotation_degrees": orientation.degrees,
+            "video_max_frame_gap_ms": cadence.maximumGap * 1000,
+            "video_estimated_missing_frames": cadence.missingFrames,
+            "gyro_max_sample_gap_ms": maximumSampleGap(gyro) * 1000,
+            "accel_max_sample_gap_ms": maximumSampleGap(accel) * 1000] as [String: Any], options: [.sortedKeys])
         var packets: [Data] = [], durations: [UInt32] = []
         if mode == "SonyMov" {
             let count = max(1, Int(ceil(end * 100)))
@@ -300,6 +332,7 @@ struct PendingIMUJob: Codable {
     var ready = false
     var recordingFailure: String?
     var recordingWarning: String?
+    var intrinsicsUnavailableReason: String?
 
     func url(in directory: URL) -> URL {
         directory.appendingPathComponent(movieName).appendingPathExtension("pending-imu.json")
@@ -332,6 +365,23 @@ struct PendingIMUJob: Codable {
         defer { if accessing { movie.stopAccessingSecurityScopedResource() } }
         if let recordingFailure { throw RecorderError.unavailable(recordingFailure) }
         try MOVTelemetryMuxer.recoverIfNeeded(movie)
+        if intrinsicsUnavailableReason != nil {
+            let video = try MovieIMUFinalizer.inspect(movie)
+            if let expectedFPS, video.duration.isFinite, video.duration > 0 {
+                let minimum = max(2, Int((video.duration * expectedFPS * 0.8).rounded(.down)))
+                guard video.frames.count >= minimum else {
+                    throw RecorderError.unavailable("MOV 视频帧率严重不足：\(video.frames.count)/\(minimum) 帧；原始文件已保留")
+                }
+                try VideoCadenceHealth(frames: video.frames, fps: expectedFPS).validate(fps: expectedFPS)
+            }
+            guard !AVURLAsset(url: movie).tracks(withMediaType: .audio).isEmpty else {
+                throw RecorderError.unavailable("MOV 音频轨校验失败；原始文件已保留")
+            }
+            // Keep raw IMU for diagnosis. Without measured K we cannot publish a
+            // Gyroflow-compatible embedded telemetry track or claim IMU success.
+            try FileManager.default.removeItem(at: url(in: directory))
+            return
+        }
         if let expectedVideoCodec, ["aprn", "aprh"].contains(expectedVideoCodec) {
             let asset = AVURLAsset(url: movie)
             guard let track = asset.tracks(withMediaType: .video).first,
