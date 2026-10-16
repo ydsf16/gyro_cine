@@ -38,7 +38,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private var peakBuffered = 0
     private var maxGap = 0.0
     private var stopDeadline = 0.0
-    private let maxBuffered = 3 // Bound retained camera buffers; never grow with recording duration.
+    private let maxBuffered = 10 // Bound retained camera buffers; never grow with recording duration.
 
     init(camera: AVCaptureDevice, codec: AVVideoCodecType, url: URL, queue: DispatchQueue,
          preview: RAWWriterPreview,
@@ -157,7 +157,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             started(pts)
         }
         guard pending.count < maxBuffered else {
-            finish(failure("RAW 写入持续积压，已停止录制并保留原片")); return
+            log("raw_writer_buffer_overflow", ["buffered": pending.count, "limit": maxBuffered])
+            finish(failure("RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格")); return
         }
         metadata(sample)
         pending.append(sample)
@@ -171,7 +172,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             return
         }
         guard writer.status == .writing else { finish(writer.error ?? failure("Writer 意外停止")); return }
-        while !pending.isEmpty && input.isReadyForMoreMediaData {
+        let simulateBlockedVideo = ProcessInfo.processInfo.arguments.contains("--writer-block-video") && frames >= 5 && !stopping
+        while !simulateBlockedVideo && !pending.isEmpty && input.isReadyForMoreMediaData {
             let sample = pending.removeFirst()
             let pts = CMSampleBufferGetPresentationTimeStamp(sample)
             guard input.append(sample) else { finish(writer.error ?? failure("RAW 帧写入失败")); return }
@@ -230,6 +232,11 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private let log: (String, [String: Any]) -> Void
     private let completion: (Error?) -> Void
     private var requested = false
+    private var lockAttempt = 0
+    private var requestFrame = 0
+    private var targetGains: AVCaptureDevice.WhiteBalanceGains?
+    private var stableLockedFrames = 0
+    private var lastObservedPTS = CMTime.invalid
     private var valid = true
     private(set) var ready = false
     private var videoCount = 0
@@ -267,23 +274,64 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         guard valid else { return }
         if output === audioOutput { audioCount += 1; return }
         videoCount += 1
-        guard !requested else { return }
+        guard !ready else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        if lockAttempt >= 3, videoCount - requestFrame >= 12, let target = targetGains {
+            let actual = camera.deviceWhiteBalanceGains
+            let pairs = [(actual.redGain, target.redGain), (actual.greenGain, target.greenGain), (actual.blueGain, target.blueGain)]
+            let matched = pairs.allSatisfy { $0.0.isFinite && $0.1.isFinite && $0.0 >= 1 && abs($0.0 - $0.1) <= 0.01 }
+            let fresh = pts.isValid && (!lastObservedPTS.isValid || CMTimeCompare(pts, lastObservedPTS) > 0)
+            stableLockedFrames = camera.whiteBalanceMode == .locked && !camera.isAdjustingWhiteBalance && matched && fresh
+                ? stableLockedFrames + 1 : 0
+            lastObservedPTS = pts
+            if stableLockedFrames >= 8 {
+                // deviceWhiteBalanceGains is the current in-use state (SDK contract).
+                // Require live, increasing RAW frames and stable target readback, not elapsed time.
+                log("raw_preview_locked_readback", ["frames": stableLockedFrames,
+                    "r": actual.redGain, "g": actual.greenGain, "b": actual.blueGain])
+                markReady(pts, source: "locked_gain_readback", attempt: lockAttempt)
+                return
+            }
+        }
+        // A lock completion can be omitted although RAW frames continue flowing.
+        // Retry against real frames; never treat a timeout or mode property as readiness.
+        guard !requested || (videoCount - requestFrame >= 12 && lockAttempt < 3) else { return }
         requested = true
+        lockAttempt += 1
+        requestFrame = videoCount
+        let attempt = lockAttempt
         do {
             try camera.lockForConfiguration()
-            camera.setWhiteBalanceModeLocked(with: AVCaptureDevice.currentWhiteBalanceGains) { [weak self] time in
+            let gains = camera.deviceWhiteBalanceGains
+            targetGains = gains
+            let request = attempt == 1 || !camera.isLockingWhiteBalanceWithCustomDeviceGainsSupported
+                ? AVCaptureDevice.currentWhiteBalanceGains : gains
+            camera.setWhiteBalanceModeLocked(with: request) { [weak self] time in
                 guard let self else { return }
                 self.queue.async {
-                    guard self.valid else { return }
-                    self.ready = true
-                    self.log("raw_preview_ready", ["effectivePTS": time.seconds, "video": self.videoCount,
-                        "audio": self.audioCount, "wbMode": self.camera.whiteBalanceMode.rawValue])
-                    self.completion(nil)
+                    self.log("raw_preview_lock_callback", ["attempt": attempt,
+                        "latestAttempt": self.lockAttempt, "valid": self.valid, "effectivePTS": time.seconds])
+                    // AVFoundation delivers lock callbacks FIFO. An earlier request's
+                    // real completion still proves this unchanged preview is locked.
+                    guard self.valid, !self.ready else { return }
+                    if ProcessInfo.processInfo.arguments.contains("--wb-drop-all-completions") ||
+                        (attempt == 1 && ProcessInfo.processInfo.arguments.contains("--wb-drop-first-completion")) {
+                        self.log("raw_preview_test_completion_dropped", [:]); return
+                    }
+                    self.markReady(time, source: "completion", attempt: attempt)
                 }
             }
             camera.unlockForConfiguration()
-            log("raw_preview_lock_requested", ["mode": camera.whiteBalanceMode.rawValue])
+            log("raw_preview_lock_requested", ["mode": camera.whiteBalanceMode.rawValue, "attempt": attempt, "video": videoCount])
         } catch { valid = false; completion(error) }
     }
+    private func markReady(_ time: CMTime, source: String, attempt: Int) {
+        guard valid, !ready else { return }
+        ready = true
+        log("raw_preview_ready", ["pts": time.seconds, "source": source, "video": videoCount,
+            "audio": audioCount, "wbMode": camera.whiteBalanceMode.rawValue, "attempt": attempt])
+        completion(nil)
+    }
+
 }
 #endif

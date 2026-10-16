@@ -222,6 +222,7 @@ private struct MovieThumbnail: View {
                 }
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: 246, height: 174)
                 let frame = try? generator.copyCGImage(at: .zero, actualTime: nil)
                 return (frame.map(UIImage.init(cgImage:)), raw)
             }.value

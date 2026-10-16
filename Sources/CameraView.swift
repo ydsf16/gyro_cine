@@ -3,6 +3,7 @@ import SwiftUI
 
 private struct Preview: UIViewRepresentable {
     let session: AVCaptureSession
+    let onAttached: () -> Void
     let onTap: (CGPoint) -> Void
     let onLongPress: (CGPoint) -> Void
     func makeUIView(context: Context) -> PreviewUIView {
@@ -11,6 +12,7 @@ private struct Preview: UIViewRepresentable {
         view.previewLayer.videoGravity = .resizeAspectFill
         view.onTap = onTap
         view.onLongPress = onLongPress
+        onAttached()
         return view
     }
     func updateUIView(_ view: PreviewUIView, context: Context) {
@@ -123,6 +125,7 @@ struct CameraView: View {
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
     @State private var showingMedia = false
+    @State private var showingWBPresets = false
     @State private var shutterValue = 1.0 / 120.0
     @State private var shutterMaxValue = 1.0 / 200.0
     @State private var shutterAngleValue = 180.0
@@ -149,7 +152,7 @@ struct CameraView: View {
 
     var body: some View {
         ZStack {
-            Preview(session: camera.session, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
+            Preview(session: camera.session, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
                 .ignoresSafeArea()
             if showCompositionGrid {
                 CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
@@ -189,6 +192,7 @@ struct CameraView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showingSettings) { SettingsView().environmentObject(camera) }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
+        .sheet(isPresented: $showingWBPresets) { whiteBalancePresets }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
             if camera.storageSetupRequired {
                 Button(t("设置存储", "Set up storage")) {
@@ -248,9 +252,15 @@ struct CameraView: View {
                             storageLocation == "专用视频存储" ? "PVS" : t("本机", "LOCAL"),
                             healthy: storageLocation == "外部 SSD" ? camera.externalStorageConnected :
                                 storageLocation == "专用视频存储" ?
-                                    (ProVideoStorageBridge.isSupported() && ProVideoStorageBridge.remainingCapacity() > 0) : true)
+                                    (camera.checkedStorageLocation == storageLocation
+                                        ? (camera.availableStorageBytes ?? 0) > 0 : nil) : true)
                 statusBadge(camera.telemetryEmbeddable ? "IMU" : "!IMU",
                             healthy: camera.imuAvailable && camera.telemetryEmbeddable)
+            }
+            if let bytes = camera.availableStorageBytes, let seconds = camera.estimatedRecordingSeconds {
+                Text(String(format: t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
+                            Double(bytes) / 1_000_000_000, Int(seconds / 60)))
+                    .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
             }
             Text(specification)
                 .font(.system(size: 13, weight: .medium))
@@ -292,12 +302,14 @@ struct CameraView: View {
         .background(LinearGradient(colors: [.black.opacity(0.58), .black.opacity(0.28), .clear], startPoint: .top, endPoint: .bottom))
     }
 
-    private func statusBadge(_ text: String, healthy: Bool) -> some View {
-        Text(text + (healthy ? " ✓" : " !"))
+    private func statusBadge(_ text: String, healthy: Bool?) -> some View {
+        let color: Color = healthy.map { $0 ? .green : .red } ?? .gray
+        return Text(text + (healthy.map { $0 ? " ✓" : " !" } ?? " …"))
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(healthy ? .green : .red)
+            .foregroundStyle(color)
             .padding(.horizontal, 5).padding(.vertical, 3)
-            .overlay(RoundedRectangle(cornerRadius: 5).stroke(healthy ? .green : .red, lineWidth: 0.8))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(color, lineWidth: 0.8))
+            .accessibilityLabel(healthy == nil ? text + " · " + t("检测中", "Checking") : text)
     }
 
     private var specification: String {
@@ -333,6 +345,46 @@ struct CameraView: View {
         }
     }
 
+    private var whiteBalancePresets: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(Array(zip(["日光", "阴影", "多云", "钨丝灯", "荧光灯", "闪光灯"],
+                                      [5600, 7000, 6500, 3200, 4000, 5500])), id: \.0) { name, kelvin in
+                        Button {
+                            wbValue = Double(kelvin)
+                            camera.setWhiteBalance(kelvin: Float(kelvin))
+                            showingWBPresets = false
+                            dismissPanelAfterAdjustment()
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(t(name, ["日光": "Daylight", "阴影": "Shade", "多云": "Cloudy", "钨丝灯": "Tungsten", "荧光灯": "Fluorescent", "闪光灯": "Flash"][name] ?? name))
+                                    .font(.headline)
+                                Text("\(kelvin)K").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 76)
+                            .background(accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(accent.opacity(0.45)))
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("wb.preset.\(kelvin)")
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(t("白平衡预设", "White balance presets"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(t("取消", "Cancel")) { showingWBPresets = false }
+                }
+            }
+        }
+        .presentationDetents([.height(380), .large])
+        .presentationDragIndicator(.visible)
+    }
+
     private func parameterPanel(_ parameter: Parameter) -> some View {
         VStack(spacing: 5) {
             Capsule().fill(.white.opacity(0.35)).frame(width: 44, height: 4)
@@ -347,6 +399,30 @@ struct CameraView: View {
                         .font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
                 }
                 Spacer()
+                if parameter == .wb {
+                    Button {
+                        panelDismissID = UUID() // Keep the controls alive while choosing a preset.
+                        showingWBPresets = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sun.max.fill").foregroundStyle(accent)
+                            Text(t("预设", "Presets"))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.75))
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 44)
+                        .background(accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(accent.opacity(0.6), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .accessibilityLabel(t("白平衡预设", "White balance presets"))
+                    .accessibilityHint(t("选择日光、阴影等六种预设", "Choose from six lighting presets"))
+                    .accessibilityIdentifier("wb.presets")
+                }
                 if parameter != .lens { modePicker(parameter) }
             }
             Group {

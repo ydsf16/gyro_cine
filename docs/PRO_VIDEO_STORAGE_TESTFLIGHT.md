@@ -109,3 +109,31 @@ Device: iPhone 18 Pro Max / iOS 27.0.1. Added DEBUG automation flag `--writer-op
 Encoder preparation reported 1/1/3/3 late frames before movie start, separately excluded from capture drops. Peak writer queue depth 1. HQ60 MOV indexed video duration 10.066667s, aprh video + AAC audio + 604 gyrf packets. RAW30 Sony K maximum alignment 0.851ms; HQ30 protobuf K 0.851ms. No K fallback used by these successful native-metadata checks. Final screenshot shows 4224×3024/60fps, green PVS/IMU, normal preview and no alert.
 
 Evidence: `artifacts/prostorage-20261016/opengate/`. Original MOVs remain on phone. Short functional tests only: long recording, optical sync/stabilized export, AF near/far and gravity-driven physical rotation remain unverified. No commit/push.
+
+
+### Naming, white balance presets and storage safety (2026-10-16)
+- Manual RAW Writer recordings now share the existing collision-safe IMG_####.mov allocator. Explicit automated captures keep UITEST_ names. Real test wrote IMG_0003.mov (152 frames, IMU finalized).
+- WB menu: Daylight 5600K, Shade 7000K, Cloudy 6500K, Tungsten 3200K, Fluorescent 4000K, Flash 5500K. All use manual temperature, tint 0, clamped device gains; approximate presets, not measured illuminant calibration. Menu compiled; physical UI selection for all six not yet exercised.
+- HUD displays free destination bytes and conservative estimated minutes, refreshed every 2 seconds. Format/FPS-dependent budget uses 8 bits/pixel for HQ, 6 RAW, 0.5 other, plus audio/metadata allowance; actual variable bitrate can differ. This is not a guaranteed recording duration.
+- Reserve max(1GB, 5 seconds estimated bitrate), require 10 additional seconds before start, plus ordinary local space for logs. MovieFileOutput has minFreeDiskSpaceLimit; both capture routes monitor storage and stop once below reserve. No intentionally filling the device.
+- Injected DEBUG low-space startup rejected recording. Injected low space after start stopped at 125 frames, zero capture drops, successful IMU finalization. Test harness delayed stop now cannot restart an already completed recording.
+- In-place installation validation: all 13 pre-existing Media files remained with identical names/sizes (not a full content-hash comparison). Production bundle ID unchanged. No evidence that this update deleted media; uninstall/reinstall is not a preservation workflow.
+- User-authorized cleanup removed 12 UITEST_ movies (13,548,993,370 bytes) and matching sidecars; preserved IMG_0001, IMG_0002, IMG_0003. Explicit DEBUG cleanup flag only; never automatic on ordinary update/start. Replenished system Pro Video Storage successfully to 150,000,001,024 bytes, then relaunched without cleanup/test flags.
+- Debug and Release build succeeded. SSD capacity behavior and actual physical disk exhaustion remain untested.
+
+- Final ordinary-launch screenshot exposed a RAW WB-ready timeout at default 0.5x; this remains unresolved and is not a passing all-lens test. Restored active session to tested 1x Open Gate and recorded IMG_0004.mov: 152 frames, zero recording drops, audio/IMU finalized. This short verification clip was created after cleanup; user IMG_0001–0004 remain. Do not claim next ordinary 0.5x launch is fixed.
+
+
+### HUD, 10-frame buffering and ultra-wide WB recovery (2026-10-16)
+- Free GB / estimated time moved directly below timecode row, above video specification. Final device screenshot verified.
+- User deferred uninstall-persistent storage; no copies, cloud destinations, or bundle-ID changes added. Continue in-place upgrades with Media untouched.
+- RAW Writer pending-video queue limit 10. Injected blocked video input reached exactly 10 queued frames; the next incoming frame triggered `raw_writer_buffer_overflow`. Preserved partial 5-frame MOV, reported encoding/storage throughput error; not accepted as a complete recording. Clarifies backlog does not uniquely diagnose a disk fault. Fixed matching `.mov.pending-imu.json` sidecar deletion when deleting a recording.
+- Prior 0.5x failure log had 447 video / 650 audio packets but no lock completion. Preview now retries the lock at 12-frame intervals, at most 3 attempts, using explicit current gains after first sentinel request. Readiness still requires an actual system completion; no timeout-based success. Exhausted timeout detaches failed preview so a subsequent REC can prepare again. This exhaustion-retry branch was not separately fault-injected.
+- Forced first-completion loss: attempt 2 returned effective time, ultra-wide RAW 30fps captured 152 frames with AAC/IMU finalization, zero recording drops. Lens switches during the same run also recovered through attempt 2.
+- Three subsequent ordinary launches (no injected failure): all ready. Attempts 2, 1, 3 respectively; actual intermittent missing callback recovered. Final screenshot 0.5x RAW 4224×3024/60, locked WB, no alert. This establishes bounded recovery evidence, not elimination of the OS callback defect or long-run guarantees.
+- Deleted the two scoped fault-test clips and their sidecars after saving logs. IMG_0001–0004 retained; replenished PVS to 150GB. Final launch has no fault/cleanup arguments. Debug build PASS; diff check PASS.
+Evidence: `artifacts/prostorage-20261016/wb-buffer/`.
+
+### 2026-10-16 WB/readiness and responsiveness follow-up
+
+The RAW experiment now supports a separately logged stable locked-gain readback when three WB completion requests do not return: eight live frames with matching current in-use gains, locked/non-adjusting state, and increasing PTS. The exact completion timestamp is not fabricated. Failure invalidates the preview for the next attempt. See `RAW_HQ_THREAD_REVIEW_2026-10-16.md` for the HQ matrix, fault injection, queue changes and remaining isolated capture drop risk. This remains a DEBUG experiment.

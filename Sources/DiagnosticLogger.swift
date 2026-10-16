@@ -58,14 +58,16 @@ final class DiagnosticLogger {
     private var sessionHandle: FileHandle?
 
     init() {
-        do { try RecordingStoragePaths.prepare() }
-        catch { NSLog("GyroCine diagnostic migration: %@", String(describing: error)) }
         let directory = RecordingStoragePaths.diagnosticDirectory
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         sessionURL = directory.appendingPathComponent("focus-\(sessionID).jsonl")
         capabilityURL = directory.appendingPathComponent("capabilities-\(sessionID).json")
-        FileManager.default.createFile(atPath: sessionURL.path, contents: nil)
-        sessionHandle = try? FileHandle(forWritingTo: sessionURL)
+        // Queued before every subsequent log write; migration never blocks SwiftUI init.
+        queue.async {
+            do { try RecordingStoragePaths.prepare() }
+            catch { NSLog("GyroCine diagnostic migration: %@", String(describing: error)) }
+            FileManager.default.createFile(atPath: self.sessionURL.path, contents: nil)
+            self.sessionHandle = try? FileHandle(forWritingTo: self.sessionURL)
+        }
     }
 
     func event(_ type: String, _ data: [String: Any] = [:]) {
@@ -91,6 +93,8 @@ final class DiagnosticLogger {
             try? data.write(to: capabilityURL, options: .atomic)
         }
     }
+
+    func whenReady(_ completion: @escaping () -> Void) { queue.async(execute: completion) }
 
     func flush(_ completion: @escaping () -> Void) {
         queue.async { [self] in
