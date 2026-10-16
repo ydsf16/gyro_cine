@@ -10,7 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
     NS_SWIFT_NAME(whiteBalanceTemperature(for:error:));
 @end
 
-/// Runtime adapter for iOS 27 Pro Video Storage while building with the iOS 26 SDK.
+/// Typed iOS 27 Pro Video Storage API with availability guards for older iOS.
 @interface ProVideoStorageBridge : NSObject
 + (BOOL)isSupported;
 + (BOOL)isBusy;

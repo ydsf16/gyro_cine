@@ -41,82 +41,73 @@
 
 @implementation ProVideoStorageBridge
 
-+ (id)sharedStorage {
-    Class storageClass = NSClassFromString(@"AVProVideoStorage");
-    SEL supported = NSSelectorFromString(@"isSupported");
-    SEL shared = NSSelectorFromString(@"sharedStorage");
-    if (!storageClass || ![storageClass respondsToSelector:supported] ||
-        ![storageClass respondsToSelector:shared]) return nil;
-    BOOL (*supports)(id, SEL) = (void *)[storageClass methodForSelector:supported];
-    if (!supports(storageClass, supported)) return nil;
-    id (*getShared)(id, SEL) = (void *)[storageClass methodForSelector:shared];
-    return getShared(storageClass, shared);
++ (BOOL)isSupported {
+    if (@available(iOS 27.0, *)) {
+        return AVProVideoStorage.isSupported && AVProVideoStorage.sharedStorage != nil;
+    }
+    return NO;
 }
 
-+ (BOOL)isSupported { return [self sharedStorage] != nil; }
-
 + (BOOL)isBusy {
-    id storage = [self sharedStorage];
-    SEL selector = NSSelectorFromString(@"busyReasons");
-    if (!storage || ![storage respondsToSelector:selector]) return YES;
-    id (*getReasons)(id, SEL) = (void *)[storage methodForSelector:selector];
-    return [getReasons(storage, selector) count] != 0;
+    if (@available(iOS 27.0, *)) {
+        AVProVideoStorage *storage = AVProVideoStorage.sharedStorage;
+        return storage == nil || storage.busyReasons.count != 0;
+    }
+    return YES;
 }
 
 + (int64_t)remainingCapacity {
-    id storage = [self sharedStorage];
-    SEL selector = NSSelectorFromString(@"remainingCapacity");
-    if (!storage || ![storage respondsToSelector:selector]) return 0;
-    NSInteger (*getCapacity)(id, SEL) = (void *)[storage methodForSelector:selector];
-    return getCapacity(storage, selector);
+    if (@available(iOS 27.0, *)) {
+        return AVProVideoStorage.sharedStorage.remainingCapacity;
+    }
+    return 0;
 }
 
 + (BOOL)isOutputSupported:(AVCaptureMovieFileOutput *)output {
-    SEL selector = NSSelectorFromString(@"isProVideoStorageSupported");
-    if (![self isSupported] || ![output respondsToSelector:selector]) return NO;
-    BOOL (*supports)(id, SEL) = (void *)[output methodForSelector:selector];
-    return supports(output, selector);
+    if (@available(iOS 27.0, *)) {
+        return [self isSupported] && output.isProVideoStorageSupported;
+    }
+    return NO;
 }
 
 + (NSDictionary<NSString *, id> *)diagnosticsForOutput:(AVCaptureMovieFileOutput *)output {
-    SEL getter = NSSelectorFromString(@"usesProVideoStorage");
     BOOL enabled = NO;
-    if ([output respondsToSelector:getter]) {
-        BOOL (*getEnabled)(id, SEL) = (void *)[output methodForSelector:getter];
-        enabled = getEnabled(output, getter);
+    NSArray *busyReasons = @[];
+    NSInteger initialCapacity = 0;
+    if (@available(iOS 27.0, *)) {
+        enabled = output.usesProVideoStorage;
+        AVProVideoStorage *storage = AVProVideoStorage.sharedStorage;
+        busyReasons = storage.busyReasons.allObjects ?: @[];
+        initialCapacity = storage.initialCapacity;
     }
-    return @{@"deviceSupported": @([self isSupported]),
+    return @{@"apiBinding": @"native-sdk27",
+             @"deviceSupported": @([self isSupported]),
              @"outputSupported": @([self isOutputSupported:output]),
-             @"outputSupportSelectorPresent": @([output respondsToSelector:NSSelectorFromString(@"isProVideoStorageSupported")]),
-             @"outputSetterPresent": @([output respondsToSelector:NSSelectorFromString(@"setUsesProVideoStorage:")]),
              @"usesProVideoStorage": @(enabled),
+             @"initialBytes": @(initialCapacity),
              @"remainingBytes": @([self remainingCapacity]),
+             @"busyReasons": busyReasons,
              @"busy": @([self isBusy])};
 }
 
 + (NSString *)configureOutput:(AVCaptureMovieFileOutput *)output enabled:(BOOL)enabled {
-    SEL selector = NSSelectorFromString(@"setUsesProVideoStorage:");
-    if (![output respondsToSelector:selector]) {
-        return enabled ? @"当前系统不支持专用视频存储" : nil;
+    if (@available(iOS 27.0, *)) {
+        if (enabled && ![self isOutputSupported:output]) {
+            return @"当前镜头、编码或分辨率不支持专用视频存储";
+        }
+        @try {
+            output.usesProVideoStorage = enabled;
+            return nil;
+        } @catch (NSException *exception) {
+            return [NSString stringWithFormat:@"专用视频存储配置失败：%@", exception.reason ?: exception.name];
+        }
     }
-    if (enabled && ![self isOutputSupported:output]) {
-        return @"当前镜头、编码或分辨率不支持专用视频存储";
-    }
-    @try {
-        void (*setEnabled)(id, SEL, BOOL) = (void *)[output methodForSelector:selector];
-        setEnabled(output, selector, enabled);
-        return nil;
-    } @catch (NSException *exception) {
-        return [NSString stringWithFormat:@"专用视频存储配置失败：%@", exception.reason ?: exception.name];
-    }
+    return enabled ? @"当前系统不支持专用视频存储" : nil;
 }
 
 + (void)openSettings {
-    id storage = [self sharedStorage];
-    SEL selector = NSSelectorFromString(@"openSettings");
-    if (storage && [storage respondsToSelector:selector]) {
-        void (*open)(id, SEL) = (void *)[storage methodForSelector:selector];
-        open(storage, selector);
+    if (@available(iOS 27.0, *)) {
+        [AVProVideoStorage.sharedStorage openSettings];
     }
 }
 

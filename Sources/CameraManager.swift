@@ -103,16 +103,50 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var failedPendingSignatures: [String: String] = [:]
     private var captureFinishing = false // Camera queue only.
     private var movieFirstFrameHost: Double?
+    private var recordingTimeSource: String?
+    private var nativeRAWKSupport: [String: Bool] = [:]
+    private var nativeRAWKKey: String { "\(device?.uniqueID ?? ""):\(chosenIndex ?? -1)" }
+    private var currentTelemetrySupport: Bool {
+        if usesRAWWriterExperiment { return nativeRAWKSupport[nativeRAWKKey] ?? false }
+        return intrinsicOutput.connection(with: .video)?.isCameraIntrinsicMatrixDeliveryEnabled ?? false
+    }
+    private var usesRAWWriterExperiment: Bool {
+        #if DEBUG
+        if #available(iOS 27.0, *) {
+            return (ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-experiment") ||
+                    UserDefaults.standard.bool(forKey: "debug.rawInternalWriterExperiment")) &&
+                ["aprn", "aprh"].contains(chosenCodec?.rawValue ?? "") &&
+                UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储"
+        }
+        #endif
+        return false
+    }
+    private var isRAWWriterActive: Bool {
+        #if DEBUG
+        return rawWriterExperiment != nil
+        #else
+        return false
+        #endif
+    }
     private var recordingLens = ""
     private var audioReady = false
     private var telemetryReadoutTick = 0
     #if DEBUG
     private var rawSmokeMovieName: String?
+    private var rawWriterExperiment: AnyObject?
+    private var rawWriterPreview: AnyObject?
+    private var rawWriterStartRequested = false
+    private var rawWriterSmokeCompleted = 0
     #endif
 
     override init() {
         super.init()
         CaptureDefaults.restoreIfNeeded()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-experiment") {
+            UserDefaults.standard.set(true, forKey: "debug.rawInternalWriterExperiment")
+        }
+        #endif
         gravityMonitor.start()
         logger.event("app_launch", ["model": Self.hardwareModel(), "systemName": UIDevice.current.systemName,
                                     "systemVersion": UIDevice.current.systemVersion])
@@ -318,10 +352,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         return "\(camera.uniqueID)|\(codec.rawValue)|\(index)|\(chosenFPS)"
     }
     private func scheduleRAWPipelinePreparation() {
+        guard !usesRAWWriterExperiment else {
+            rawPreparedSignature = nil
+            #if DEBUG
+            if #available(iOS 27.0, *) { queue.async { self.prepareRAWWriterPreview() } }
+            #endif
+            return
+        }
         guard currentRAWSignature != nil else { rawPreparedSignature = nil; return }
         rawPreparedSignature = nil
         queue.async {
-            guard self.session.isRunning, !self.output.isRecording,
+            guard !self.usesRAWWriterExperiment, self.session.isRunning, !self.output.isRecording,
                   let signature = self.currentRAWSignature,
                   self.rawPreparedSignature != signature else { return }
             do { try self.prepareRAWRecordingPipeline() }
@@ -380,6 +421,33 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if self.output.isRecording { self.toggleRecording() }
             else { self.logger.event("raw_smoke_failed", ["reason": "MovieFileOutput never entered recording state"]) }
         }
+    }
+
+    // Debug-only support probe. Relaunch normally to restore the production session.
+    private func runProStorageSupportProbe() {
+        guard !output.isRecording else { return }
+        logProVideoStorage("probe_full_session")
+        session.stopRunning()
+        session.beginConfiguration()
+        session.removeOutput(intrinsicOutput)
+        session.commitConfiguration()
+        logProVideoStorage("probe_without_intrinsics_stopped")
+        session.startRunning()
+        logProVideoStorage("probe_without_intrinsics_running")
+        session.stopRunning()
+        session.beginConfiguration()
+        for input in session.inputs {
+            if let deviceInput = input as? AVCaptureDeviceInput,
+               deviceInput.device.hasMediaType(.audio) { session.removeInput(input) }
+        }
+        session.commitConfiguration()
+        session.startRunning()
+        logProVideoStorage("probe_movie_only_running")
+        if let connection = output.connection(with: .video) {
+            output.setOutputSettings([AVVideoCodecKey: "aprn"], for: connection)
+            logProVideoStorage("probe_raw_codec_only_settings")
+        }
+        publish { self.cameraReady = false; self.status = "Storage probe complete; relaunch app" }
     }
 
     private func runHEVCCadenceSmoke() {
@@ -585,13 +653,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             discoverCapabilities(camera)
             startSampling(camera)
             session.startRunning()
-            let telemetryEmbeddable = intrinsicOutput.connection(with: .video)?
-                .isCameraIntrinsicMatrixDeliveryEnabled ?? false
+            let telemetryEmbeddable = currentTelemetrySupport
             publish {
                 self.status = "Camera ready"; self.cameraReady = self.session.isRunning
                 self.telemetryEmbeddable = telemetryEmbeddable
             }
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") { runRAWWriterIntegratedSmoke() }
+            if ProcessInfo.processInfo.arguments.contains("--pro-storage-support-probe") { runProStorageSupportProbe() }
             if ProcessInfo.processInfo.arguments.contains("--raw-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke") ||
@@ -645,6 +714,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             do {
                 let newInput = try AVCaptureDeviceInput(device: next)
                 self.session.beginConfiguration()
+                self.restoreRAWPreviewForConfiguration()
                 self.session.removeInput(oldInput)
                 guard self.session.canAddInput(newInput) else {
                     self.session.addInput(oldInput)
@@ -852,6 +922,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         do {
             session.beginConfiguration()
             defer { session.commitConfiguration() }
+            restoreRAWPreviewForConfiguration()
+            // RAW Writer reads K from the same RAW samples. A second full-raster
+            // data output exceeds the device's resource budget at 120 fps.
+            if usesRAWWriterExperiment {
+                if session.outputs.contains(intrinsicOutput) { session.removeOutput(intrinsicOutput) }
+            } else if !session.outputs.contains(intrinsicOutput), session.canAddOutput(intrinsicOutput) {
+                session.addOutput(intrinsicOutput)
+            }
             logProVideoStorage("format_before_sensor_change")
             try camera.lockForConfiguration()
             camera.activeFormat = info.format
@@ -880,8 +958,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             logger.event("configuration_result", ["kind": reason, "success": true, "after": configurationSnapshot()])
             scheduleRAWPipelinePreparation()
-            let telemetryEmbeddable = intrinsicOutput.connection(with: .video)?
-                .isCameraIntrinsicMatrixDeliveryEnabled ?? false
+            let telemetryEmbeddable = currentTelemetrySupport
             publish {
                 self.selectedCodec = codec; self.selectedEncoding = self.chosenEncoding
                 self.selectedFormatIndex = index; self.fps = targetFPS
@@ -996,6 +1073,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 if !self.applyFormat(alternate.index, reason: "fps_change") {
                     self.chosenFPS = previousFPS
                 }
+                return
+            }
+            if self.usesRAWWriterExperiment {
+                let previous = self.chosenFPS
+                self.chosenFPS = value
+                if !self.applyFormat(index, reason: "fps_change") { self.chosenFPS = previous }
                 return
             }
             let before = self.configurationSnapshot()
@@ -1281,7 +1364,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     func setWhiteBalanceAuto(_ enabled: Bool) {
         queue.async {
             guard let camera = self.device else { return }
-            if enabled && self.output.isRecording &&
+            if enabled && (self.output.isRecording || self.usesRAWWriterExperiment) &&
                 (self.chosenCodec?.rawValue == "aprn" || self.chosenCodec?.rawValue == "aprh") {
                 self.fail("RAW 录制期间白平衡需要保持锁定")
                 return
@@ -1367,8 +1450,163 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    private func restoreRAWPreviewForConfiguration() {
+        #if DEBUG
+        if #available(iOS 27.0, *), let preview = rawWriterPreview as? RAWWriterPreview {
+            preview.invalidate()
+            if session.outputs.contains(preview.dataOutput) { session.removeOutput(preview.dataOutput) }
+            if session.outputs.contains(preview.audioOutput) { session.removeOutput(preview.audioOutput) }
+            if !session.outputs.contains(output), session.canAddOutput(output) { session.addOutput(output) }
+            rawWriterPreview = nil
+        }
+        #endif
+    }
+
+    #if DEBUG
+    @available(iOS 27.0, *)
+    private func prepareRAWWriterPreview() {
+        guard usesRAWWriterExperiment, rawWriterPreview == nil, rawWriterExperiment == nil,
+              let camera = device else { return }
+        let preview = RAWWriterPreview(camera: camera, queue: queue,
+            log: { [weak self] name, details in self?.logger.event(name, details) },
+            completion: { [weak self] error in
+                guard let self else { return }
+                if let error {
+                    self.recordingStarting = false; self.rawWriterStartRequested = false
+                    self.fail(error.localizedDescription); return
+                }
+                self.publish { self.whiteBalanceAuto = false; self.status = "Camera ready"; self.cameraReady = true }
+                if self.rawWriterStartRequested {
+                    self.rawWriterStartRequested = false; self.recordingStarting = false
+                    self.startRAWWriterExperiment()
+                }
+            })
+        rawWriterPreview = preview
+        session.stopRunning()
+        session.beginConfiguration()
+        if session.outputs.contains(output) { session.removeOutput(output) }
+        if session.outputs.contains(intrinsicOutput) { session.removeOutput(intrinsicOutput) }
+        guard session.canAddOutput(preview.dataOutput) else {
+            session.addOutput(output); session.commitConfiguration(); session.startRunning()
+            rawWriterPreview = nil; fail("无法准备 RAW 输出"); return
+        }
+        session.addOutput(preview.dataOutput)
+        guard session.canAddOutput(preview.audioOutput) else {
+            session.removeOutput(preview.dataOutput); session.addOutput(output)
+            session.commitConfiguration(); session.startRunning()
+            rawWriterPreview = nil; fail("无法准备音频输出"); return
+        }
+        session.addOutput(preview.audioOutput)
+        preview.configure()
+        let supportsK = preview.dataOutput.connection(with: .video)?.isCameraIntrinsicMatrixDeliveryEnabled ?? false
+        nativeRAWKSupport[nativeRAWKKey] = supportsK
+        publish { self.telemetryEmbeddable = supportsK; self.status = "正在准备 RAW 预览" }
+        session.commitConfiguration()
+        session.startRunning()
+    }
+
+    private func runRAWWriterIntegratedSmoke() {
+        if let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }),
+           device?.uniqueID != wide.uniqueID {
+            chooseLens(wide.uniqueID)
+            queue.asyncAfter(deadline: .now() + 2) { self.runRAWWriterIntegratedSmoke() }
+            return
+        }
+        let encoding: VideoEncoding = ProcessInfo.processInfo.arguments.contains("--writer-hq") ? .proResRAWHQ : .proResRAW
+        let rate: Double = ProcessInfo.processInfo.arguments.contains("--writer-120") ? 120 :
+            ProcessInfo.processInfo.arguments.contains("--writer-60") ? 60 : 30
+        let height = ProcessInfo.processInfo.arguments.contains("--writer-opengate") ? 3024 : 2240
+        guard let format = formatObjects.first(where: {
+            $0.width == 4224 && $0.height == height && $0.supports(rate) && $0.compatibleCodecs.contains(encoding.codec.rawValue)
+        }) else { logger.event("raw_writer_no_format"); return }
+        chosenEncoding = encoding; chosenCodec = encoding.codec; chosenFPS = rate
+        UserDefaults.standard.set("专用视频存储", forKey: "storageLocation")
+        guard applyFormat(format.index, reason: "raw_writer_experiment") else { return }
+        UserDefaults.standard.set("专用视频存储", forKey: "storageLocation")
+        UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--writer-proto") ? "GyroflowProto" : "SonyMov", forKey: "outputFormat")
+        toggleRecording()
+    }
+
+    @available(iOS 27.0, *)
+    private func startRAWWriterExperiment() {
+        guard !recordingStarting, !captureFinishing, !output.isRecording,
+              let camera = device, let codec = chosenCodec else { return }
+        guard ProVideoStorageBridge.isSupported(), ProVideoStorageBridge.remainingCapacity() > 0,
+              !ProVideoStorageBridge.isBusy() else { failStorage("请先配置可用的专用视频存储"); return }
+        guard audioReady else { fail("录制需要麦克风权限"); return }
+        guard let preview = rawWriterPreview as? RAWWriterPreview, preview.ready else {
+            rawWriterStartRequested = true; recordingStarting = true
+            publish { self.status = "等待 RAW 预览就绪" }
+            prepareRAWWriterPreview()
+            return
+        }
+        let url = RecordingStoragePaths.movieDirectory.appendingPathComponent("UITEST_IMG_writer_\(UUID().uuidString).mov")
+        let directory = logger.sessionURL.deletingLastPathComponent()
+        let base = url.deletingPathExtension().lastPathComponent
+        let imu = IMURecorder()
+        do { try imu.start(at: directory.appendingPathComponent(base + ".imu_raw.jsonl")) }
+        catch { fail("IMU 启动失败：\(error.localizedDescription)"); return }
+        imuRecorder = imu
+        intrinsicURL = directory.appendingPathComponent(base + ".camera_frames.jsonl")
+        intrinsicsUnavailableReason = nil
+        movieFirstFrameHost = nil
+        recordingLens = camera.localizedName
+        recordingOrientation = gravityMonitor.snapshot().orientation
+        if ProcessInfo.processInfo.arguments.contains("--writer-portrait") { recordingOrientation = .portrait }
+        if ProcessInfo.processInfo.arguments.contains("--writer-landscape") { recordingOrientation = .landscapeRight }
+        currentFile = url
+        recordingTimeSource = "MOV first frame PTS mapped from VideoDataOutput source sample; optical sync unverified"
+        recordingStarting = true
+        captureFinishing = true // Block lens/spec changes for the entire experimental capture.
+        publish { self.status = "准备 RAW 内录" }
+        let experiment = RAWInternalWriterExperiment(camera: camera, codec: codec, url: url, queue: queue,
+            preview: preview, orientation: recordingOrientation,
+            imuReady: {
+                guard let gyro = imu.firstGyroTime, let accel = imu.firstAccelTime else { return false }
+                return ProcessInfo.processInfo.systemUptime - max(gyro, accel) >= 0.07
+            }, metadata: { [weak self] sample in
+                guard let self else { return }
+                self.intrinsicRecorder.recordNativeMetadata(sample, clock: self.session.synchronizationClock, camera: camera)
+            }, log: { [weak self] name, details in self?.logger.event(name, details) },
+            started: { [weak self] pts in
+                guard let self else { return }
+                self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
+                if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") {
+                    let duration: Double = ProcessInfo.processInfo.arguments.contains("--writer-short") ? 5 : 10
+                    self.queue.asyncAfter(deadline: .now() + duration) { self.toggleRecording() }
+                }
+            }, finished: { [weak self] error in
+                guard let self else { return }
+                // Flush only metadata from frames actually delivered to this recorder.
+                // Do not mix in restored preview/K callbacks after recording.
+                do { try self.intrinsicRecorder.stop() }
+                catch { self.logger.event("raw_writer_k_stop_error", ["error": String(describing: error)]) }
+                preview.resume()
+                self.rawWriterExperiment = nil
+                self.recordingStarting = false
+                self.fileOutput(self.output, didFinishRecordingTo: url, from: [], error: error)
+            })
+        rawWriterExperiment = experiment
+        do { try intrinsicRecorder.start(at: intrinsicURL!, clock: session.synchronizationClock, camera: camera) }
+        catch { experiment.stop(); fail("内参记录启动失败：\(error.localizedDescription)"); return }
+        experiment.arm()
+    }
+    #endif
+
     func toggleRecording() {
         queue.async {
+            #if DEBUG
+            if #available(iOS 27.0, *), let experiment = self.rawWriterExperiment as? RAWInternalWriterExperiment {
+                self.publish { self.finalizing = true }
+                experiment.stop()
+                return
+            }
+            if #available(iOS 27.0, *),
+               self.usesRAWWriterExperiment {
+                self.startRAWWriterExperiment()
+                return
+            }
+            #endif
             if self.output.isRecording {
                 self.logger.event("record_stop_request", ["state": self.configurationSnapshot()])
                 self.publish { self.finalizing = true }
@@ -1496,6 +1734,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             #endif
             self.currentFile = url
+            self.recordingTimeSource = nil
             let imu = IMURecorder()
             let imuURL = directory.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".imu_raw.jsonl")
             do { try imu.start(at: imuURL) }
@@ -1615,11 +1854,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 framesName: frames.lastPathComponent, firstHost: firstHost, orientation: self.recordingOrientation,
                 camera: Self.hardwareModel(), lens: self.recordingLens,
                 mode: UserDefaults.standard.string(forKey: "outputFormat") == "GyroflowProto" ? "GyroflowProto" : "SonyMov",
-                retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled"),
+                retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled") || self.isRAWWriterActive,
                 externalMovieBookmark: self.activeExternalMovieBookmark,
                 expectedVideoCodec: self.chosenCodec?.rawValue,
                 expectedFPS: self.chosenFPS,
-                intrinsicsUnavailableReason: self.intrinsicsUnavailableReason)
+                intrinsicsUnavailableReason: self.intrinsicsUnavailableReason,
+                timingSource: self.recordingTimeSource)
             do {
                 try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                 self.pendingRecordingJob = job
@@ -1645,6 +1885,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         recordingSetupFailure = reason
         logger.event("record_setup_failed", ["reason": reason, "state": configurationSnapshot()])
         publish { self.finalizing = true; self.recording = false; self.recordingStartedAt = nil }
+        #if DEBUG
+        if #available(iOS 27.0, *), let experiment = rawWriterExperiment as? RAWInternalWriterExperiment {
+            experiment.stop(); return
+        }
+        #endif
         if let exception = RecordingExceptionCatcher.exceptionMessage(for: { self.output.stopRecording() }) {
             logger.event("record_setup_stop_exception", ["reason": exception])
             try? intrinsicRecorder.stop()
@@ -1710,6 +1955,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 logger.event("imu_finalize_total", ["movie": job.movieName,
                     "seconds": ProcessInfo.processInfo.systemUptime - finalizationStart])
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--writer-repeat"), job.movieName.hasPrefix("UITEST_IMG_writer_") {
+                    rawWriterSmokeCompleted += 1
+                    logger.event("raw_writer_repeat_complete", ["count": rawWriterSmokeCompleted])
+                    if rawWriterSmokeCompleted < 3 { queue.async { self.toggleRecording() } }
+                }
+                #endif
                 publish {
                     self.finalizing = false
                     self.status = job.recordingWarning != nil ? "SSD 中断 · 可读片段已保存" :
@@ -1900,6 +2152,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.logger.event("lifecycle", ["name": name.rawValue,
                                                     "error": note.userInfo?[AVCaptureSessionErrorKey].map { String(describing: $0) } ?? ""])
                     if (name == UIApplication.willResignActiveNotification || name == UIScene.willDeactivateNotification || name == UIApplication.didEnterBackgroundNotification || name == UIScene.didEnterBackgroundNotification), self.output.isRecording { self.output.stopRecording() }
+                    #if DEBUG
+                    if #available(iOS 27.0, *), let experiment = self.rawWriterExperiment as? RAWInternalWriterExperiment,
+                       [UIApplication.willResignActiveNotification, UIScene.willDeactivateNotification,
+                        UIApplication.didEnterBackgroundNotification, AVCaptureSession.wasInterruptedNotification,
+                        AVCaptureSession.runtimeErrorNotification].contains(name) {
+                        self.publish { self.finalizing = true }
+                        experiment.stop()
+                    }
+                    #endif
                     if name == UIApplication.willEnterForegroundNotification || name == AVCaptureSession.interruptionEndedNotification {
                         if !self.session.isRunning { self.session.startRunning() }
                         self.publish { self.status = self.session.isRunning ? "Camera ready" : "Camera interrupted"; self.cameraReady = self.session.isRunning }

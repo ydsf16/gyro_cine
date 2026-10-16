@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E286DED35A89FA3E11D2263 /* RAWInternalWriterExperiment.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */; };
 		0E9EA1990236C5739FDB98E6 /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */; };
 		1A88DD1D0C6671CDAE1BE79C /* MediaLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */; };
 		20707B6FFCEBBF8F913A3AF1 /* MOVTelemetryMuxer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */; };
@@ -79,6 +80,7 @@
 		DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
 		DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
+		E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWInternalWriterExperiment.swift; sourceTree = "<group>"; };
 		F685F1FA9AB76A1323DEE148 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -113,6 +115,7 @@
 				891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */,
 				2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */,
 				160B0A3208CA6FF8D6FE278F /* RAWFocusTest-Bridging-Header.h */,
+				E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */,
 				97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */,
 				8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */,
 				DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */,
@@ -293,6 +296,7 @@
 				20707B6FFCEBBF8F913A3AF1 /* MOVTelemetryMuxer.swift in Sources */,
 				1A88DD1D0C6671CDAE1BE79C /* MediaLibraryView.swift in Sources */,
 				8B7574C40EDE681D7840F8B1 /* MovingRuler.swift in Sources */,
+				0E286DED35A89FA3E11D2263 /* RAWInternalWriterExperiment.swift in Sources */,
 				993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */,
 				F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */,
 				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,

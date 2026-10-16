@@ -155,7 +155,7 @@ enum MovieIMUFinalizer {
     static func finalize(movie: URL, rawIMU: URL, firstFrameHost: Double,
                          cameraFrames: URL, orientation: RecordingOrientation,
                          camera: String, lens: String, mode: String, retainDebug: Bool,
-                         expectedFPS: Double? = nil,
+                         expectedFPS: Double? = nil, timingSource: String? = nil,
                          progress: ((String, Double) -> Void)? = nil) throws -> (Int, Double, Double) {
         var checkpoint = ProcessInfo.processInfo.systemUptime
         func completed(_ stage: String) {
@@ -235,7 +235,7 @@ enum MovieIMUFinalizer {
                 "distortion_coeffs": Array(repeating: 0.0, count: 8)]]
         let profileData = try JSONSerialization.data(withJSONObject: profile, options: [.sortedKeys])
         let note = try JSONSerialization.data(withJSONObject: ["source_camera": camera,
-            "transport": mode, "timing": "MOV first frame PTS mapped from MovieFileOutput startPTS; optical sync unverified",
+            "transport": mode, "timing": timingSource ?? "MOV first frame PTS mapped from MovieFileOutput startPTS; optical sync unverified",
             "pre_roll_ms": Int((actualPreRoll * 1000).rounded()),
             "post_roll_ms": Int((actualPostRoll * 1000).rounded()), "lens_profile": profile,
             "intrinsic_source": intrinsicSource, "intrinsic_frame_count": frameEvidence.count,
@@ -333,6 +333,7 @@ struct PendingIMUJob: Codable {
     var recordingFailure: String?
     var recordingWarning: String?
     var intrinsicsUnavailableReason: String?
+    var timingSource: String? = nil
 
     func url(in directory: URL) -> URL {
         directory.appendingPathComponent(movieName).appendingPathExtension("pending-imu.json")
@@ -400,7 +401,7 @@ struct PendingIMUJob: Codable {
                 rawIMU: directory.appendingPathComponent(imuName), firstFrameHost: firstHost,
                 cameraFrames: directory.appendingPathComponent(framesName), orientation: orientation,
                 camera: camera, lens: lens, mode: mode, retainDebug: true,
-                expectedFPS: expectedFPS, progress: progress)
+                expectedFPS: expectedFPS, timingSource: timingSource, progress: progress)
         }
         // The full compressed-video scan above is needed for frame PTS only once.
         // Verify the committed metadata sample index and original AV tracks

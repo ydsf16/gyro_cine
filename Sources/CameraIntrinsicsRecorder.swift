@@ -117,6 +117,31 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
         droppedReasons[label, default: 0] += 1
     }
 
+    /// Snapshot metadata synchronously, then write only value types off the RAW capture queue.
+    /// No pixel/sample buffer is retained by the metadata writer.
+    func recordNativeMetadata(_ sample: CMSampleBuffer, clock: CMClock?, camera: AVCaptureDevice) {
+        let snapshot = Result { () throws -> Frame in
+            guard let matrix = CaptureFrameEvidence.intrinsicMatrix(sample),
+                  let format = CMSampleBufferGetFormatDescription(sample) else {
+                throw RecorderError.unavailable("RAW 数据帧没有真实 K")
+            }
+            let size = CMVideoFormatDescriptionGetDimensions(format)
+            return Frame(hostTime: try ClockAligner.hostTime(CMSampleBufferGetPresentationTimeStamp(sample), clock: clock),
+                width: Int(size.width), height: Int(size.height), matrix: matrix,
+                exposure: camera.exposureDuration.seconds, iso: camera.iso)
+        }
+        queue.async {
+            guard let handle = self.handle else { return }
+            self.received += 1
+            do {
+                let frame = try snapshot.get()
+                if let previous = self.lastHost { self.maxGap = max(self.maxGap, frame.hostTime - previous) }
+                self.lastHost = frame.hostTime
+                try handle.write(contentsOf: JSONEncoder().encode(frame) + Data([10]))
+            } catch { self.failed += 1; self.failure = error }
+        }
+    }
+
     struct Alignment {
         let frames: [Frame]
         let interpolatedCount: Int
