@@ -1,0 +1,144 @@
+import AVFoundation
+import SwiftUI
+
+/// Immutable per-recording slate; metadata is set before either recorder starts.
+struct RecordingSlate: Codable, Equatable {
+    var production = ""
+    var camera = "A"
+    var director = ""
+    var cinematographer = ""
+    var reel = 1
+    var scene = 1
+    var take = 1
+    var autoTake = true
+    var environment = ""
+    var timeOfDay = ""
+
+    static func load(_ defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: "recordingSlate"),
+              let value = try? JSONDecoder().decode(Self.self, from: data) else { return Self() }
+        return value
+    }
+    func save(_ defaults: UserDefaults = .standard) {
+        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: "recordingSlate") }
+    }
+    var cameraID: String {
+        let letters = camera.uppercased().filter { $0.isASCII && $0.isLetter }
+        return String(letters.prefix(3)).isEmpty ? "A" : String(letters.prefix(3))
+    }
+    func filename(date: Date, clip: Int, timeZone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "MMddHHmm"
+        return String(format: "%@%03d_%@_C%03d.mov", cameraID, max(1, reel), formatter.string(from: date), max(1, clip))
+    }
+    func reserveURL(in directory: URL, date: Date = Date(), defaults: UserDefaults = .standard) -> URL {
+        var clip = max(1, defaults.integer(forKey: "slate.nextClip"))
+        var url = directory.appendingPathComponent(filename(date: date, clip: clip))
+        while FileManager.default.fileExists(atPath: url.path) {
+            clip += 1
+            url = directory.appendingPathComponent(filename(date: date, clip: clip))
+        }
+        defaults.set(clip + 1, forKey: "slate.nextClip")
+        return url
+    }
+    func advanceTake(_ defaults: UserDefaults = .standard) {
+        // Never overwrite edits made since this recording's snapshot.
+        guard autoTake, Self.load(defaults) == self else { return }
+        var next = self
+        next.take = min(take + 1, 999999)
+        next.save(defaults)
+    }
+    var metadata: [AVMetadataItem] {
+        let fields = ["com.apple.quicktime.title": production,
+                      "com.apple.quicktime.director": director,
+                      "com.apple.quicktime.camera.identifier": cameraID,
+                      "com.apple.quicktime.reel": String(reel),
+                      "com.apple.quicktime.scene": String(scene),
+                      "com.apple.quicktime.take": String(take),
+                      "com.tinygrape.gyrocine.cinematographer": cinematographer,
+                      "com.tinygrape.gyrocine.environment": environment,
+                      "com.tinygrape.gyrocine.timeOfDay": timeOfDay,
+                      "com.tinygrape.gyrocine.slate": String(data: (try? JSONEncoder().encode(self)) ?? Data(), encoding: .utf8) ?? ""]
+        return fields.filter { !$0.value.isEmpty }.sorted { $0.key < $1.key }.map { key, value in
+            let item = AVMutableMetadataItem()
+            item.keySpace = .quickTimeMetadata
+            item.key = key as NSString
+            item.value = value as NSString
+            item.dataType = kCMMetadataBaseDataType_UTF8 as String
+            return item
+        }
+    }
+}
+
+struct RecordingSlateView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var camera: CameraManager
+    @State private var slate = RecordingSlate.load()
+    @AppStorage("filenameType") private var filenameType = "BMC"
+    @AppStorage("storageLocation") private var storageLocation = "内部文件"
+    private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing }
+    private func t(_ zh: String, _ en: String) -> String { Locale.preferredLanguages.first?.hasPrefix("zh") == true ? zh : en }
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(t("项目", "PROJECT")) {
+                    field(t("制作名称", "Production"), text: $slate.production, id: "slateProduction")
+                    field(t("机位编号", "Camera ID"), text: $slate.camera, id: "slateCamera").textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    field(t("导演", "Director"), text: $slate.director, id: "slateDirector")
+                    field(t("摄影师", "Cinematographer"), text: $slate.cinematographer, id: "slateCinematographer")
+                }
+                Section(t("片段", "CLIP")) {
+                    number(t("卷号", "Reel"), value: $slate.reel)
+                    number(t("场景", "Scene"), value: $slate.scene)
+                    number(t("镜次", "Take"), value: $slate.take)
+                    Toggle(t("镜次自动递增", "Auto increment take"), isOn: $slate.autoTake)
+                    Picker(t("拍摄环境", "Environment"), selection: $slate.environment) {
+                        Text(t("未指定", "Unspecified")).tag("")
+                        Text(t("棚内", "Interior")).tag("Interior")
+                        Text(t("外景", "Exterior")).tag("Exterior")
+                    }
+                    Picker(t("拍摄时间", "Time of day"), selection: $slate.timeOfDay) {
+                        Text(t("未指定", "Unspecified")).tag("")
+                        Text(t("白天", "Day")).tag("Day")
+                        Text(t("夜晚", "Night")).tag("Night")
+                    }
+                }
+                Section(t("下一条文件名", "NEXT FILENAME")) {
+                    Text(filenameType == "BMC" && storageLocation != "外部 SSD" ? slate.filename(date: Date(), clip: max(1, UserDefaults.standard.integer(forKey: "slate.nextClip"))) : "IMG_XXXX.mov")
+                        .font(.footnote.monospaced()).textSelection(.enabled).accessibilityIdentifier("slateFilenamePreview")
+                    if storageLocation == "外部 SSD" { Text(t("SSD 使用系统分配的 IMG 文件名；场记信息仍内嵌视频。", "SSD uses system-assigned IMG names; slate metadata remains embedded.")).font(.caption).foregroundStyle(.secondary) }
+                    Text(t("日期、时间和片段号自动生成。场记信息保存在视频中。", "Date, time and clip number are generated automatically. Slate metadata is embedded in the movie."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .disabled(locked)
+            .navigationTitle(t("场记", "Slate")).navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { dismiss() }.accessibilityIdentifier("slateDone") } }
+            .onChange(of: slate) { old, new in
+                if old.scene != new.scene { slate.take = 1 }
+                slate.reel = min(max(slate.reel, 1), 999999)
+                slate.scene = min(max(slate.scene, 1), 999999)
+                slate.take = min(max(slate.take, 1), 999999)
+                slate.save()
+            }
+        }
+    }
+    private func field(_ title: String, text: Binding<String>, id: String) -> some View {
+        LabeledContent(title) {
+            TextField(t("未填写", "Optional"), text: text)
+                .multilineTextAlignment(.trailing).accessibilityIdentifier(id)
+        }
+    }
+    private func number(_ title: String, value: Binding<Int>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField(title, value: value, format: .number.grouping(.never))
+                .keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 65)
+            Stepper(title, value: value, in: 1...999999).labelsHidden().fixedSize()
+        }
+    }
+}

@@ -8,8 +8,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
+    @AppStorage("filenameType") private var filenameType = "BMC"
     @AppStorage("outputFormat") private var outputFormat = "SonyMov"
-    @AppStorage("debugEnabled") private var debugEnabled = false
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
     @AppStorage("rulerHaptics") private var rulerHaptics = true
@@ -103,7 +103,7 @@ struct SettingsView: View {
             }
             .navigationTitle(quickCapture ? t("拍摄配置", "Capture setup") : t("设置", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(quickCapture ? t("关闭", "Close") : t("完成", "Done")) { dismiss() }.accessibilityIdentifier("captureSettingsClose") } }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(quickCapture ? t("关闭", "Close") : t("完成", "Done")) { dismiss() }.accessibilityIdentifier("captureSettingsClose") } }
             .alert(t("设置", "Settings"), isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 if offerProVideoStorageSettings {
                     Button(t("打开专用存储设置", "Open Pro Video Storage Settings")) {
@@ -242,6 +242,10 @@ struct SettingsView: View {
                         }
                             .disabled(locked)
                     }
+                    Picker(t("文件名类型", "Filename type"), selection: $filenameType) {
+                        Text(t("简洁", "Simple")).tag("simple")
+                        Text("BMC").tag("BMC")
+                    }.pickerStyle(.menu).disabled(locked).accessibilityIdentifier("filenameTypePicker")
                     Menu {
                         Button("Sony MOV") { outputFormat = "SonyMov" }
                         Button("Gyroflow Proto MOV") { outputFormat = "GyroflowProto" }
@@ -318,14 +322,10 @@ struct SettingsView: View {
     }
     private var advancedSection: some View {
         Section {
-                    Toggle(t("刻度震动反馈", "Ruler haptics"), isOn: $rulerHaptics)
+                    Toggle(t("震动反馈", "Haptic feedback"), isOn: $rulerHaptics)
                         .accessibilityIdentifier("rulerHapticsToggle")
                         .onChange(of: rulerHaptics) { _, enabled in camera.setRulerHaptics(enabled) }
-                    Toggle(t("调试", "Debug"), isOn: $debugEnabled)
-        } header: { Text(t("高级", "ADVANCED")) } footer: {
-            Text(t("开启时保留原始 IMU 记录；封装失败时始终保留原始文件。",
-                   "Retain raw IMU when enabled. Failed embeds always retain raw files."))
-        }
+        } header: { Text(t("高级", "ADVANCED")) }
     }
 
     private func row(_ name: String, _ value: String) -> some View {

@@ -428,7 +428,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         return true
     }
 
+    private var recordingSlate = RecordingSlate()
+
     private func movieDestination(localDirectory: URL, baseName: String) throws -> (URL, Bool) {
+        recordingSlate = RecordingSlate.load()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--slate-smoke") {
+            recordingSlate.production = "UITEST Slate QA"
+            recordingSlate.director = "GyroCine Director"
+            recordingSlate.cinematographer = "GyroCine Camera Operator"
+            recordingSlate.scene = 12; recordingSlate.take = 3
+        }
+        #endif
         guard UserDefaults.standard.string(forKey: "storageLocation") == "外部 SSD" else {
             if baseName.hasPrefix("UITEST_") {
                 var url = localDirectory.appendingPathComponent("\(baseName).mov")
@@ -438,6 +449,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     suffix += 1
                 }
                 return (url, false)
+            }
+            if UserDefaults.standard.string(forKey: "filenameType") != "simple" {
+                return (recordingSlate.reserveURL(in: localDirectory), false)
             }
             let names = try FileManager.default.contentsOfDirectory(at: localDirectory,
                 includingPropertiesForKeys: nil).compactMap { file -> Int? in
@@ -1973,7 +1987,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         captureFinishing = true // Block lens/spec changes for the entire experimental capture.
         publish { self.status = "准备 RAW 录制" }
         let experiment = RAWInternalWriterExperiment(camera: camera, codec: codec, url: url, queue: queue,
-            preview: preview, dedicatedStorage: dedicatedStorage,
+            preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: recordingSlate.metadata,
             prepareRecovery: { [weak self] in
                 guard let self, self.activeExternalMovieURL != nil else { return }
                 let start = ProcessInfo.processInfo.systemUptime
@@ -2108,7 +2122,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 arguments.contains("--hevc-1080p240-smoke") ||
                 arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
                 arguments.contains("--raw-hotplug-smoke")
-            let baseName = isTest ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
+            let baseName = isTest && !arguments.contains("--slate-smoke") ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
             let storageLocation = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
             if (codec.rawValue == "aprn" || codec.rawValue == "aprh"),
                storageLocation != "外部 SSD", storageLocation != "专用视频存储" {
@@ -2237,6 +2251,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
+                self.output.metadata = self.recordingSlate.metadata
                 self.output.startRecording(to: url, recordingDelegate: self)
             }) {
                 recordingStarting = false
@@ -2266,6 +2281,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         queue.async {
             self.recordingStarting = false
             self.movieFirstFrameHost = try? ClockAligner.hostTime(startPTS, clock: self.session.synchronizationClock)
+            self.recordingSlate.advanceTake()
             self.logger.event("record_delegate_start", ["path": fileURL.path, "state": self.configurationSnapshot(),
                 "startPTS": startPTS.seconds, "firstHost": self.movieFirstFrameHost ?? -1,
                 "outputIsRecording": self.output.isRecording])
@@ -2400,9 +2416,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                   signature: String, directory: URL, finalizationStart: Double) {
         switch result {
         case .success(let job):
+                let slateMovie = RecordingStoragePaths.movieDirectory.appendingPathComponent(job.movieName)
                 logger.event(job.intrinsicsUnavailableReason == nil ? "imu_pending_completed" : "video_only_completed",
                              ["movie": job.movieName, "reason": job.intrinsicsUnavailableReason ?? ""])
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--slate-smoke") {
+                    do {
+                        let metadata = AVURLAsset(url: slateMovie).metadata
+                        logger.event("slate_smoke_metadata", ["file": slateMovie.lastPathComponent,
+                            "values": metadata.compactMap { item -> [String: String]? in
+                                guard let key = item.key as? String, let value = item.stringValue else { return nil }
+                                return ["key": key, "value": value]
+                            }])
+                    }
+                }
                 writeRAWSSDSmokeResult(job, directory: directory)
                 #endif
                 if let bookmark = job.externalMovieBookmark {

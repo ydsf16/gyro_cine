@@ -225,7 +225,7 @@ enum MovieIMUFinalizer {
         let intrinsicSource = alignment.interpolatedCount + alignment.nearestFallbackCount == 0
             ? "CameraIntrinsicMatrix" : "CameraIntrinsicMatrix with estimated missing frames"
         let profile: [String: Any] = ["camera_brand": "Apple", "camera_model": camera,
-            "lens_model": lens, "calibrated_by": "Apple sampled K mean; distortion uncalibrated",
+            "lens_model": lens, "calibrated_by": "GyroCine",
             "calib_dimension": ["w": video.width, "h": video.height],
             "orig_dimension": ["w": video.width, "h": video.height],
             "output_dimension": ["w": orientation.isPortrait ? video.height : video.width,
@@ -239,6 +239,7 @@ enum MovieIMUFinalizer {
             "pre_roll_ms": Int((actualPreRoll * 1000).rounded()),
             "post_roll_ms": Int((actualPostRoll * 1000).rounded()), "lens_profile": profile,
             "intrinsic_source": intrinsicSource, "intrinsic_frame_count": frameEvidence.count,
+            "lens_profile_source": "Apple sampled K mean; distortion uncalibrated",
             "intrinsic_interpolated_frame_count": alignment.interpolatedCount,
             "intrinsic_nearest_fallback_frame_count": alignment.nearestFallbackCount,
             "intrinsic_max_nearest_time_error_ms": alignment.maximumNearestError * 1000,

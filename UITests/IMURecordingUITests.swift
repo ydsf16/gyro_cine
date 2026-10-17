@@ -14,6 +14,98 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testSlateForm() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--slate-ui-preview", "-AppleLanguages", "(zh-Hans)", "-filenameType", "BMC"]
+        app.launch()
+        let director = app.textFields["slateDirector"]
+        XCTAssertTrue(director.waitForExistence(timeout: 15))
+        director.tap(); director.typeText("QA Director")
+        XCTAssertTrue(app.textFields["slateProduction"].exists)
+        XCTAssertTrue(app.textFields["slateCinematographer"].exists)
+        XCTAssertFalse(app.buttons["slateGoodTake"].exists)
+        XCTAssertGreaterThan(app.buttons["slateDone"].frame.midX, app.frame.midX)
+        controlScreenshot(app, "slate-project-fields")
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["slateFilenamePreview"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["slateFilenamePreview"].label.contains("_C"))
+        controlScreenshot(app, "slate-clip-fields")
+        app.terminate(); app.launch()
+        XCTAssertTrue(director.waitForExistence(timeout: 15))
+        XCTAssertEqual(director.value as? String, "QA Director")
+    }
+
+    func testSlatePanelAndRecording() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件", "-filenameType", "BMC"]
+        app.launch()
+        XCTAssertTrue(app.buttons["slateOpen"].waitForExistence(timeout: 30))
+        app.buttons["slateOpen"].tap()
+        let director = app.textFields["slateDirector"]
+        XCTAssertTrue(director.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["slateProduction"].exists)
+        XCTAssertTrue(app.textFields["slateCinematographer"].exists)
+        XCTAssertGreaterThan(app.buttons["slateDone"].frame.midX, app.frame.midX)
+        controlScreenshot(app, "slate-single-page")
+        app.buttons["slateDone"].tap()
+        app.buttons["settingsOpen"].tap()
+        app.swipeUp()
+        XCTAssertTrue(app.otherElements["filenameTypePicker"].exists || app.buttons["filenameTypePicker"].exists)
+        controlScreenshot(app, "slate-naming-setting")
+        app.buttons["captureSettingsClose"].tap()
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.isEnabled)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 20), .completed)
+        XCTAssertFalse(app.buttons["slateOpen"].isEnabled)
+        Thread.sleep(forTimeInterval: 3)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+
+    #if !targetEnvironment(simulator)
+    func testCaptureButtonsAndInterfacePolish() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件", "-outputFormat", "SonyMov"]
+        app.launch()
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.waitForExistence(timeout: 25))
+        XCTAssertTrue(app.staticTexts["storageRemaining"].exists)
+        app.buttons["settingsOpen"].tap()
+        let close = app.buttons["captureSettingsClose"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(close.frame.midX, app.frame.midX)
+        app.swipeUp()
+        XCTAssertTrue(app.switches["rulerHapticsToggle"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["rulerHapticsToggle"].label.contains("震动反馈"))
+        XCTAssertFalse(app.switches["调试"].exists)
+        XCUIDevice.shared.press(.volumeUp)
+        XCTAssertFalse(record.label.contains("停止录制"))
+        controlScreenshot(app, "settings-cleaned")
+        close.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"), object: record)], timeout: 20), .completed)
+        XCUIDevice.shared.press(.volumeUp)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 20), .completed)
+        Thread.sleep(forTimeInterval: 3)
+        XCUIDevice.shared.press(.volumeDown)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        app.buttons["mediaOpen"].tap()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mediaRow.'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.press(forDuration: 0.7)
+        XCTAssertTrue(app.buttons["mediaSaveSelected"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["mediaSaveSelected"].label.contains("保存相册"))
+        XCTAssertLessThan(app.buttons["mediaShareSelected"].frame.maxX, app.buttons["mediaSaveSelected"].frame.minX)
+        XCTAssertLessThan(app.buttons["mediaSaveSelected"].frame.maxX, app.buttons["mediaDeleteSelected"].frame.minX)
+        controlScreenshot(app, "media-spaced-actions")
+    }
+
+    #endif
     func testSSDWriterBufferFailureThenRetry() {
         let app = XCUIApplication()
         app.launchArguments = ["--raw-ssd-smoke", "--ssd-matrix", "--ssd-fps=30",

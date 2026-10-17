@@ -69,20 +69,21 @@ struct MediaLibraryView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 if selecting {
-                    HStack {
+                    VStack(spacing: 12) {
                         Text(t("已选 \(selection.count) 项", "\(selection.count) selected")).font(.subheadline)
-                        Spacer()
-                        ShareLink(items: files.filter { selection.contains($0) }) {
-                            Label(t("分享", "Share"), systemImage: "square.and.arrow.up")
-                        }.accessibilityIdentifier("mediaShareSelected")
-                        Button { saveToPhotos(files.filter { selection.contains($0) }) } label: {
-                            Image(systemName: "square.and.arrow.down")
-                        }.accessibilityLabel(t("存入相册", "Save to Photos"))
-                        Button(role: .destructive) { pendingDelete = files.filter { selection.contains($0) } } label: {
-                            Label(t("删除", "Delete"), systemImage: "trash")
-                        }.accessibilityIdentifier("mediaDeleteSelected")
-                    }.padding().background(.regularMaterial)
+                        HStack(spacing: 24) {
+                            ShareLink(items: files.filter { selection.contains($0) }) {
+                                mediaActionLabel(t("分享", "Share"), icon: "square.and.arrow.up")
+                            }.accessibilityIdentifier("mediaShareSelected")
+                            Button { saveToPhotos(files.filter { selection.contains($0) }) } label: {
+                                mediaActionLabel(t("保存相册", "Save to Photos"), icon: "square.and.arrow.down")
+                            }.accessibilityIdentifier("mediaSaveSelected")
+                            Button(role: .destructive) { pendingDelete = files.filter { selection.contains($0) } } label: {
+                                mediaActionLabel(t("删除", "Delete"), icon: "trash")
+                            }.accessibilityIdentifier("mediaDeleteSelected")
+                        }
                         .disabled(selection.isEmpty || deleting || camera.finalizing || camera.recording)
+                    }.padding().background(.regularMaterial)
                 }
             }
             .disabled(deleting)
@@ -125,6 +126,13 @@ struct MediaLibraryView: View {
                 scopedExternalFiles = []
             }
         }
+    }
+
+    private func mediaActionLabel(_ title: String, icon: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.title3)
+            Text(title).font(.caption).lineLimit(1).minimumScaleFactor(0.8)
+        }.frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
     }
 
     private func fileSize(_ url: URL) -> String {

@@ -45,14 +45,17 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     #endif
     private let maxBuffered = 10 // Bound retained camera buffers; never grow with recording duration.
 
+    private let slateMetadata: [AVMetadataItem]
+
     init(camera: AVCaptureDevice, codec: AVVideoCodecType, url: URL, queue: DispatchQueue,
-         preview: RAWWriterPreview, dedicatedStorage: Bool,
+         preview: RAWWriterPreview, dedicatedStorage: Bool, slateMetadata: [AVMetadataItem] = [],
          prepareRecovery: @escaping () throws -> Void,
          orientation: RecordingOrientation, imuReady: @escaping () -> Bool,
          metadata: @escaping (CMSampleBuffer) -> Void,
          log: @escaping (String, [String: Any]) -> Void, started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?) -> Void) {
         self.camera = camera; self.codec = codec; self.url = url; self.queue = queue
+        self.slateMetadata = slateMetadata
         self.dedicatedStorage = dedicatedStorage
         self.prepareRecovery = prepareRecovery
         #if DEBUG
@@ -141,7 +144,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 var settings: [String: Any]?
                 if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                     settings = self.dataOutput.recommendedVideoSettings(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov)
-                    w.metadata = self.dataOutput.recommendedMovieMetadata(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov) ?? []
+                    w.metadata = (self.dataOutput.recommendedMovieMetadata(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov) ?? []) + self.slateMetadata
                 }) { throw failure(exception) }
                 guard let settings, let hint = CMSampleBufferGetFormatDescription(sample) else { throw failure("缺少 RAW 编码配置") }
                 let i = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: hint)

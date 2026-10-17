@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import SwiftUI
 import MetalKit
 
@@ -6,6 +7,9 @@ private struct Preview: UIViewRepresentable {
     let session: AVCaptureSession
     let lut: LUTPreview
     let lutEnabled: Bool
+    let captureEnabled: Bool
+    let onCapture: () -> Void
+    let captureLog: (String, [String: Any]) -> Void
     let onAttached: () -> Void
     let onTap: (CGPoint) -> Void
     let onLongPress: (CGPoint) -> Void
@@ -16,11 +20,13 @@ private struct Preview: UIViewRepresentable {
         view.installLUT(lut)
         view.onTap = onTap
         view.onLongPress = onLongPress
+        view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         onAttached()
         return view
     }
     func updateUIView(_ view: PreviewUIView, context: Context) {
         view.onTap = onTap; view.onLongPress = onLongPress
+        view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         lut.setDisplayActive(lutEnabled)
         view.lutView?.setRefreshActive(lutEnabled)
         if !lutEnabled { view.lutView?.alpha = 0 }
@@ -58,6 +64,41 @@ private final class LUTMetalView: UIView {
 private final class PreviewUIView: UIView {
     var onTap: ((CGPoint) -> Void)?
     var onLongPress: ((CGPoint) -> Void)?
+    private var captureInteraction: AVCaptureEventInteraction?
+    private var captureEnabled = false
+    private var captureAction: (() -> Void)?
+    private var captureLog: ((String, [String: Any]) -> Void)?
+
+    func configureCaptureControls(enabled: Bool, action: @escaping () -> Void,
+                                  log: @escaping (String, [String: Any]) -> Void) {
+        captureAction = action; captureLog = log; captureEnabled = enabled
+        if captureInteraction == nil {
+            let interaction = AVCaptureEventInteraction { [weak self] event in
+                guard let self else { return }
+                self.captureLog?("hardware_capture_event", ["phase": String(describing: event.phase),
+                    "enabled": self.captureEnabled, "inWindow": self.window != nil])
+                if event.phase == .ended && self.captureEnabled { self.captureAction?() }
+            }
+            interaction.isEnabled = false
+            addInteraction(interaction)
+            captureInteraction = interaction
+        }
+        updateCaptureInteraction()
+    }
+
+    private func updateCaptureInteraction() {
+        let enabled = captureEnabled && window != nil
+        guard captureInteraction?.isEnabled != enabled else { return }
+        captureInteraction?.isEnabled = enabled
+        captureLog?("hardware_capture_enabled", ["enabled": enabled, "inWindow": window != nil,
+            "sessionRunning": previewLayer.session?.isRunning ?? false])
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateCaptureInteraction()
+    }
+
     private let focusFrame = UIView()
     var lutView: LUTMetalView?
     private var lutRenderer: LUTPreview?
@@ -187,6 +228,7 @@ struct CameraView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
     @State private var showingCaptureSetup = false
+    @State private var showingSlate = false
     @State private var lutCard: String?
     @State private var showingLUTCredits = false
     @State private var panelDismissID = UUID()
@@ -202,9 +244,29 @@ struct CameraView: View {
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
     @State private var lastControlSend = Date.distantPast
+    @State private var lastCaptureShortcut = -Double.infinity
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
     private let shutterStops: [Double] = [4000, 2000, 1000, 500, 250, 200, 120, 60, 30, 15, 10]
         .map { 1.0 / $0 }
+
+    private var captureControlsEnabled: Bool {
+        scenePhase == .active && camera.cameraReady && !camera.preparingRecording &&
+        !camera.finalizing && !camera.switchingLens && camera.errorText == nil &&
+        !showingSettings && !showingCaptureSetup && !showingSlate && !showingMedia &&
+        !showingWBPresets && !showingLUTCredits
+    }
+
+    private func captureShortcut() {
+        let now = ProcessInfo.processInfo.systemUptime
+        let accepted = captureControlsEnabled && now - lastCaptureShortcut > 0.35
+        camera.logger.event("capture_shortcut_request", ["accepted": accepted,
+            "ready": camera.cameraReady, "recording": camera.recording,
+            "preparing": camera.preparingRecording, "finalizing": camera.finalizing,
+            "sceneActive": scenePhase == .active])
+        guard accepted else { return }
+        lastCaptureShortcut = now
+        camera.toggleRecording()
+    }
 
     private var shutterRulerRange: ClosedRange<Double> {
         let lower = max(camera.exposureRange.lowerBound, 1.0 / 8000)
@@ -220,7 +282,9 @@ struct CameraView: View {
 
     var body: some View {
         ZStack {
-            Preview(session: camera.session, lut: camera.lutPreview, lutEnabled: camera.lutEnabled && camera.lutSupported, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
+            Preview(session: camera.session, lut: camera.lutPreview, lutEnabled: camera.lutEnabled && camera.lutSupported,
+                    captureEnabled: captureControlsEnabled, onCapture: captureShortcut,
+                    captureLog: camera.logger.event, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
                 .ignoresSafeArea()
             if showCompositionGrid {
                 CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
@@ -263,6 +327,7 @@ struct CameraView: View {
             SettingsView(quickCapture: true).environmentObject(camera)
                 .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showingSlate) { RecordingSlateView().environmentObject(camera) }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
         .sheet(isPresented: $showingLUTCredits) {
             NavigationStack {
@@ -275,7 +340,7 @@ struct CameraView: View {
                         Link("CC BY 4.0", destination: URL(string: "https://creativecommons.org/licenses/by/4.0/")!)
                     }
                 }.navigationTitle(t("LUT 来源", "LUT credits"))
-                    .toolbar { Button(t("完成", "Done")) { showingLUTCredits = false } }
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { showingLUTCredits = false } } }
             }
         }
         .sheet(isPresented: $showingWBPresets) { whiteBalancePresets }
@@ -344,12 +409,19 @@ struct CameraView: View {
                 statusBadge(camera.telemetryEmbeddable ? "IMU" : "!IMU",
                             healthy: camera.imuAvailable && camera.telemetryEmbeddable)
             }
-            if let bytes = camera.availableStorageBytes, let seconds = camera.estimatedRecordingSeconds {
+            if camera.checkedStorageLocation == storageLocation,
+               let bytes = camera.availableStorageBytes, bytes >= 0,
+               let seconds = camera.estimatedRecordingSeconds, seconds.isFinite {
                 Text(String(format: t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
                             Double(bytes) / 1_000_000_000, Int(seconds / 60)))
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
+            } else {
+                Text(t("剩余 — GB · 约 — 分钟", "Free — GB · ~— min"))
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
+                    .accessibilityIdentifier("storageRemaining")
             }
+            HStack(spacing: 8) {
             Button {
                 closePanel()
                 showingCaptureSetup = true
@@ -366,6 +438,11 @@ struct CameraView: View {
             .disabled(camera.recording || camera.preparingRecording || camera.finalizing)
             .accessibilityIdentifier("captureSetupOpen")
                 .lineLimit(1).minimumScaleFactor(0.75)
+            Button { closePanel(); showingSlate = true } label: {
+                Image(systemName: "movieclapper").padding(8)
+            }.accessibilityLabel(t("场记", "Slate")).accessibilityIdentifier("slateOpen")
+                .disabled(camera.recording || camera.preparingRecording || camera.finalizing)
+            }
             HStack(spacing: 0) {
                 ForEach(Parameter.allCases) { parameter in
                     Button {
@@ -486,8 +563,8 @@ struct CameraView: View {
             .navigationTitle(t("白平衡预设", "White balance presets"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(t("取消", "Cancel")) { showingWBPresets = false }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(t("关闭", "Close")) { showingWBPresets = false }
                 }
             }
         }
@@ -791,14 +868,15 @@ struct CameraView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .accessibilityIdentifier("mediaOpen")
-                Button { camera.toggleRecording() } label: {
+                Button { captureShortcut() } label: {
                     ZStack {
                         Circle().stroke(.white, lineWidth: 4).frame(width: 68, height: 68)
                         RoundedRectangle(cornerRadius: camera.recording ? 5 : 32)
                             .fill(.red).frame(width: camera.recording ? 29 : 46, height: camera.recording ? 29 : 46)
                     }
                 }
-                .disabled(!camera.cameraReady || camera.preparingRecording || camera.finalizing || camera.switchingLens)
+                .disabled(!captureControlsEnabled)
+                .keyboardShortcut(.space, modifiers: [])
                 .accessibilityLabel(camera.finalizing ? t("正在保存", "Finalizing") : camera.recording ? t("停止录制", "Stop recording") : t("开始录制", "Record"))
                 .accessibilityIdentifier("recordToggle")
                 .frame(maxWidth: .infinity)
