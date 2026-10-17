@@ -14,6 +14,30 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testSSDWriterBufferFailureThenRetry() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--raw-ssd-smoke", "--ssd-matrix", "--ssd-fps=30",
+            "--ssd-duration=8", "--ssd-verify-decode", "--writer-block-first-recording",
+            "-storageLocation", "外部 SSD", "-debugEnabled", "YES", "-outputFormat", "SonyMov"]
+        app.launch()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 40))
+        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS '10 帧'")).firstMatch.exists,
+                      alert.debugDescription)
+        controlScreenshot(app, "ssd-buffer-overflow")
+        alert.buttons["确定"].tap()
+        let record = app.buttons["recordToggle"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"), object: record)], timeout: 40), .completed)
+        // Retry inside the same app process. Only the first writer has injected backpressure.
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 30), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+        controlScreenshot(app, "ssd-retry-after-buffer-overflow")
+    }
     func testQuickCaptureAndMediaCards() {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.buttons["captureSetupOpen"].waitForExistence(timeout: 25))
@@ -304,6 +328,26 @@ final class IMURecordingUITests: XCTestCase {
         let attachment = XCTAttachment(string: result); attachment.lifetime = .keepAlways; add(attachment)
         XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
         XCTAssertTrue(app.buttons["recordToggle"].isEnabled)
+    }
+
+    func testAuthorizeConnectedSSD() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        let storage = app.buttons["storageLocationMenu"]
+        if !storage.isHittable { app.swipeUp() }
+        XCTAssertTrue(storage.waitForExistence(timeout: 10)); storage.tap()
+        app.buttons["外部 SSD"].tap()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.firstMatch.waitForExistence(timeout: 5) {
+            print("SSD_PERMISSION \(springboard.alerts.firstMatch.debugDescription)")
+            let allow = springboard.alerts.firstMatch.buttons["允许"]
+            if allow.exists { allow.tap() }
+        }
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "外部 SSD"), object: storage)], timeout: 15) == .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        controlScreenshot(app, "authorized-ssd")
     }
 
     func testStorageMissingSSD() {

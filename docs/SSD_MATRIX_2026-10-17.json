@@ -1,0 +1,224 @@
+[
+  {
+    "case": "raw-4k-30",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 29.993828430364122,
+      "bytes": 399580795,
+      "codec": "aprn",
+      "decodedFrames": 243,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.101666666666667,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 243,
+      "hasTelemetry": true,
+      "height": 2240,
+      "maximumFrameGapMS": 34.9999999999997,
+      "movie": "IMG_0016.mov",
+      "width": 4224
+    },
+    "sessionID": "89A2D2E5-B073-4B84-BF01-8D8B33A41591"
+  },
+  {
+    "case": "raw-4k-60",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 60.01222244856386,
+      "bytes": 1031405603,
+      "codec": "aprn",
+      "decodedFrames": 491,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.181666666666667,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 60,
+      "frames": 491,
+      "hasTelemetry": true,
+      "height": 2240,
+      "maximumFrameGapMS": 16.666666666667496,
+      "movie": "IMG_0017.mov",
+      "width": 4224
+    },
+    "sessionID": "BDAD432A-5A6E-49FA-B0A4-A015BA3454F0"
+  },
+  {
+    "case": "raw-4k-120",
+    "outcome": "error",
+    "data": {
+      "message": "RAW 相机会话重启失败"
+    },
+    "sessionID": "C5B4651B-B262-4159-BE96-BE5151D2076B"
+  },
+  {
+    "case": "raw-opengate-30",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 29.993828430364122,
+      "bytes": 679534161,
+      "codec": "aprn",
+      "decodedFrames": 243,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.101666666666667,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 243,
+      "hasTelemetry": true,
+      "height": 3024,
+      "maximumFrameGapMS": 35.00000000000014,
+      "movie": "IMG_0018.mov",
+      "width": 4224
+    },
+    "sessionID": "E42D3973-34D1-442B-ADDD-0F9B7DBB27E9"
+  },
+  {
+    "case": "raw-opengate-60",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 60.01222244856386,
+      "bytes": 1454260255,
+      "codec": "aprn",
+      "decodedFrames": 491,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.181666666666667,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 60,
+      "frames": 491,
+      "hasTelemetry": true,
+      "height": 3024,
+      "maximumFrameGapMS": 16.666666666667496,
+      "movie": "IMG_0020.mov",
+      "width": 4224
+    },
+    "sessionID": "24245991-BF8E-4088-8ED1-13DE36C67982"
+  },
+  {
+    "case": "raw-opengate-120",
+    "outcome": "raw_smoke_unsupported",
+    "data": {
+      "codec": "aprn",
+      "fps": 120,
+      "openGate": true
+    },
+    "sessionID": "74B9F7BE-62A2-45D5-8FDC-A50A298BA0C9"
+  },
+  {
+    "case": "hq-4k-30",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 30,
+      "bytes": 919015653,
+      "codec": "aprh",
+      "decodedFrames": 242,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.066666666666666,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 242,
+      "hasTelemetry": true,
+      "height": 2240,
+      "maximumFrameGapMS": 35.00000000000014,
+      "movie": "IMG_0021.mov",
+      "width": 4224
+    },
+    "sessionID": "1FED3E81-0EA0-415D-8B4F-8713B5432358"
+  },
+  {
+    "case": "hq-4k-60",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 60.012247397428055,
+      "bytes": 1868462953,
+      "codec": "aprh",
+      "decodedFrames": 490,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.165,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 60,
+      "frames": 490,
+      "hasTelemetry": true,
+      "height": 2240,
+      "maximumFrameGapMS": 16.666666666667496,
+      "movie": "IMG_0022.mov",
+      "width": 4224
+    },
+    "sessionID": "53D2FE4A-2520-4D90-B4CA-DFAA9F571460"
+  },
+  {
+    "case": "hq-4k-120",
+    "outcome": "raw_smoke_unsupported",
+    "data": {
+      "codec": "aprh",
+      "fps": 120,
+      "openGate": false
+    },
+    "sessionID": "9DE12C86-835F-4D5D-A06D-4FB434E9EC6E"
+  },
+  {
+    "case": "hq-opengate-30",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 29.993828430364122,
+      "bytes": 1231363645,
+      "codec": "aprh",
+      "decodedFrames": 243,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.101666666666667,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 243,
+      "hasTelemetry": true,
+      "height": 3024,
+      "maximumFrameGapMS": 35.00000000000014,
+      "movie": "IMG_0023.mov",
+      "width": 4224
+    },
+    "sessionID": "C01C2705-EC85-42FB-96AA-A45F1743ACE9"
+  },
+  {
+    "case": "hq-opengate-60",
+    "outcome": "raw_smoke_result",
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 60.00000000000001,
+      "bytes": 2572876245,
+      "codec": "aprh",
+      "decodedFrames": 492,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.2,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 60,
+      "frames": 492,
+      "hasTelemetry": true,
+      "height": 3024,
+      "maximumFrameGapMS": 16.666666666667496,
+      "movie": "IMG_0024.mov",
+      "width": 4224
+    },
+    "sessionID": "ACD453E6-2ED8-4EB5-A939-D5ADAD56B045"
+  },
+  {
+    "case": "hq-opengate-120",
+    "outcome": "raw_smoke_unsupported",
+    "data": {
+      "codec": "aprh",
+      "fps": 120,
+      "openGate": true
+    },
+    "sessionID": "1CB6958A-38C8-40C2-B87B-8AC07BAB9276"
+  }
+]

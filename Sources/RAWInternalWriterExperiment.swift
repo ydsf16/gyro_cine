@@ -1,6 +1,6 @@
 import AVFoundation
 
-/// Dedicated-storage RAW, audio and metadata recorder. All state lives on the camera queue.
+/// RAW, audio and metadata recorder for dedicated storage or external SSD. All state lives on the camera queue.
 @available(iOS 27.0, *)
 final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let dataOutput: AVCaptureVideoDataOutput
@@ -9,7 +9,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private let camera: AVCaptureDevice
     private let codec: AVVideoCodecType
     private let url: URL
+    private let dedicatedStorage: Bool
     private let log: (String, [String: Any]) -> Void
+    private let prepareRecovery: () throws -> Void
     private let started: (CMTime) -> Void
     private let orientation: RecordingOrientation
     private let imuReady: () -> Bool
@@ -37,15 +39,28 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private var peakBuffered = 0
     private var maxGap = 0.0
     private var stopDeadline = 0.0
+    #if DEBUG
+    private static var consumedBufferFailure = false
+    private let simulateBufferFailure: Bool
+    #endif
     private let maxBuffered = 10 // Bound retained camera buffers; never grow with recording duration.
 
     init(camera: AVCaptureDevice, codec: AVVideoCodecType, url: URL, queue: DispatchQueue,
-         preview: RAWWriterPreview,
+         preview: RAWWriterPreview, dedicatedStorage: Bool,
+         prepareRecovery: @escaping () throws -> Void,
          orientation: RecordingOrientation, imuReady: @escaping () -> Bool,
          metadata: @escaping (CMSampleBuffer) -> Void,
          log: @escaping (String, [String: Any]) -> Void, started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?) -> Void) {
         self.camera = camera; self.codec = codec; self.url = url; self.queue = queue
+        self.dedicatedStorage = dedicatedStorage
+        self.prepareRecovery = prepareRecovery
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        let firstOnly = args.contains("--writer-block-first-recording") && !Self.consumedBufferFailure
+        simulateBufferFailure = args.contains("--writer-block-video") || firstOnly
+        if firstOnly { Self.consumedBufferFailure = true }
+        #endif
         self.log = log; self.started = started; self.finished = finished
         self.orientation = orientation; self.imuReady = imuReady; self.metadata = metadata
         dataOutput = preview.dataOutput; audioOutput = preview.audioOutput
@@ -67,6 +82,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         NSError(domain: "GyroCine.RAWWriterExperiment", code: 1,
                 userInfo: [NSLocalizedDescriptionKey: message])
     }
+    func abort(_ message: String) { finish(failure(message)) }
+
     func stop() {
         guard !completed, !stopping else { return }
         stopping = true
@@ -75,6 +92,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     }
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+        // Frames delivered after Stop are outside the recorded interval.
+        guard !stopping, !completed else { return }
         if firstPTS == nil { preparationDrops += 1 } else { captureDrops += 1 }
         log("raw_writer_capture_drop", ["pts": CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds,
             "phase": firstPTS == nil ? "preparation" : "recording",
@@ -115,8 +134,10 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         if writer == nil {
             do {
                 let w = try AVAssetWriter(outputURL: url, fileType: .mov)
-                guard w.isProVideoStorageSupported else { throw failure("Writer 不支持专用存储") }
-                w.usesProVideoStorage = true
+                if dedicatedStorage {
+                    guard w.isProVideoStorageSupported else { throw failure("Writer 不支持专用存储") }
+                    w.usesProVideoStorage = true
+                }
                 var settings: [String: Any]?
                 if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                     settings = self.dataOutput.recommendedVideoSettings(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov)
@@ -141,6 +162,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 w.add(audio); audioInput = audio
                 guard w.startWriting() else { throw w.error ?? failure("Writer 启动失败") }
                 writer = w; input = i
+                // Persist external access before the first recorded frame, off its deadline.
+                try prepareRecovery()
                 log("raw_writer_encoder_ready", ["file": url.path, "codec": codec.rawValue,
                     "dedicated": w.usesProVideoStorage, "settings": settings])
                 // Encoder creation can take longer than a frame. Begin the recorded interval
@@ -159,10 +182,18 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             log("raw_writer_buffer_overflow", ["buffered": pending.count, "limit": maxBuffered])
             finish(failure("RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格")); return
         }
+        let startupFrame = frames < 3
+        let processingStart = ProcessInfo.processInfo.systemUptime
         metadata(sample)
+        let metadataEnd = ProcessInfo.processInfo.systemUptime
         pending.append(sample)
         peakBuffered = max(peakBuffered, pending.count)
         drain()
+        if startupFrame {
+            log("raw_writer_startup_frame_timing", ["frame": frames,
+                "metadataMS": (metadataEnd - processingStart) * 1000,
+                "appendMS": (ProcessInfo.processInfo.systemUptime - metadataEnd) * 1000])
+        }
     }
     private var retryScheduled = false
     private func drain() {
@@ -172,7 +203,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         }
         guard writer.status == .writing else { finish(writer.error ?? failure("Writer 意外停止")); return }
         #if DEBUG
-        let simulateBlockedVideo = ProcessInfo.processInfo.arguments.contains("--writer-block-video") && frames >= 5 && !stopping
+        let simulateBlockedVideo = simulateBufferFailure && frames >= 5 && !stopping
         #else
         let simulateBlockedVideo = false
         #endif

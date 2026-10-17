@@ -1,0 +1,624 @@
+[
+  {
+    "case": "raw-4k-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.99377722464219,
+        "bytes": 388153766,
+        "codec": "aprn",
+        "decodedFrames": 241,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.035,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 241,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0041.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0041.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 44172.58711570834,
+      "sessionID": "8704714A-E847-4A02-B043-D11BCC17A8F7",
+      "wallTime": "2026-10-17T07:19:18Z"
+    },
+    "evidenceDirectory": "buffer-retry3-raw-4k-30"
+  },
+  {
+    "case": "hq-4k-120",
+    "event": {
+      "data": {
+        "codec": "aprh",
+        "fps": 120,
+        "openGate": false
+      },
+      "eventType": "raw_smoke_unsupported",
+      "monotonicSeconds": 43027.246607583336,
+      "sessionID": "9ABE7C27-368C-42FB-B8AB-CA068D07FDBA",
+      "wallTime": "2026-10-17T06:55:12Z"
+    },
+    "evidenceDirectory": "hq-4k-120"
+  },
+  {
+    "case": "hq-4k-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.993853718500308,
+        "bytes": 733693501,
+        "codec": "aprh",
+        "decodedFrames": 244,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.135,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 244,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0030.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0030.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43001.09312241667,
+      "sessionID": "F90CFDAB-5EAE-41D6-9289-F8525EDF8AE2",
+      "wallTime": "2026-10-17T06:54:45Z"
+    },
+    "evidenceDirectory": "hq-4k-30"
+  },
+  {
+    "case": "hq-4k-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.99999999999999,
+        "bytes": 1539349589,
+        "codec": "aprh",
+        "decodedFrames": 483,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.05,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 483,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "IMG_0031.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0031.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43022.62709579167,
+      "sessionID": "2EED33FC-3088-4CBF-96F2-5F1B7235BFD9",
+      "wallTime": "2026-10-17T06:55:07Z"
+    },
+    "evidenceDirectory": "hq-4k-60"
+  },
+  {
+    "case": "hq-opengate-120",
+    "event": {
+      "data": {
+        "codec": "aprh",
+        "fps": 120,
+        "openGate": true
+      },
+      "eventType": "raw_smoke_unsupported",
+      "monotonicSeconds": 43074.90760895834,
+      "sessionID": "8D95384F-2E9C-4E9C-91C1-A34F4C889F74",
+      "wallTime": "2026-10-17T06:55:59Z"
+    },
+    "evidenceDirectory": "hq-opengate-120"
+  },
+  {
+    "case": "hq-opengate-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.993828430364122,
+        "bytes": 1008372056,
+        "codec": "aprh",
+        "decodedFrames": 243,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.101666666666667,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 243,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0032.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0032.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43047.20483775,
+      "sessionID": "42A8AF78-9A9D-4498-A749-9B09FBE69266",
+      "wallTime": "2026-10-17T06:55:32Z"
+    },
+    "evidenceDirectory": "hq-opengate-30"
+  },
+  {
+    "case": "hq-opengate-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.99999999999999,
+        "bytes": 2082626630,
+        "codec": "aprh",
+        "decodedFrames": 483,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.05,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 483,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "IMG_0033.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0033.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43070.44235129167,
+      "sessionID": "0763FFDB-9AE3-4911-BD27-FF834A62EF37",
+      "wallTime": "2026-10-17T06:55:55Z"
+    },
+    "evidenceDirectory": "hq-opengate-60"
+  },
+  {
+    "case": "hevc-4k-60",
+    "event": {
+      "data": {
+        "message": "Camera session is not running"
+      },
+      "eventType": "error",
+      "monotonicSeconds": 45008.16778145834,
+      "sessionID": "C92F8C46-D392-434A-ABF2-1661E025DB4E",
+      "wallTime": "2026-10-17T07:34:19Z"
+    },
+    "evidenceDirectory": "internal-usb-hevc-4k-60"
+  },
+  {
+    "case": "raw-4k-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.98013902681231,
+        "bytes": 1057724654,
+        "codec": "aprn",
+        "decodedFrames": 302,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 5.035,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 302,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 18.33333333333309,
+        "movie": "UITEST_IMG_writer_2F02BFFA-59B0-4BBB-8D12-973EB3E2887C.mov",
+        "path": "/var/mobile/Containers/Data/Application/45AFEC97-0DCE-428A-9411-F25966E2456A/Documents/Media/UITEST_IMG_writer_2F02BFFA-59B0-4BBB-8D12-973EB3E2887C.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 44968.10513075,
+      "sessionID": "833AB03B-0A9B-4006-846B-AB1A5AE68070",
+      "wallTime": "2026-10-17T07:33:39Z"
+    },
+    "evidenceDirectory": "internal-usb-raw-4k-60"
+  },
+  {
+    "case": "hevc-4k-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60.004963189676566,
+        "bytes": 27696467,
+        "codec": "hvc1",
+        "decodedFrames": 1209,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 20.148333333333333,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 1209,
+        "hasTelemetry": true,
+        "height": 2160,
+        "maximumFrameGapMS": 16.666666666669272,
+        "movie": "UITEST_IMG_2026-10-17-15-36-02.mov",
+        "path": "/var/mobile/Containers/Data/Application/0AF486D2-55D8-4CEE-AD18-735D92A8F83D/Documents/Media/UITEST_IMG_2026-10-17-15-36-02.mov",
+        "width": 3840
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 45140.131111625,
+      "sessionID": "1CB60A2D-E5F5-4C5D-B09F-0B74D26A45A9",
+      "wallTime": "2026-10-17T07:36:31Z"
+    },
+    "evidenceDirectory": "internal-usb-ready-hevc-4k-60"
+  },
+  {
+    "case": "raw-4k-120",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.92828789785398,
+        "bytes": 29977856758,
+        "codec": "aprn",
+        "decodedFrames": 14399,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 120.06341666666667,
+        "estimatedMissingFrames": 2,
+        "expectedFPS": 120,
+        "frames": 14399,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.66666666666667,
+        "movie": "IMG_0034.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0034.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43324.074764625,
+      "sessionID": "0B6167B8-778B-4B43-B7F5-613C032B5ACE",
+      "wallTime": "2026-10-17T07:00:59Z"
+    },
+    "evidenceDirectory": "long-raw-4k-120"
+  },
+  {
+    "case": "raw-4k-30",
+    "event": {
+      "data": {
+        "message": "剩余空间不足：需要保留封装空间及至少约 10 秒的录制容量。"
+      },
+      "eventType": "storage_error",
+      "monotonicSeconds": 43505.928663875005,
+      "sessionID": "03D6D048-E7D2-4364-9279-C2F5E77D17F4",
+      "wallTime": "2026-10-17T07:06:11Z"
+    },
+    "evidenceDirectory": "lowspace-raw-4k-30"
+  },
+  {
+    "case": "prewarm-long-raw-4k-120",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.94502138057422,
+        "bytes": 27636601512,
+        "codec": "aprn",
+        "decodedFrames": 14399,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 120.04666666666667,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 120,
+        "frames": 14399,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 10.000000000005116,
+        "movie": "IMG_0038.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0038.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43802.549130750005,
+      "sessionID": "CDC4C11B-352F-4252-8DEB-ADDAC93E42EF",
+      "wallTime": "2026-10-17T07:11:07Z"
+    },
+    "evidenceDirectory": "prewarm-long-raw-4k-120"
+  },
+  {
+    "case": "raw-4k-120",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.95033112582782,
+        "bytes": 2060645485,
+        "codec": "aprn",
+        "decodedFrames": 966,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.053333333333333,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 120,
+        "frames": 966,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 10.000000000000675,
+        "movie": "IMG_0037.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0037.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43598.16138879167,
+      "sessionID": "68DDEC2F-1D77-48CE-96E7-24BFCEA12520",
+      "wallTime": "2026-10-17T07:07:43Z"
+    },
+    "evidenceDirectory": "prewarm-raw-4k-120"
+  },
+  {
+    "case": "raw-4k-120",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.82651796778191,
+        "bytes": 2171742037,
+        "codec": "aprn",
+        "decodedFrames": 967,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.07,
+        "estimatedMissingFrames": 1,
+        "expectedFPS": 120,
+        "frames": 967,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666666668,
+        "movie": "IMG_0025.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0025.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 42864.505829,
+      "sessionID": "D14C60BE-538A-4D01-94CC-3A73E08CD0E9",
+      "wallTime": "2026-10-17T06:52:29Z"
+    },
+    "evidenceDirectory": "raw-4k-120"
+  },
+  {
+    "case": "raw-4k-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.993853718500308,
+        "bytes": 321570399,
+        "codec": "aprn",
+        "decodedFrames": 244,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.135,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 244,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0026.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0026.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 42911.96770016667,
+      "sessionID": "E45F143D-FB2E-4015-9CF3-2858A4996F6D",
+      "wallTime": "2026-10-17T06:53:16Z"
+    },
+    "evidenceDirectory": "raw-4k-30"
+  },
+  {
+    "case": "raw-4k-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60,
+        "bytes": 652430927,
+        "codec": "aprn",
+        "decodedFrames": 484,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.066666666666666,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 484,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "IMG_0027.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0027.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 42932.297015625,
+      "sessionID": "DD633288-518D-4256-A698-5043CF8D9650",
+      "wallTime": "2026-10-17T06:53:37Z"
+    },
+    "evidenceDirectory": "raw-4k-60"
+  },
+  {
+    "case": "raw-opengate-120",
+    "event": {
+      "data": {
+        "codec": "aprn",
+        "fps": 120,
+        "openGate": true
+      },
+      "eventType": "raw_smoke_unsupported",
+      "monotonicSeconds": 42981.642221333335,
+      "sessionID": "324E6EBA-031C-4A1E-AB3F-7F156CC631D0",
+      "wallTime": "2026-10-17T06:54:26Z"
+    },
+    "evidenceDirectory": "raw-opengate-120"
+  },
+  {
+    "case": "raw-opengate-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.993828430364122,
+        "bytes": 415451770,
+        "codec": "aprn",
+        "decodedFrames": 243,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.101666666666667,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 243,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0028.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0028.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 42953.938355833336,
+      "sessionID": "7691D5D8-408B-4F4F-B6E4-E95FE3CE0417",
+      "wallTime": "2026-10-17T06:53:58Z"
+    },
+    "evidenceDirectory": "raw-opengate-30"
+  },
+  {
+    "case": "raw-opengate-60",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60,
+        "bytes": 901045291,
+        "codec": "aprn",
+        "decodedFrames": 486,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.1,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 486,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "IMG_0029.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0029.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 42975.580553625005,
+      "sessionID": "E4FBDC06-B42C-4DBC-B0A5-97EDA5A7110E",
+      "wallTime": "2026-10-17T06:54:20Z"
+    },
+    "evidenceDirectory": "raw-opengate-60"
+  },
+  {
+    "case": "raw-4k-30",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 30,
+        "bytes": 168127323,
+        "codec": "aprn",
+        "decodedFrames": 112,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 3.7333333333333334,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 112,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 33.333333333333655,
+        "movie": "IMG_0036.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0036.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43529.24478758334,
+      "sessionID": "750BEB5E-2605-4CCB-BAE6-5A42C13DD69C",
+      "wallTime": "2026-10-17T07:06:34Z"
+    },
+    "evidenceDirectory": "space-stop-raw-4k-30"
+  },
+  {
+    "case": "raw-4k-120",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.82633863965266,
+        "bytes": 1821275969,
+        "codec": "aprn",
+        "decodedFrames": 966,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 8.061666666666667,
+        "estimatedMissingFrames": 1,
+        "expectedFPS": 120,
+        "frames": 966,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666666668,
+        "movie": "IMG_0035.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0035.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 43473.330004958334,
+      "sessionID": "C2A63D4B-0579-4D86-B072-59CA280DD205",
+      "wallTime": "2026-10-17T07:05:38Z"
+    },
+    "evidenceDirectory": "timing-raw-4k-120"
+  },
+  {
+    "case": "IMG_0042.mov",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.993612471418125,
+        "bytes": 7291404406,
+        "codec": "aprn",
+        "decodedFrames": 5400,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 180.03833333333333,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 5400,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.0000000000108,
+        "movie": "IMG_0042.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0042.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 44406.55097725,
+      "sessionID": "B55CBB44-F553-430F-8740-2DE858A79685",
+      "wallTime": "2026-10-17T07:23:12Z"
+    },
+    "evidenceDirectory": "hotplug-console.log.json"
+  },
+  {
+    "case": "IMG_0044.mov",
+    "event": {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.991622451829095,
+        "bytes": 247373032,
+        "codec": "aprn",
+        "decodedFrames": 179,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 5.968333333333334,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 179,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.00000000000014,
+        "movie": "IMG_0044.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0044.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 44593.85731216667,
+      "sessionID": "E19ABFC3-4571-43A3-8770-9A39844B3A2F",
+      "wallTime": "2026-10-17T07:26:19Z"
+    },
+    "evidenceDirectory": "hotplug-second-console.log.json"
+  }
+]
