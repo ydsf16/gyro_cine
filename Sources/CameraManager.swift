@@ -6,6 +6,88 @@ import VideoToolbox
 enum WhiteBalanceChoice: String, CaseIterable { case autoLock = "Auto-L", auto = "Auto", manual = "Manual" }
 
 final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate {
+    @Published private(set) var ssdSpeedTesting = false
+    @Published private(set) var ssdSpeedProgress = 0.0
+    @Published private(set) var ssdSpeedCurrentMBps = 0.0
+    @Published private(set) var ssdSpeedReport: SSDSpeedReport?
+    @Published private(set) var ssdSpeedError: String?
+    private var ssdSpeedCancellation: SSDSpeedCancellation?
+    func refreshSSDSpeedAssessment() {
+        queue.async {
+            guard self.ssdSpeedCancellation == nil else { return }
+            let size = self.device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+            let config = "\(self.chosenEncoding.title) · \(size?.width ?? 0)×\(size?.height ?? 0) · \(String(format: "%.1f", self.chosenFPS)) fps"
+            let required = self.estimatedBytesPerSecond / 1_000_000
+            let fps = self.chosenFPS
+            let bufferLimit: Int? = self.usesRAWWriterExperiment ? 10 : nil
+            let drives = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.filter(\.isConnected) ?? []
+            let selectedID = UserDefaults.standard.string(forKey: "externalDeviceID")
+            let drive = drives.first(where: { $0.uuid?.uuidString == selectedID }) ?? (drives.count == 1 ? drives.first : nil)
+            self.publish {
+                guard var report = self.ssdSpeedReport else { return }
+                guard let id = drive?.uuid?.uuidString, id == report.driveID else { self.ssdSpeedReport = nil; return }
+                report.configuration = config; report.requiredMBps = required; report.fps = fps; report.bufferedFrameLimit = bufferLimit
+                self.ssdSpeedReport = report
+            }
+        }
+    }
+    func cancelSSDSpeedTest() { queue.async { self.ssdSpeedCancellation?.cancel() } }
+    func startSSDSpeedTest() {
+        queue.async {
+            guard self.ssdSpeedCancellation == nil, !self.captureFinishing, !self.recordingStarting,
+                  !self.output.isRecording, self.rawWriterExperiment == nil, self.canFinalizeNow else {
+                self.publish { self.ssdSpeedError = "请等待录制或保存完成 / Wait for recording or saving to finish" }; return
+            }
+            let drives = AVExternalStorageDeviceDiscoverySession.shared?.externalStorageDevices.filter(\.isConnected) ?? []
+            let selectedID = UserDefaults.standard.string(forKey: "externalDeviceID")
+            guard let drive = drives.first(where: { $0.uuid?.uuidString == selectedID }) ?? (drives.count == 1 ? drives.first : nil) else {
+                self.publish { self.ssdSpeedError = "请连接并选择 SSD / Connect and select an SSD" }; return
+            }
+            guard drive.freeSize >= SSDSpeedTest.bytes + 5_000_000_000 else {
+                self.publish { self.ssdSpeedError = "测速需要至少 14 GB 可用空间 / At least 14 GB free is required" }; return
+            }
+            do {
+                guard let url = try drive.nextAvailableURLs(withPathExtensions: ["tmp"]).first,
+                      url.startAccessingSecurityScopedResource() else { throw RecorderError.unavailable("无法访问 SSD / Cannot access SSD") }
+                let token = SSDSpeedCancellation()
+                self.ssdSpeedCancellation = token
+                self.captureFinishing = true
+                let driveName = drive.displayName ?? "SSD"
+                let driveID = drive.uuid?.uuidString
+                let size = self.device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+                let config = "\(self.chosenEncoding.title) · \(size?.width ?? 0)×\(size?.height ?? 0) · \(String(format: "%.1f", self.chosenFPS)) fps"
+                let required = self.estimatedBytesPerSecond / 1_000_000
+                let fps = self.chosenFPS
+                let bufferLimit: Int? = self.usesRAWWriterExperiment ? 10 : nil
+                self.publish { self.ssdSpeedTesting = true; self.ssdSpeedProgress = 0; self.ssdSpeedCurrentMBps = 0; self.ssdSpeedReport = nil; self.ssdSpeedError = nil }
+                self.logger.event("ssd_speed_ui_started", ["drive": driveName, "configuration": config, "requiredMBps": required, "path": url.path])
+                DispatchQueue.global(qos: .utility).async {
+                    let result = Result { try SSDSpeedTest.run(url: url, cancellation: token) { progress, rate in
+                        self.publish { self.ssdSpeedProgress = progress; self.ssdSpeedCurrentMBps = rate }
+                    } }
+                    url.stopAccessingSecurityScopedResource()
+                    self.queue.async {
+                        self.ssdSpeedCancellation = nil; self.captureFinishing = false
+                        self.publish {
+                            self.ssdSpeedTesting = false
+                            switch result {
+                            case .success(let value):
+                                let report = SSDSpeedReport(drive: driveName, driveID: driveID, configuration: config, requiredMBps: required, fps: fps, bufferedFrameLimit: bufferLimit,
+                                    averageMBps: value.average, sustainedMBps: value.sustained, maximumWriteMS: value.maxWriteMS, maximumFlushMS: value.maxFlushMS)
+                                self.ssdSpeedReport = report
+                                self.logger.event("ssd_speed_ui_completed", ["sustainedMBps": value.sustained, "averageMBps": value.average,
+                                    "maxWriteMS": value.maxWriteMS, "assessment": String(describing: report.assessment), "temporaryFileRemoved": true])
+                            case .failure(let error):
+                                self.ssdSpeedError = error is CancellationError ? "测速已取消，临时文件已清理 / Cancelled; test file removed" : error.localizedDescription
+                                self.logger.event("ssd_speed_ui_failed", ["error": error.localizedDescription])
+                            }
+                        }
+                    }
+                }
+            } catch { self.publish { self.ssdSpeedError = error.localizedDescription } }
+        }
+    }
+
     @Published private(set) var formats: [FormatInfo] = []
     @Published private(set) var codecs: [AVVideoCodecType] = []
     @Published private(set) var selectedCodec: AVVideoCodecType?
@@ -154,11 +236,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var imuRecorder: IMURecorder?
     private var pendingRecordingJob: PendingIMUJob?
     private var recordingSetupFailure: String?
+    private var recordingCadenceWarning: String?
     private var backgroundLease: UIBackgroundTaskIdentifier = .invalid // Main thread only.
     private var attemptedPendingJobs = Set<String>()
     private var failedPendingSignatures: [String: String] = [:]
     private var captureFinishing = false // Camera queue only.
-    private var storageReplenishPending = false
+    private var storageReplenishPending = true
+    private var storageReplenishRetries = 0
+    private var storageReplenishNotBefore: Double = 0
     private var movieFirstFrameHost: Double?
     private var recordingTimeSource: String?
     private var nativeRAWKSupport: [String: Bool] = [:]
@@ -180,6 +265,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var audioReady = false
     private var telemetryReadoutTick = 0
     #if DEBUG
+    private let verificationQueue = DispatchQueue(label: "GyroCine.testVerification", qos: .utility)
     private var rawSmokeMovieName: String?
     private var rawWriterSmokeCompleted = 0
     #endif
@@ -328,22 +414,59 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     // Conservative estimate: RAW content/encoder bitrate varies; this is not a duration guarantee.
-    private var estimatedBytesPerSecond: Double {
+    private var conservativeBytesPerSecond: Double {
         let size = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         let pixels = Double(size?.width ?? 3840) * Double(size?.height ?? 2160)
         let bitsPerPixel: Double = chosenCodec?.rawValue == "aprh" ? 8 :
             (chosenCodec?.rawValue == "aprn" ? 6 : 0.5)
         return max(1_000_000, pixels * max(chosenFPS, 1) * bitsPerPixel / 8 + 100_000)
     }
+    // Learned locally per hardware/lens/codec/format/rate, never from a single lab clip.
+    private var bitrateProbeFile: URL?
+    private var bitrateProbeStart: (time: Double, bytes: Int64)?
+    private var liveBytesPerSecond: Double?
+    private var bitrateStatisticsKey: String {
+        let size = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+        return "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(chosenEncoding.rawValue).\(size?.width ?? 0)x\(size?.height ?? 0).\(chosenFPS)"
+    }
+    private var estimatedBytesPerSecond: Double {
+        let learned = UserDefaults.standard.double(forKey: bitrateStatisticsKey)
+        return liveBytesPerSecond ?? (learned.isFinite && learned > 0 ? learned : conservativeBytesPerSecond)
+    }
+    private func updateRecordingBitrateEstimate() {
+        guard output.isRecording || rawWriterExperiment != nil, let file = currentFile else {
+            bitrateProbeFile = nil; bitrateProbeStart = nil; liveBytesPerSecond = nil
+            return
+        }
+        if bitrateProbeFile != file {
+            bitrateProbeFile = file; bitrateProbeStart = nil; liveBytesPerSecond = nil
+        }
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+              let bytes = (attributes[.size] as? NSNumber)?.int64Value else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let start = bitrateProbeStart else {
+            bitrateProbeStart = (now, bytes); return
+        }
+        // Ten-second windows smooth container flushes without scanning video samples.
+        guard now - start.time >= 10 else { return }
+        let measured = Double(bytes - start.bytes) / (now - start.time)
+        bitrateProbeStart = (now, bytes)
+        guard measured.isFinite, measured >= 100_000 else { return }
+        liveBytesPerSecond = liveBytesPerSecond.map { $0 * 0.7 + measured * 0.3 } ?? measured
+        let previous = UserDefaults.standard.double(forKey: bitrateStatisticsKey)
+        let learned = previous > 0 ? previous * 0.8 + measured * 0.2 : measured
+        UserDefaults.standard.set(learned, forKey: bitrateStatisticsKey)
+    }
     private var storageReserveBytes: Int64 {
-        max(1_000_000_000, Int64(estimatedBytesPerSecond * 5))
+        // Leave enough headroom for queued writes, audio and metadata finalization.
+        max(5_000_000_000, Int64(conservativeBytesPerSecond * 10))
     }
     private func freeRecordingBytes() -> Int64? {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--storage-low-space-smoke") { return 100_000_000 }
         if args.contains("--storage-stop-smoke"), let start = movieFirstFrameHost,
-           ProcessInfo.processInfo.systemUptime - start > 3 { return 100_000_000 }
+           ProcessInfo.processInfo.systemUptime - start > 3 { return max(1, storageReserveBytes - 100_000_000) }
         #endif
         switch UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件" {
         case "专用视频存储":
@@ -361,9 +484,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         (try? RecordingStoragePaths.movieDirectory.resourceValues(forKeys: [.volumeAvailableCapacityKey]))?
             .volumeAvailableCapacity.map { Int64($0) }
     }
-    /// Deleted PVS files free filesystem space; replenish returns it to the reserved pool.
+    func requestStorageReplenishment() {
+        queue.async {
+            self.storageReplenishPending = true
+            self.storageReplenishRetries = 0
+            self.storageReplenishNotBefore = 0
+            self.replenishDeletedVideoStorageIfPossible()
+        }
+    }
+
+    /// Reclaim on launch, foreground and deletion, including after reinstall or Files deletion.
     private func replenishDeletedVideoStorageIfPossible() {
-        guard storageReplenishPending, !output.isRecording, !isRAWWriterActive,
+        guard storageReplenishPending, ProcessInfo.processInfo.systemUptime >= storageReplenishNotBefore,
+              !output.isRecording, !isRAWWriterActive,
               !recordingStarting, !captureFinishing else { return }
         guard #available(iOS 27.0, *), let storage = AVProVideoStorage.shared else {
             storageReplenishPending = false
@@ -377,6 +510,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             return
         }
         storageReplenishPending = false
+        logger.event("storage_replenish_begin", ["initialBytes": storage.initialCapacity,
+            "remainingBytes": storage.remainingCapacity, "localFreeBytes": localFreeBytes() ?? -1])
         captureFinishing = true
         publish { self.finalizing = true; self.status = "正在回收专用存储空间…" }
         storage.replenishCapacity { capacity, error in
@@ -384,6 +519,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.captureFinishing = false
                 self.logger.event("deleted_media_storage_replenished", ["remainingBytes": capacity,
                     "error": error?.localizedDescription ?? ""])
+                // File deletion and reader teardown may release blocks asynchronously.
+                // Retry a partial reclaim a bounded number of times, only while idle.
+                if capacity < storage.initialCapacity, self.storageReplenishRetries < 4 {
+                    let delays = [2.0, 5.0, 10.0, 20.0]
+                    self.storageReplenishNotBefore = ProcessInfo.processInfo.systemUptime + delays[self.storageReplenishRetries]
+                    self.storageReplenishRetries += 1
+                    self.storageReplenishPending = true
+                    self.logger.event("storage_replenish_retry_scheduled", ["attempt": self.storageReplenishRetries,
+                        "remainingBytes": capacity, "initialBytes": storage.initialCapacity])
+                }
                 self.refreshStorageBudget()
                 self.publish {
                     self.finalizing = false
@@ -394,8 +539,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
     @discardableResult private func refreshStorageBudget() -> Int64? {
+        let probeStart = ProcessInfo.processInfo.systemUptime
+        defer {
+            let elapsed = ProcessInfo.processInfo.systemUptime - probeStart
+            if elapsed > 0.008 { logger.event("storage_probe_latency", ["seconds": elapsed]) }
+        }
         let location = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
         let free = freeRecordingBytes()
+        updateRecordingBitrateEstimate()
         let remaining = free.map { max(0, Double($0 - storageReserveBytes) / estimatedBytesPerSecond) }
         publish {
             self.availableStorageBytes = free; self.estimatedRecordingSeconds = remaining
@@ -403,6 +554,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         var active = output.isRecording
         active = active || rawWriterExperiment != nil
+        if active {
+            logger.event("recording_storage_health", ["availableBytes": free ?? -1,
+                "reserveBytes": storageReserveBytes, "localFreeBytes": localFreeBytes() ?? -1])
+        }
         if active && !storageStopRequested &&
             (free.map { $0 <= storageReserveBytes } == true || localFreeBytes().map { $0 < 500_000_000 } == true) {
             storageStopRequested = true
@@ -421,10 +576,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             return false
         }
-        guard free > storageReserveBytes + Int64(estimatedBytesPerSecond * 10), local > 750_000_000 else {
+        guard free > storageReserveBytes + Int64(conservativeBytesPerSecond * 10), local > 750_000_000 else {
             failStorage("剩余空间不足：需要保留封装空间及至少约 10 秒的录制容量。"); return false
         }
         storageStopRequested = false
+        recordingCadenceWarning = nil
         output.minFreeDiskSpaceLimit = storageReserveBytes
         return true
     }
@@ -784,26 +940,54 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    private func cleanupTestMovieWhenIdle(_ name: String, deadline: Double) {
+        guard !captureFinishing, !recordingStarting, !recoveryInProgress, !isRAWWriterActive, !output.isRecording else {
+            if ProcessInfo.processInfo.systemUptime < deadline {
+                queue.asyncAfter(deadline: .now() + 1) { self.cleanupTestMovieWhenIdle(name, deadline: deadline) }
+            } else { logger.event("failed_test_cleanup", ["movie": name, "error": "App remained busy"]) }
+            return
+        }
+        deleteMedia([RecordingStoragePaths.movieDirectory.appendingPathComponent(name)]) { error in
+            self.queue.async {
+                if error == "录制尚未结束", ProcessInfo.processInfo.systemUptime < deadline {
+                    self.queue.asyncAfter(deadline: .now() + 1) { self.cleanupTestMovieWhenIdle(name, deadline: deadline) }
+                } else { self.logger.event("failed_test_cleanup", ["movie": name, "error": error ?? ""]) }
+            }
+        }
+    }
+
     private func writeRAWSSDSmokeResult(_ job: PendingIMUJob, directory: URL) {
         let internalTest = ProcessInfo.processInfo.arguments.contains("--verify-internal-movie") &&
             job.movieName == currentFile?.lastPathComponent
-        guard job.movieName == rawSmokeMovieName || internalTest else { return }
+        let recoveredTest = ProcessInfo.processInfo.arguments.contains("--verify-recovered-test-movie") &&
+            job.movieName.hasPrefix("UITEST_IMG_writer_")
+        guard job.movieName == rawSmokeMovieName || internalTest || recoveredTest else { return }
+        verificationQueue.async { self.inspectRAWSSDSmokeResult(job, directory: directory) }
+    }
+
+    private func inspectRAWSSDSmokeResult(_ job: PendingIMUJob, directory: URL) {
+        inspectRAWMovie(movieName: job.movieName, externalMovieBookmark: job.externalMovieBookmark,
+            expectedFPS: job.expectedFPS, directory: directory)
+    }
+
+    private func inspectRAWMovie(movieName: String, externalMovieBookmark: Data?, expectedFPS: Double?, directory: URL) {
+        logger.event("raw_verification_begin", ["movie": movieName])
         let movie: URL
         var accessing = false
-        if let bookmark = job.externalMovieBookmark {
+        if let bookmark = externalMovieBookmark {
             var stale = false
             guard let external = try? URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil,
                                           bookmarkDataIsStale: &stale), !stale,
                   external.startAccessingSecurityScopedResource() else { return }
             movie = external; accessing = true
         } else {
-            movie = RecordingStoragePaths.movieDirectory.appendingPathComponent(job.movieName)
+            movie = RecordingStoragePaths.movieDirectory.appendingPathComponent(movieName)
         }
         defer { if accessing { movie.stopAccessingSecurityScopedResource() } }
         do {
             let info = try MovieIMUFinalizer.inspect(movie)
             let asset = AVURLAsset(url: movie)
-            let cadence = VideoCadenceHealth(frames: info.frames, fps: job.expectedFPS ?? 30)
+            let cadence = VideoCadenceHealth(frames: info.frames, fps: expectedFPS ?? 30)
             var decodedFrames = 0
             var decodeStatus = "notRequested"
             var decodeError = ""
@@ -819,6 +1003,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         while autoreleasepool(invoking: { () -> Bool in
                             guard decoded.copyNextSampleBuffer() != nil else { return false }
                             decodedFrames += 1
+                            if decodedFrames % 600 == 0 {
+                                logger.event("raw_verification_progress", ["decodedFrames": decodedFrames,
+                                    "totalFrames": info.frames.count, "movie": movieName])
+                            }
                             return true
                         }) {}
                     }
@@ -827,7 +1015,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 } catch { decodeStatus = "failed"; decodeError = error.localizedDescription }
             }
             let result: [String: Any] = ["movie": movie.lastPathComponent,
-                "path": movie.path, "expectedFPS": job.expectedFPS ?? 0,
+                "path": movie.path, "expectedFPS": expectedFPS ?? 0,
                 "decodedFrames": decodedFrames, "decodeStatus": decodeStatus, "decodeError": decodeError,
                 "maximumFrameGapMS": cadence.maximumGap * 1000,
                 "estimatedMissingFrames": cadence.missingFrames,
@@ -840,6 +1028,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let data = try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: directory.appendingPathComponent("raw-ssd-smoke-result.json"), options: .atomic)
             logger.event("raw_smoke_result", result)
+            if ProcessInfo.processInfo.arguments.contains("--writer-cleanup-verified"),
+               movie.lastPathComponent.hasPrefix("UITEST_IMG_writer_"), !accessing,
+               decodeStatus == "completed", decodedFrames == info.frames.count,
+               MOVTelemetryMuxer.hasTelemetry(movie) {
+                deleteMedia([movie]) { error in
+                    self.logger.event("long_test_cleanup", ["movie": movie.lastPathComponent, "error": error ?? ""])
+                }
+            }
         } catch { logger.event("raw_smoke_failed", ["reason": error.localizedDescription]) }
     }
 
@@ -969,6 +1165,22 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.telemetryEmbeddable = telemetryEmbeddable
             }
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--ssd-speed-probe") {
+                runSSDSpeedTestWhenIdle(deadline: ProcessInfo.processInfo.systemUptime + 90)
+            }
+            if let name = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--cleanup-test-file=") })?.dropFirst("--cleanup-test-file=".count),
+               name.hasPrefix("UITEST_IMG_writer_"), !name.contains("/"), name.hasSuffix(".mov") {
+                cleanupTestMovieWhenIdle(String(name), deadline: ProcessInfo.processInfo.systemUptime + 30)
+            }
+            if let name = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--verify-existing-test=") })?.dropFirst("--verify-existing-test=".count),
+               name.hasPrefix("UITEST_IMG_writer_"), !name.contains("/"), name.hasSuffix(".mov") {
+                let fps = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--verify-existing-fps=") }
+                    .flatMap { Double($0.dropFirst("--verify-existing-fps=".count)) } ?? 30
+                verificationQueue.async {
+                    self.inspectRAWMovie(movieName: String(name), externalMovieBookmark: nil, expectedFPS: fps,
+                        directory: self.logger.sessionURL.deletingLastPathComponent())
+                }
+            }
             if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") { runRAWWriterIntegratedSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--pro-storage-support-probe") { runProStorageSupportProbe() }
             if ProcessInfo.processInfo.arguments.contains("--raw-ssd-smoke") ||
@@ -1804,6 +2016,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "errors": errors, "storageLocation": UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"])
             if deletedLocalMovie && ProVideoStorageBridge.isSupported() {
                 self.storageReplenishPending = true
+                self.storageReplenishRetries = 0
+                self.storageReplenishNotBefore = 0
                 self.replenishDeletedVideoStorageIfPossible()
             }
             self.refreshStorageBudget()
@@ -1900,6 +2114,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     #if DEBUG
+    private func runSSDSpeedTestWhenIdle(deadline: Double) {
+        guard ProcessInfo.processInfo.systemUptime < deadline else { logger.event("ssd_speed_smoke_timeout"); return }
+        guard !captureFinishing, !recordingStarting, !storageReplenishPending else {
+            queue.asyncAfter(deadline: .now() + 1) { self.runSSDSpeedTestWhenIdle(deadline: deadline) }; return
+        }
+        startSSDSpeedTest()
+    }
+
     private func runRAWWriterIntegratedSmoke() {
         let targetType: AVCaptureDevice.DeviceType = ProcessInfo.processInfo.arguments.contains("--writer-ultrawide")
             ? .builtInUltraWideCamera : (ProcessInfo.processInfo.arguments.contains("--writer-telephoto")
@@ -1910,6 +2132,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         if device?.uniqueID != wide.uniqueID {
             chooseLens(wide.uniqueID)
             queue.asyncAfter(deadline: .now() + 2) { self.runRAWWriterIntegratedSmoke() }
+            return
+        }
+        if storageReplenishPending || captureFinishing {
+            replenishDeletedVideoStorageIfPossible()
+            queue.asyncAfter(deadline: .now() + 1) { self.runRAWWriterIntegratedSmoke() }
             return
         }
         let encoding: VideoEncoding = ProcessInfo.processInfo.arguments.contains("--writer-hq") ? .proResRAWHQ : .proResRAW
@@ -1930,7 +2157,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             "width": format.width, "height": format.height, "fps": rate, "codec": encoding.codec.rawValue])
         chosenEncoding = encoding; chosenCodec = encoding.codec; chosenFPS = rate
         let invalidStorageTest = ProcessInfo.processInfo.arguments.contains("--writer-invalid-internal")
-        UserDefaults.standard.set(invalidStorageTest ? "内部文件" : "专用视频存储", forKey: "storageLocation")
+        UserDefaults.standard.set(invalidStorageTest ? "内部文件" : (ProcessInfo.processInfo.arguments.contains("--writer-ssd") ? "外部 SSD" : "专用视频存储"), forKey: "storageLocation")
         guard applyFormat(format.index, reason: "raw_writer_experiment") else { return }
         if invalidStorageTest {
             queue.asyncAfter(deadline: .now() + 5) {
@@ -2017,6 +2244,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         recordingStarting = true
         captureFinishing = true // Block lens/spec changes for the entire experimental capture.
         publish { self.status = "准备 RAW 录制" }
+        let recordingClock = session.synchronizationClock
         let experiment = RAWInternalWriterExperiment(camera: camera, codec: codec, url: url, queue: queue,
             preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: recordingSlate.metadata,
             prepareRecovery: { [weak self] in
@@ -2024,6 +2252,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let start = ProcessInfo.processInfo.systemUptime
                 self.activeExternalMovieBookmark = try url.bookmarkData(options: .minimalBookmark,
                     includingResourceValuesForKeys: nil, relativeTo: nil)
+                if let bookmark = self.activeExternalMovieBookmark {
+                    var known = UserDefaults.standard.array(forKey: "externalMediaBookmarks") as? [Data] ?? []
+                    if !known.contains(bookmark) { known.append(bookmark) }
+                    UserDefaults.standard.set(known, forKey: "externalMediaBookmarks")
+                }
                 self.logger.event("raw_writer_recovery_prepared", ["milliseconds":
                     (ProcessInfo.processInfo.systemUptime - start) * 1000])
             }, orientation: recordingOrientation,
@@ -2032,14 +2265,21 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return ProcessInfo.processInfo.systemUptime - max(gyro, accel) >= 0.07
             }, metadata: { [weak self] sample in
                 guard let self else { return }
-                self.intrinsicRecorder.recordNativeMetadata(sample, clock: self.session.synchronizationClock, camera: camera)
-            }, log: { [weak self] name, details in self?.logger.event(name, details) },
+                self.intrinsicRecorder.recordNativeMetadata(sample, clock: recordingClock, camera: camera)
+            }, log: { [weak self] name, details in
+                self?.logger.event(name, details)
+                if name == "raw_writer_finished", let dropped = details["captureDrops"] as? Int, dropped > 0 {
+                    self?.recordingCadenceWarning = "录制丢帧 \(dropped) 帧，请检查画面"
+                }
+            },
             started: { [weak self] pts in
                 guard let self else { return }
                 self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") {
-                    let duration: Double = ProcessInfo.processInfo.arguments.contains("--writer-short") ? 5 : 10
+                    let requestedDuration = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--writer-duration=") }
+                        .flatMap { Double($0.dropFirst("--writer-duration=".count)) }
+                    let duration = min(600, max(1, requestedDuration ?? (ProcessInfo.processInfo.arguments.contains("--writer-short") ? 5 : 10)))
                     self.queue.asyncAfter(deadline: .now() + duration) {
                         guard self.currentFile == url, self.rawWriterExperiment != nil else { return }
                         self.toggleRecording()
@@ -2479,8 +2719,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 #endif
                 publish {
                     self.finalizing = false
-                    self.status = job.recordingWarning != nil ? "SSD 中断 · 可读片段已保存" :
-                        job.intrinsicsUnavailableReason != nil ? "视频已保存 · 当前帧率无 K，IMU 未嵌入" : "Saved · IMU embedded"
+                    self.status = job.recordingWarning.map { "已保存 · " + $0 } ?? (
+                        job.intrinsicsUnavailableReason != nil ? "视频已保存 · 当前帧率无 K，IMU 未嵌入" : "Saved · IMU embedded")
+                    if let warning = job.recordingWarning, warning.contains("丢帧"), self.errorText == nil {
+                        self.errorText = "视频与 IMU 已保存，但" + warning
+                    }
                     self.endFinalizationLease()
                 }
         case .failure(let error):
@@ -2564,7 +2807,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     guard var job = self.pendingRecordingJob else { throw RecorderError.unavailable("缺少 IMU 恢复任务") }
                     job.ready = true
                     job.recordingFailure = failureReason
-                    job.recordingWarning = failureReason
+                    job.recordingWarning = failureReason ?? self.recordingCadenceWarning
                     try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                     try framesStop.get(); try imuStop.get()
                     self.pendingRecordingJob = nil
@@ -2575,6 +2818,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     if externalRecordingFailed {
                         self.failStorage("SSD 录制中断：\(failureReason ?? "存储不可用")。原始文件已保留",
                                          retryOnReconnect: true)
+                    } else if let failureReason {
+                        self.fail("录制已停止：\(failureReason)。原始文件已保留")
                     }
                 } catch {
                     self.captureFinishing = false
@@ -2641,7 +2886,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.whiteBalanceAuto = whiteBalanceAuto
                 }
             }
-            if self.output.isRecording && self.telemetryReadoutTick % 10 == 0 {
+            if (self.output.isRecording || self.isRAWWriterActive) && self.telemetryReadoutTick % 10 == 0 {
                 self.logger.event("recording_health", [
                     "thermalState": ProcessInfo.processInfo.thermalState.rawValue,
                     "pressureLevel": camera.systemPressureState.level.rawValue,
@@ -2698,7 +2943,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 self.queue.async {
                     self.finalizationAllowed = allowed
-                    if name == UIApplication.willEnterForegroundNotification { self.attemptedPendingJobs.removeAll() }
+                    if !allowed { self.ssdSpeedCancellation?.cancel() }
+                    if name == UIApplication.willEnterForegroundNotification {
+                        self.attemptedPendingJobs.removeAll()
+                        self.storageReplenishPending = true
+                        self.storageReplenishRetries = 0
+                        self.storageReplenishNotBefore = 0
+                    }
                     if name == UIApplication.didBecomeActiveNotification || name == UIScene.didActivateNotification || name == UIApplication.protectedDataDidBecomeAvailableNotification {
                         self.resumePendingIMU()
                     }

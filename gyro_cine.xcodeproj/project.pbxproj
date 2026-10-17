@@ -19,6 +19,7 @@
 		2824C3D47F874901282E65E3 /* slay-03-neon.cube in Resources */ = {isa = PBXBuildFile; fileRef = E183FFDC6DE40CDF80F1255A /* slay-03-neon.cube */; };
 		2CC48985B038B1E260CEECA4 /* SLAY-SOURCE.json in Resources */ = {isa = PBXBuildFile; fileRef = E060E12B4BE73A0FAAA89CE5 /* SLAY-SOURCE.json */; };
 		2FA4E79E6ABA5B777D44DA00 /* GyroCineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */; };
+		36FF3D630C1B353466E458B6 /* SSDSpeedTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC4D0B1EA68438745FDAC03 /* SSDSpeedTest.swift */; };
 		48DD2F49E814918E0E9D1587 /* slay-04-film.cube in Resources */ = {isa = PBXBuildFile; fileRef = 65421CAD3416494D0C97EDC5 /* slay-04-film.cube */; };
 		4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2817BCD3637009EF27D48531 /* SettingsView.swift */; };
 		52FE3F9193A3EF399A772E12 /* LUTPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8AD651BD4167D9D48632117 /* LUTPreview.swift */; };
@@ -73,6 +74,7 @@
 		1DD19334D59F169EEE052CD8 /* IMURecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMURecording.swift; sourceTree = "<group>"; };
 		27E0EA8F78966C357CF32A3C /* GyroCine.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GyroCine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2817BCD3637009EF27D48531 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2AC4D0B1EA68438745FDAC03 /* SSDSpeedTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSDSpeedTest.swift; sourceTree = "<group>"; };
 		2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOVTelemetryMuxer.swift; sourceTree = "<group>"; };
 		44CCD09C1C4B879E79792AB1 /* PreviewColorTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewColorTransformTests.swift; sourceTree = "<group>"; };
 		45B973097EAF522C0DABF600 /* GyroCineUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GyroCineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -162,6 +164,7 @@
 				5E69E57621FCFFB1DD4CFFAD /* RecordingSlate.swift */,
 				DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */,
 				2817BCD3637009EF27D48531 /* SettingsView.swift */,
+				2AC4D0B1EA68438745FDAC03 /* SSDSpeedTest.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -354,6 +357,7 @@
 				F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */,
 				065A5CB761B0F44A8CCA697F /* RecordingSlate.swift in Sources */,
 				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,
+				36FF3D630C1B353466E458B6 /* SSDSpeedTest.swift in Sources */,
 				4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

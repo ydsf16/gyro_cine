@@ -14,6 +14,59 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testNativeMenusWithoutCamera() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--settings-ui-preview", "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        let storage = app.buttons["storageLocationMenu"]
+        XCTAssertTrue(storage.waitForExistence(timeout: 15))
+        for x in [0.1, 0.5, 0.9] {
+            storage.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.5)).tap()
+            let option = app.buttons["内部文件"]
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            controlScreenshot(app, "storage-menu-\(x)")
+            option.tap()
+        }
+        let naming = app.buttons["filenameTypePicker"]
+        if !naming.isHittable { app.swipeUp() }
+        naming.tap()
+        XCTAssertTrue(app.buttons["简洁"].waitForExistence(timeout: 5))
+        app.buttons["简洁"].tap()
+        XCTAssertTrue(naming.label.contains("简洁"))
+        naming.tap(); app.buttons["BMC"].tap()
+        controlScreenshot(app, "settings-native-menu-result")
+    }
+
+    func testNativeSettingsMenusFullRow() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        let codec = app.buttons["codecMenu"]
+        XCTAssertTrue(codec.waitForExistence(timeout: 10))
+        for x in [0.1, 0.5, 0.9] {
+            codec.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.5)).tap()
+            let option = app.buttons["H.265 HQ"]
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            option.tap()
+            XCTAssertTrue(app.buttons["captureSettingsClose"].exists)
+        }
+        codec.tap(); app.buttons["H.265"].tap()
+        let storage = app.buttons["storageLocationMenu"]
+        if !storage.isHittable { app.swipeUp() }
+        for x in [0.1, 0.5, 0.9] {
+            storage.coordinate(withNormalizedOffset: CGVector(dx: x, dy: 0.5)).tap()
+            let option = app.buttons["内部文件"]
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            option.tap()
+            XCTAssertTrue(app.buttons["captureSettingsClose"].exists)
+        }
+        controlScreenshot(app, "native-settings-menus")
+        app.buttons["captureSettingsClose"].tap()
+        XCTAssertTrue(app.buttons["recordToggle"].waitForExistence(timeout: 5))
+    }
+
     func testSlateForm() {
         let app = XCUIApplication()
         app.launchArguments = ["--slate-ui-preview", "-AppleLanguages", "(zh-Hans)", "-filenameType", "BMC"]

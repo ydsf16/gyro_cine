@@ -1,11 +1,64 @@
 import AVFoundation
 
-/// RAW, audio and metadata recorder for dedicated storage or external SSD. All state lives on the camera queue.
+/// Counts all samples waiting for and inside the writer, not only its pending array.
+final class RAWFrameBudget {
+    private let lock = NSLock()
+    private let limit: Int
+    private var count = 0
+    private var highWater = 0
+    init(limit: Int) { self.limit = limit }
+    func acquire() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard count < limit else { return false }
+        count += 1; highWater = max(highWater, count)
+        return true
+    }
+    func release() { lock.lock(); count -= 1; lock.unlock() }
+    var peak: Int { lock.lock(); defer { lock.unlock() }; return highWater }
+}
+
+/// Five-second PTS windows; isolated gaps are reported, sustained >5% loss stops capture.
+struct RAWCadenceGuard {
+    private var start: Double?
+    private var previous: Double?
+    private var missing = 0
+    private var intervals = 0
+    mutating func observe(_ pts: Double, fps: Double) -> Int? {
+        guard pts.isFinite, fps.isFinite, fps > 0 else { return nil }
+        guard let last = previous, let beginning = start else {
+            previous = pts; start = pts; return nil
+        }
+        guard pts > last else { return nil }
+        missing += max(0, Int(((pts - last) * fps).rounded()) - 1)
+        previous = pts
+        intervals += 1
+        let elapsed = pts - beginning
+        guard elapsed >= 5 else { return nil }
+        let lost = max(missing, Int((elapsed * fps).rounded()) - intervals)
+        missing = 0; intervals = 0; start = pts
+        return Double(lost) > max(3, elapsed * fps * 0.05) ? lost : nil
+    }
+}
+
+private final class RAWBufferedSample {
+    let sample: CMSampleBuffer
+    private let budget: RAWFrameBudget
+    init(_ sample: CMSampleBuffer, budget: RAWFrameBudget) { self.sample = sample; self.budget = budget }
+    deinit { budget.release() }
+}
+
+/// RAW, audio and metadata recorder for dedicated storage or external SSD. Writer state lives on a dedicated serial queue, isolated from camera configuration and HUD polling.
 @available(iOS 27.0, *)
 final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let dataOutput: AVCaptureVideoDataOutput
     let audioOutput: AVCaptureAudioDataOutput
     private let queue: DispatchQueue
+    private let captureQueue = DispatchQueue(label: "GyroCine.rawIngress", qos: .userInteractive)
+    private let videoBudget = RAWFrameBudget(limit: 10)
+    private let audioBudget = RAWFrameBudget(limit: 32)
+    private var accepting = true // captureQueue only
+    private var ingressArmed = false
+    private var preparingVideo = false
     private let camera: AVCaptureDevice
     private let codec: AVVideoCodecType
     private let url: URL
@@ -18,7 +71,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private let metadata: (CMSampleBuffer) -> Void
     private var audioInput: AVAssetWriterInput?
     private var audioFormat: CMFormatDescription?
-    private var audioPending: [CMSampleBuffer] = []
+    private var audioPending: [RAWBufferedSample] = []
     private var audioPackets = 0
     private var receivedVideo = 0
     private var receivedAudio = 0
@@ -30,49 +83,61 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private var readyWB = false
     private var stopping = false
     private var completed = false
-    private var pending: [CMSampleBuffer] = []
+    private var pending: [RAWBufferedSample] = []
     private var firstPTS: CMTime?
     private var lastPTS: CMTime?
     private var frames = 0
+    private var cadenceGuard = RAWCadenceGuard()
     private var captureDrops = 0
     private var preparationDrops = 0
     private var peakBuffered = 0
     private var maxGap = 0.0
+    private var maxCallbackMS = 0.0
+    private var maxMetadataMS = 0.0
+    private var maxAppendMS = 0.0
+    private var slowCallbacks = 0
     private var stopDeadline = 0.0
     #if DEBUG
     private static var consumedBufferFailure = false
     private let simulateBufferFailure: Bool
+    private var simulatedStall = false
     #endif
     private let maxBuffered = 10 // Bound retained camera buffers; never grow with recording duration.
 
     private let slateMetadata: [AVMetadataItem]
 
-    init(camera: AVCaptureDevice, codec: AVVideoCodecType, url: URL, queue: DispatchQueue,
+    init(camera: AVCaptureDevice, codec: AVVideoCodecType, url: URL, queue controlQueue: DispatchQueue,
          preview: RAWWriterPreview, dedicatedStorage: Bool, slateMetadata: [AVMetadataItem] = [],
          prepareRecovery: @escaping () throws -> Void,
          orientation: RecordingOrientation, imuReady: @escaping () -> Bool,
          metadata: @escaping (CMSampleBuffer) -> Void,
          log: @escaping (String, [String: Any]) -> Void, started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?) -> Void) {
-        self.camera = camera; self.codec = codec; self.url = url; self.queue = queue
+        self.camera = camera; self.codec = codec; self.url = url
+        self.queue = DispatchQueue(label: "GyroCine.rawRecording", qos: .userInitiated)
         self.slateMetadata = slateMetadata
         self.dedicatedStorage = dedicatedStorage
-        self.prepareRecovery = prepareRecovery
+        self.prepareRecovery = { try controlQueue.sync(execute: prepareRecovery) }
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         let firstOnly = args.contains("--writer-block-first-recording") && !Self.consumedBufferFailure
         simulateBufferFailure = args.contains("--writer-block-video") || firstOnly
         if firstOnly { Self.consumedBufferFailure = true }
         #endif
-        self.log = log; self.started = started; self.finished = finished
+        // CameraManager state stays on its control queue; no per-frame round trip.
+        self.log = { name, details in controlQueue.async { log(name, details) } }
+        self.started = { pts in controlQueue.sync { started(pts) } }
+        self.finished = { error in controlQueue.async { finished(error) } }
         self.orientation = orientation; self.imuReady = imuReady; self.metadata = metadata
         dataOutput = preview.dataOutput; audioOutput = preview.audioOutput
         requestedWB = preview.ready; readyWB = preview.ready
         super.init()
-        dataOutput.setSampleBufferDelegate(self, queue: queue)
-        audioOutput.setSampleBufferDelegate(self, queue: queue)
     }
     func arm() {
+        captureQueue.async {
+            self.dataOutput.setSampleBufferDelegate(self, queue: self.captureQueue)
+            self.audioOutput.setSampleBufferDelegate(self, queue: self.captureQueue)
+        }
         queue.asyncAfter(deadline: .now() + 15) { [weak self] in
             guard let self, self.firstPTS == nil, !self.completed else { return }
             self.log("raw_writer_start_timeout", ["videoReceived": self.receivedVideo,
@@ -85,9 +150,17 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         NSError(domain: "GyroCine.RAWWriterExperiment", code: 1,
                 userInfo: [NSLocalizedDescriptionKey: message])
     }
-    func abort(_ message: String) { finish(failure(message)) }
+    func abort(_ message: String) { queue.async { self.finish(self.failure(message)) } }
 
     func stop() {
+        captureQueue.async {
+            self.accepting = false
+            // Already admitted samples are enqueued first; finish after their processing.
+            self.queue.async { self.stopOnQueue() }
+        }
+    }
+
+    private func stopOnQueue() {
         guard !completed, !stopping else { return }
         stopping = true
         stopDeadline = ProcessInfo.processInfo.systemUptime + 5
@@ -95,24 +168,76 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     }
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        // Frames delivered after Stop are outside the recorded interval.
-        guard !stopping, !completed else { return }
-        if firstPTS == nil { preparationDrops += 1 } else { captureDrops += 1 }
-        log("raw_writer_capture_drop", ["pts": CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds,
-            "phase": firstPTS == nil ? "preparation" : "recording",
-            "reason": String(describing: CMGetAttachment(sampleBuffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil))])
+        guard accepting else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
+        let reason = String(describing: CMGetAttachment(sampleBuffer,
+            key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil))
+        queue.async {
+            guard !self.stopping, !self.completed else { return }
+            if self.firstPTS == nil { self.preparationDrops += 1 } else { self.captureDrops += 1 }
+            self.log("raw_writer_capture_drop", ["pts": pts,
+                "phase": self.firstPTS == nil ? "preparation" : "recording", "reason": reason])
+        }
     }
     func captureOutput(_ output: AVCaptureOutput, didOutput sample: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+        guard accepting else { return }
+        let audio = output === audioOutput
+        // Encoder setup is outside the recorded interval. Keep one startup video
+        // sample in flight, rather than filling the recording buffer during setup.
+        if !audio && !ingressArmed && preparingVideo { return }
+        let preparationVideo = !audio && !ingressArmed
+        let budget = audio ? audioBudget : videoBudget
+        guard budget.acquire() else {
+            if !ingressArmed { return }
+            accepting = false
+            queue.async {
+                self.log("raw_writer_ingress_overflow", ["audio": audio, "limit": audio ? 32 : 10])
+                self.finish(self.failure(audio ? "音频写入持续积压，已停止录制" :
+                    "RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格"))
+            }
+            return
+        }
+        if preparationVideo { preparingVideo = true }
+        let buffered = RAWBufferedSample(sample, budget: budget)
+        queue.async {
+            self.consume(buffered, audio: audio)
+            if preparationVideo { self.captureQueue.async { self.preparingVideo = false } }
+        }
+    }
+    private func consume(_ buffered: RAWBufferedSample, audio: Bool) {
+        let sample = buffered.sample
         guard !stopping, !completed else { return }
-        if output === audioOutput {
+        let callbackStart = ProcessInfo.processInfo.systemUptime
+        #if DEBUG
+        if !audio, !simulatedStall, let firstPTS,
+           CMSampleBufferGetPresentationTimeStamp(sample).seconds - firstPTS.seconds > 3,
+           let milliseconds = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--writer-stall-ms=") })
+                .flatMap({ Double($0.dropFirst("--writer-stall-ms=".count)) }) {
+            simulatedStall = true
+            log("raw_writer_test_stall", ["milliseconds": milliseconds])
+            Thread.sleep(forTimeInterval: min(0.5, max(0, milliseconds / 1000)))
+        }
+        #endif
+        defer {
+            let ms = (ProcessInfo.processInfo.systemUptime - callbackStart) * 1000
+            maxCallbackMS = max(maxCallbackMS, ms)
+            if firstPTS != nil && ms > 4 {
+                slowCallbacks += 1
+                if slowCallbacks <= 12 {
+                    log("raw_writer_slow_callback", ["milliseconds": ms, "audio": audio,
+                        "frame": frames, "pending": pending.count])
+                }
+            }
+        }
+        if audio {
             receivedAudio += 1
             if receivedAudio == 1 { log("raw_writer_first_audio", ["pts": CMSampleBufferGetPresentationTimeStamp(sample).seconds]) }
             audioFormat = CMSampleBufferGetFormatDescription(sample)
             guard let firstPTS else { return }
             guard CMSampleBufferGetPresentationTimeStamp(sample) >= firstPTS else { return }
-            guard audioPending.count < 16 else { finish(failure("音频写入持续积压")); return }
-            audioPending.append(sample)
+            guard audioPending.count < 32 else { finish(failure("音频写入持续积压")); return }
+            audioPending.append(buffered)
             drain()
             return
         }
@@ -133,7 +258,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             } catch { finish(error) }
             return
         }
-        guard readyWB, imuReady(), let audioFormat else { return }
+        // IMU pre-roll is an arming condition only. Its timestamp getters share
+        // a lock with IMU disk writes; never wait on that lock for every video frame.
+        guard readyWB, writer != nil || imuReady(), let audioFormat else { return }
         if writer == nil {
             do {
                 let w = try AVAssetWriter(outputURL: url, fileType: .mov)
@@ -170,6 +297,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 try prepareRecovery()
                 log("raw_writer_encoder_ready", ["file": url.path, "codec": codec.rawValue,
                     "dedicated": w.usesProVideoStorage, "settings": settings])
+                captureQueue.async { self.ingressArmed = true }
                 // Encoder creation can take longer than a frame. Begin the recorded interval
                 // with the next delivered frame, retaining its real capture timestamp.
                 return
@@ -188,11 +316,19 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         }
         let startupFrame = frames < 3
         let processingStart = ProcessInfo.processInfo.systemUptime
+        if let lost = cadenceGuard.observe(CMSampleBufferGetPresentationTimeStamp(sample).seconds,
+            fps: 1 / camera.activeVideoMinFrameDuration.seconds) {
+            log("raw_writer_cadence_stop", ["missingFrames": lost, "windowSeconds": 5])
+            finish(failure("检测到持续严重丢帧，已停止录制并保留原片。请检查存储持续写入速度，或降低编码质量、分辨率及帧率"))
+            return
+        }
         metadata(sample)
         let metadataEnd = ProcessInfo.processInfo.systemUptime
-        pending.append(sample)
+        maxMetadataMS = max(maxMetadataMS, (metadataEnd - processingStart) * 1000)
+        pending.append(buffered)
         peakBuffered = max(peakBuffered, pending.count)
         drain()
+        maxAppendMS = max(maxAppendMS, (ProcessInfo.processInfo.systemUptime - metadataEnd) * 1000)
         if startupFrame {
             log("raw_writer_startup_frame_timing", ["frame": frames,
                 "metadataMS": (metadataEnd - processingStart) * 1000,
@@ -212,7 +348,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         let simulateBlockedVideo = false
         #endif
         while !simulateBlockedVideo && !pending.isEmpty && input.isReadyForMoreMediaData {
-            let sample = pending.removeFirst()
+            let buffered = pending.removeFirst()
+            defer { withExtendedLifetime(buffered) {} }
+            let sample = buffered.sample
             let pts = CMSampleBufferGetPresentationTimeStamp(sample)
             guard input.append(sample) else { finish(writer.error ?? failure("RAW 帧写入失败")); return }
             if let lastPTS { maxGap = max(maxGap, CMTimeSubtract(pts, lastPTS).seconds) }
@@ -221,7 +359,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         if let audioInput {
             while !audioPending.isEmpty && audioInput.isReadyForMoreMediaData {
                 let audio = audioPending.removeFirst()
-                guard audioInput.append(audio) else { finish(writer.error ?? failure("音频写入失败")); return }
+                defer { withExtendedLifetime(audio) {} }
+                guard audioInput.append(audio.sample) else { finish(writer.error ?? failure("音频写入失败")); return }
                 audioPackets += 1
             }
         }
@@ -247,6 +386,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private func finish(_ error: Error) {
         guard !completed else { return }
         completed = true; pending.removeAll(); audioPending.removeAll()
+        captureQueue.async { self.accepting = false }
         if let writer, writer.status == .writing, let input {
             input.markAsFinished(); audioInput?.markAsFinished()
             writer.finishWriting { self.queue.async { self.report(error) } }
@@ -254,7 +394,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     }
     private func report(_ error: Error?) {
         log("raw_writer_finished", ["file": url.path, "frames": frames, "captureDrops": captureDrops,
-            "audioPackets": audioPackets, "receivedVideo": receivedVideo, "receivedAudio": receivedAudio, "rotation": orientation.degrees, "preparationDrops": preparationDrops, "peakBuffered": peakBuffered, "maxGap": maxGap, "error": error.map { String(describing: $0) } ?? ""])
+            "maxCallbackMS": maxCallbackMS, "maxMetadataMS": maxMetadataMS,
+            "maxAppendMS": maxAppendMS, "slowCallbacks": slowCallbacks,
+            "audioPackets": audioPackets, "receivedVideo": receivedVideo, "receivedAudio": receivedAudio, "rotation": orientation.degrees, "preparationDrops": preparationDrops, "peakBuffered": max(peakBuffered, videoBudget.peak), "peakAudioBuffered": audioBudget.peak, "maxGap": maxGap, "error": error.map { String(describing: $0) } ?? ""])
         finished(error)
     }
 }

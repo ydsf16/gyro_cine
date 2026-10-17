@@ -280,18 +280,92 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/200, fps: 30,
             minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
     }
-    func testVideoCadenceRejectsLongGapsAndHeavyFrameLoss() throws {
+    func testSSDSpeedReusesMeasurementForChangedConfiguration() {
+        var report = SSDSpeedReport(drive: "SSD", driveID: "disk-a", configuration: "H.265 4K60", requiredMBps: 31,
+            fps: 60, averageMBps: 333, sustainedMBps: 237, maximumWriteMS: 20, maximumFlushMS: 50)
+        let timestamp = report.date
+        XCTAssertEqual(report.assessment, .usable)
+        report.configuration = "ProRes RAW HQ 4K60"
+        report.requiredMBps = 340
+        XCTAssertEqual(report.assessment, .insufficient)
+        XCTAssertEqual(report.sustainedMBps, 237)
+        XCTAssertEqual(report.date, timestamp)
+    }
+
+    func testSSDSpeedAssessmentUsesHeadroomAndStalls() {
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 214, required: 31, stallMS: 668, fps: 60), .usable)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 214, required: 143, stallMS: 668, fps: 60, bufferedFrameLimit: 10), .risky)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 237, required: 340, stallMS: 10, fps: 60), .insufficient)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 237, required: 143, stallMS: 668, fps: 30, bufferedFrameLimit: 10), .risky)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 350, required: 300, stallMS: 10, fps: 60), .risky)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: 500, required: 300, stallMS: 20, fps: 60), .usable)
+        XCTAssertEqual(SSDSpeedReport.assess(sustained: .nan, required: 300, stallMS: 20, fps: 60), .insufficient)
+    }
+    func testSSDSpeedCancellationCleansOnlyItsFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".tmp")
+        let token = SSDSpeedCancellation(); token.cancel()
+        XCTAssertThrowsError(try SSDSpeedTest.run(url: url, cancellation: token) { _, _ in })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        let midWrite = SSDSpeedCancellation()
+        XCTAssertThrowsError(try SSDSpeedTest.run(url: url, cancellation: midWrite) { _, _ in midWrite.cancel() })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        try Data("keep".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertThrowsError(try SSDSpeedTest.run(url: url, cancellation: token) { _, _ in })
+        XCTAssertEqual(try String(contentsOf: url), "keep")
+    }
+
+    func testRAWCadenceGuardStopsSustainedLoss() {
+        var guardrail = RAWCadenceGuard()
+        var stopped = false
+        for frame in 0...300 {
+            if guardrail.observe(Double(frame) / 48, fps: 60) != nil { stopped = true }
+        }
+        XCTAssertTrue(stopped)
+        var missingGuard = RAWCadenceGuard()
+        var result: Int?
+        for frame in 0...360 where frame % 5 != 4 {
+            if let missing = missingGuard.observe(Double(frame) / 60, fps: 60) { result = missing }
+        }
+        XCTAssertNotNil(result)
+    }
+    func testRAWCadenceGuardAllowsSparseLoss() {
+        var guardrail = RAWCadenceGuard()
+        for frame in 0...900 where frame != 40 && frame != 700 {
+            XCTAssertNil(guardrail.observe(Double(frame) / 60, fps: 60))
+        }
+    }
+
+    func testRAWFrameBudgetIncludesQueuedSamples() {
+        let budget = RAWFrameBudget(limit: 10)
+        for _ in 0..<10 { XCTAssertTrue(budget.acquire()) }
+        XCTAssertFalse(budget.acquire())
+        XCTAssertEqual(budget.peak, 10)
+        budget.release()
+        XCTAssertTrue(budget.acquire())
+        XCTAssertFalse(budget.acquire())
+        for _ in 0..<10 { budget.release() }
+        XCTAssertTrue(budget.acquire())
+        budget.release()
+    }
+
+    func testVideoCadenceRejectsDuplicateAndInvalidPTS() {
+        XCTAssertThrowsError(try VideoCadenceHealth(frames: [.init(pts: 0), .init(pts: 0)], fps: 60).validate(fps: 60))
+        XCTAssertThrowsError(try VideoCadenceHealth(frames: [.init(pts: 0), .init(pts: .nan)], fps: 60).validate(fps: 60))
+    }
+    func testVideoCadenceAllowsSparsePTSButRejectsHeavyLoss() throws {
         let healthy = (0..<600).map { ActualVideoFrame(pts: Double($0) / 60) }
         XCTAssertFalse(VideoCadenceHealth(frames: healthy, fps: 60).isSeverelyDiscontinuous)
         let interrupted = healthy.filter { $0.pts < 3 || $0.pts > 3.25 }
         let result = VideoCadenceHealth(frames: interrupted, fps: 60)
         XCTAssertTrue(result.isSeverelyDiscontinuous)
         XCTAssertGreaterThan(result.maximumGap, 0.25)
-        XCTAssertThrowsError(try result.validate(fps: 60))
+        XCTAssertNoThrow(try result.validate(fps: 60))
         let recurringLoss = healthy.enumerated().compactMap { $0.offset.isMultiple(of: 10) ? nil : $0.element }
         let recurring = VideoCadenceHealth(frames: recurringLoss, fps: 60)
         XCTAssertLessThan(recurring.maximumGap, 0.1)
         XCTAssertTrue(recurring.isSeverelyDiscontinuous)
+        XCTAssertThrowsError(try recurring.validate(fps: 60))
     }
     func testSettingsMigrationRunsOnce() {
         let suite = "GyroCineTests.\(UUID())"

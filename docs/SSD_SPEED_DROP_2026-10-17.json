@@ -1,0 +1,364 @@
+{
+  "gyrocine-ssd-speed-console.log": [
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 48.65327411270935,
+        "bytes": 33840378720,
+        "codec": "aprh",
+        "decodedFrames": 0,
+        "decodeError": "",
+        "decodeStatus": "notRequested",
+        "duration": 122.705,
+        "estimatedMissingFrames": 1389,
+        "expectedFPS": 60,
+        "frames": 5970,
+        "hasTelemetry": false,
+        "height": 2240,
+        "maximumFrameGapMS": 600.0000000000085,
+        "movie": "IMG_0001.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0001.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 66069.58547066667,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:21Z"
+    },
+    {
+      "data": {
+        "flushMS": 350.89674999471754,
+        "maximumWriteMS": 88.97766667359974,
+        "MBps": 698.3149203715662,
+        "window": 1
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66070.37249225,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:21Z"
+    },
+    {
+      "data": {
+        "flushMS": 346.0629166656872,
+        "maximumWriteMS": 88.97766667359974,
+        "MBps": 694.4923822012154,
+        "window": 2
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66071.146230375,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:22Z"
+    },
+    {
+      "data": {
+        "flushMS": 353.7685833289288,
+        "maximumWriteMS": 88.97766667359974,
+        "MBps": 675.1558916160574,
+        "window": 3
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66071.941941,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:23Z"
+    },
+    {
+      "data": {
+        "flushMS": 350.74704166618176,
+        "maximumWriteMS": 89.2993333254708,
+        "MBps": 660.9824591829309,
+        "window": 4
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66072.754966625,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:24Z"
+    },
+    {
+      "data": {
+        "flushMS": 350.1971666555619,
+        "maximumWriteMS": 89.2993333254708,
+        "MBps": 677.4583717771668,
+        "window": 5
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66073.5483485,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:25Z"
+    },
+    {
+      "data": {
+        "flushMS": 349.09950000292156,
+        "maximumWriteMS": 89.2993333254708,
+        "MBps": 685.7962915542794,
+        "window": 6
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66074.33296208334,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:25Z"
+    },
+    {
+      "data": {
+        "flushMS": 837.9067083296832,
+        "maximumWriteMS": 89.2993333254708,
+        "MBps": 418.20654685520805,
+        "window": 7
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66075.617971625,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:27Z"
+    },
+    {
+      "data": {
+        "flushMS": 1310.5103749985574,
+        "maximumWriteMS": 214.53779166040476,
+        "MBps": 238.55287646625624,
+        "window": 8
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66077.86920054167,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:29Z"
+    },
+    {
+      "data": {
+        "flushMS": 843.1850416673115,
+        "maximumWriteMS": 214.8236666689627,
+        "MBps": 296.9314405311941,
+        "window": 9
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66079.67794483334,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:31Z"
+    },
+    {
+      "data": {
+        "flushMS": 856.3113333220826,
+        "maximumWriteMS": 656.2768750009127,
+        "MBps": 237.1776023719486,
+        "window": 10
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66081.94232633333,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:33Z"
+    },
+    {
+      "data": {
+        "flushMS": 857.3874166613678,
+        "maximumWriteMS": 664.1840833326569,
+        "MBps": 237.36456761667358,
+        "window": 11
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66084.204833125,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:35Z"
+    },
+    {
+      "data": {
+        "flushMS": 1309.709416673286,
+        "maximumWriteMS": 664.1840833326569,
+        "MBps": 237.53724026825242,
+        "window": 12
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66086.465730625,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:38Z"
+    },
+    {
+      "data": {
+        "flushMS": 850.820041669067,
+        "maximumWriteMS": 664.1840833326569,
+        "MBps": 297.9912459070207,
+        "window": 13
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66088.26810641667,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:39Z"
+    },
+    {
+      "data": {
+        "flushMS": 842.8655000025174,
+        "maximumWriteMS": 668.2900000014342,
+        "MBps": 238.0882777071912,
+        "window": 14
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66090.52382895834,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:42Z"
+    },
+    {
+      "data": {
+        "flushMS": 856.3868750061374,
+        "maximumWriteMS": 668.2900000014342,
+        "MBps": 237.31450190469158,
+        "window": 15
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66092.78736725,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:44Z"
+    },
+    {
+      "data": {
+        "flushMS": 1314.1929999983404,
+        "maximumWriteMS": 668.2900000014342,
+        "MBps": 237.26573743982294,
+        "window": 16
+      },
+      "eventType": "ssd_speed_probe_window",
+      "monotonicSeconds": 66095.05140383333,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:46Z"
+    },
+    {
+      "data": {
+        "maximumWriteMS": 668.2900000014342,
+        "MBps": 337.54285553979696,
+        "minimumWindowMBps": 237.1776023719486
+      },
+      "eventType": "ssd_speed_probe_finished",
+      "monotonicSeconds": 66095.05206170834,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:46Z"
+    },
+    {
+      "data": {
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0002.tmp"
+      },
+      "eventType": "ssd_speed_probe_cleaned",
+      "monotonicSeconds": 66095.145084125,
+      "sessionID": "7111EB5D-DD1F-4575-B071-04C9CBDDB71B",
+      "wallTime": "2026-10-17T13:25:46Z"
+    }
+  ],
+  "gyrocine-ssd-hq60-guard.log": [
+    {
+      "data": {
+        "missingFrames": 37,
+        "windowSeconds": 5
+      },
+      "eventType": "raw_writer_cadence_stop",
+      "monotonicSeconds": 66303.33526075,
+      "sessionID": "A784874D-A5A3-441C-BDC4-9BF291599041",
+      "wallTime": "2026-10-17T13:29:14Z"
+    },
+    {
+      "data": {
+        "audioPackets": 863,
+        "captureDrops": 37,
+        "error": "Error Domain=GyroCine.RAWWriterExperiment Code=1 \"检测到持续严重丢帧，已停止录制并保留原片。请检查存储持续写入速度，或降低编码质量、分辨率及帧率\" UserInfo={NSLocalizedDescription=检测到持续严重丢帧，已停止录制并保留原片。请检查存储持续写入速度，或降低编码质量、分辨率及帧率}",
+        "file": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0002.mov",
+        "frames": 1163,
+        "maxAppendMS": 4.097791665117256,
+        "maxCallbackMS": 136.76745833072346,
+        "maxGap": 0.40016525,
+        "maxMetadataMS": 4.644541666493751,
+        "peakAudioBuffered": 6,
+        "peakBuffered": 4,
+        "preparationDrops": 0,
+        "receivedAudio": 881,
+        "receivedVideo": 1171,
+        "rotation": 0,
+        "slowCallbacks": 10
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 66305.071591,
+      "sessionID": "A784874D-A5A3-441C-BDC4-9BF291599041",
+      "wallTime": "2026-10-17T13:29:16Z"
+    }
+  ],
+  "gyrocine-ssd-hq30.log": [
+    {
+      "data": {
+        "audioPackets": 1951,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0003.mov",
+        "frames": 1351,
+        "maxAppendMS": 4.135666662477888,
+        "maxCallbackMS": 89.16858333395794,
+        "maxGap": 0.033356255,
+        "maxMetadataMS": 2.830416677170433,
+        "peakAudioBuffered": 4,
+        "peakBuffered": 1,
+        "preparationDrops": 0,
+        "receivedAudio": 1966,
+        "receivedVideo": 1355,
+        "rotation": 0,
+        "slowCallbacks": 5
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 66459.46968000001,
+      "sessionID": "7D7AA5F9-EC09-4A00-8547-409C0FA2C4A9",
+      "wallTime": "2026-10-17T13:31:51Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 29.99666950375606,
+        "bytes": 6431309968,
+        "codec": "aprh",
+        "decodedFrames": 1351,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 45.038333333333334,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 30,
+        "frames": 1351,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 35.000000000003695,
+        "movie": "IMG_0003.mov",
+        "path": "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/95C25021-9D0B-3A85-8A04-54B6BEE4F2D4/DCIM/100APPLE/IMG_0003.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 66470.72735370834,
+      "sessionID": "7D7AA5F9-EC09-4A00-8547-409C0FA2C4A9",
+      "wallTime": "2026-10-17T13:32:02Z"
+    }
+  ],
+  "gyrocine-ssd-media-check.log": [
+    {
+      "data": {
+        "count": 5,
+        "externalCount": 3,
+        "files": [
+          "IMG_0003.mov",
+          "IMG_0002.mov",
+          "IMG_0001.mov",
+          "A001_10172057_C002.mov",
+          "A001_10172040_C001.mov"
+        ]
+      },
+      "eventType": "media_library_loaded",
+      "monotonicSeconds": 66501.37142129167,
+      "sessionID": "C9BF4A15-D37B-4DDD-A4D2-B85B67A34E22",
+      "wallTime": "2026-10-17T13:32:32Z"
+    },
+    {
+      "data": {
+        "count": 5,
+        "externalCount": 3,
+        "files": [
+          "IMG_0003.mov",
+          "IMG_0002.mov",
+          "IMG_0001.mov",
+          "A001_10172057_C002.mov",
+          "A001_10172040_C001.mov"
+        ]
+      },
+      "eventType": "media_library_loaded",
+      "monotonicSeconds": 66501.44346587501,
+      "sessionID": "C9BF4A15-D37B-4DDD-A4D2-B85B67A34E22",
+      "wallTime": "2026-10-17T13:32:33Z"
+    }
+  ]
+}

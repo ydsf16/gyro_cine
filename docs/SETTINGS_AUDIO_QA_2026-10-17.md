@@ -4,7 +4,7 @@
 - Committed and pushed `c5c8317` to `origin/master` before this round of changes.
 
 ## Changes
-- Settings selections expand inline on the same page; choosing an option applies it and collapses the list. Updated after user feedback that navigation required too many steps.
+- Settings initially used navigation and then inline expansion. Superseded by native full-row menus in the long-recording QA follow-up; see LONG_RECORDING_QA_2026-10-17.md.
 - Media Done hit areas enlarged; player IMU overlay does not intercept touches.
 - Thumbnail decoding runs serially on a dedicated actor; canceled queued requests skip decoding.
 - Enable stereo microphone capture when supported. RAW Writer AAC target is 320 kbps for stereo, 128 kbps for mono.

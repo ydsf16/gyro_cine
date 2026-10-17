@@ -1,0 +1,676 @@
+{
+  "ultrawide": [
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 71270400000,
+        "remainingBytes": 144038182912
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 56678.26400129167,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:48:49Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 56678.283546375,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:48:49Z"
+    },
+    {
+      "data": {
+        "camera": "后置超广角相机",
+        "codec": "aprh",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:5",
+        "fps": 60,
+        "height": 3024,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 56679.324220375005,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:48:50Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13037,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/B77F4980-C6C1-4E1B-90FA-A91FC6E6A4AD/Documents/Media/UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov",
+        "frames": 17993,
+        "maxGap": 0.016694383,
+        "peakBuffered": 1,
+        "preparationDrops": 2,
+        "receivedAudio": 13050,
+        "receivedVideo": 17999,
+        "rotation": 180
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 56980.09469679167,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:53:51Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.016694876001565717,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 17993
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 56980.22343641667,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:53:51Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.97433433144267,
+        "bytes": 132061097666,
+        "codec": "aprh",
+        "decodedFrames": 17993,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.01166666666666,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 17993,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 18.333333333373503,
+        "movie": "UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov",
+        "path": "/var/mobile/Containers/Data/Application/B77F4980-C6C1-4E1B-90FA-A91FC6E6A4AD/Documents/Media/UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 57177.20778645833,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:57:08Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov",
+        "seconds": 196.98533608332946
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 57177.22352854167,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:57:08Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 65126400000,
+        "remainingBytes": 17945124864
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 57177.22789604167,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:57:08Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_350C1287-7222-4B8F-AFD3-7523E75D452A.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 57177.23233366667,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:57:08Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 62483546112
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 57177.25639216667,
+      "sessionID": "8AD1BE65-DBF5-45F3-A47F-9C911B576332",
+      "wallTime": "2026-10-17T10:57:08Z"
+    }
+  ],
+  "wide": [
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 120,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 57485.883662375,
+      "sessionID": "E04F9471-1D7E-4199-95FE-2F183684CEEA",
+      "wallTime": "2026-10-17T11:02:17Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13037,
+        "captureDrops": 16,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/5AE696FE-CA39-4C00-8675-14C31709E3EF/Documents/Media/UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov",
+        "frames": 35970,
+        "maxGap": 0.125059965,
+        "peakBuffered": 1,
+        "preparationDrops": 5,
+        "receivedAudio": 13050,
+        "receivedVideo": 35980,
+        "rotation": 180
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 57786.78467704167,
+      "sessionID": "E04F9471-1D7E-4199-95FE-2F183684CEEA",
+      "wallTime": "2026-10-17T11:07:18Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.008333333333333333,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.12505781099753221,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 35970
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 57786.910946208336,
+      "sessionID": "E04F9471-1D7E-4199-95FE-2F183684CEEA",
+      "wallTime": "2026-10-17T11:07:18Z"
+    },
+    {
+      "data": {
+        "error": "unavailable(\"视频帧时间异常：120 fps 最大间隔 125 ms，估计缺少 16 帧；原始 MOV 与 IMU 已保留\")",
+        "job": "UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 57787.12428829167,
+      "sessionID": "E04F9471-1D7E-4199-95FE-2F183684CEEA",
+      "wallTime": "2026-10-17T11:07:18Z"
+    }
+  ],
+  "wide_recovery": [
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov",
+        "seconds": 4.063504749996355
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 58157.987861208334,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:29Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 65126400000,
+        "remainingBytes": 63166570496
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58159.76898179167,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:31Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 105424277504
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58159.79039291667,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:31Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 25272320000,
+        "remainingBytes": 105424277504
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58163.766201375,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:35Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 105424433152
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58163.779209750006,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:35Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 25272320000,
+        "remainingBytes": 105424433152
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58169.766763708336,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:41Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 105424433152
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58169.78101491667,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:41Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 25272320000,
+        "remainingBytes": 105424433152
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58181.76663204167,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:53Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 105424433152
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58181.7774155,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:13:53Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 25272320000,
+        "remainingBytes": 105424433152
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58203.765484250005,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:14:15Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 105424433152
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58203.77654991667,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:14:15Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.89134118091472,
+        "bytes": 86840063265,
+        "codec": "aprn",
+        "decodedFrames": 35970,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.02166666666665,
+        "estimatedMissingFrames": 16,
+        "expectedFPS": 120,
+        "frames": 35970,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 125,
+        "movie": "UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov",
+        "path": "/var/mobile/Containers/Data/Application/A015DB84-ED50-4B3F-B3B4-0C8E59C13883/Documents/Media/UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 58415.46181558334,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:47Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 25559040000,
+        "remainingBytes": 105424433152
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58415.496225125,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:47Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_E99C405C-6EC6-4C78-9567-AA6BB52D265F.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 58415.49884179167,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:47Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 105773494272
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58415.50364391667,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:47Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 111411200000,
+        "remainingBytes": 105773494272
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58417.76838875,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:49Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58417.78736691667,
+      "sessionID": "F314E8B6-E3B5-488F-89E3-D3824CB24836",
+      "wallTime": "2026-10-17T11:17:49Z"
+    }
+  ],
+  "low_space": [
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 60,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 58448.613720208334,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:20Z"
+    },
+    {
+      "data": {
+        "availableBytes": 4900000000,
+        "reserveBytes": 5000000000
+      },
+      "eventType": "storage_safety_stop",
+      "monotonicSeconds": 58453.917865875,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:25Z"
+    },
+    {
+      "data": {
+        "audioPackets": 186,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/A015DB84-ED50-4B3F-B3B4-0C8E59C13883/Documents/Media/UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov",
+        "frames": 268,
+        "maxGap": 0.016685488,
+        "peakBuffered": 1,
+        "preparationDrops": 2,
+        "receivedAudio": 199,
+        "receivedVideo": 274,
+        "rotation": 180
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 58453.95864066667,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:25Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.016679635999025777,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 268
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 58454.08951241667,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:25Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov",
+        "seconds": 0.08356649999768706
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 58454.18360879167,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:25Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60,
+        "bytes": 462928646,
+        "codec": "aprn",
+        "decodedFrames": 268,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 4.466666666666667,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 268,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov",
+        "path": "/var/mobile/Containers/Data/Application/A015DB84-ED50-4B3F-B3B4-0C8E59C13883/Documents/Media/UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 58455.78027283333,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:27Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 65536000000,
+        "remainingBytes": 149537411072
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58455.78830745834,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:27Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_B0057444-BCB0-42B1-B64D-F9619974F67D.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 58455.79672200001,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:27Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58455.802495125004,
+      "sessionID": "FF2070C0-8A6D-45D4-964B-FCA8E54D592D",
+      "wallTime": "2026-10-17T11:18:27Z"
+    }
+  ],
+  "telephoto": [
+    {
+      "data": {
+        "camera": "后置长焦相机",
+        "codec": "aprh",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:2",
+        "fps": 60,
+        "height": 3024,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 58481.193356,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:18:52Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13037,
+        "captureDrops": 19,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/A015DB84-ED50-4B3F-B3B4-0C8E59C13883/Documents/Media/UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov",
+        "frames": 17974,
+        "maxGap": 0.116728169,
+        "peakBuffered": 1,
+        "preparationDrops": 2,
+        "receivedAudio": 13050,
+        "receivedVideo": 17980,
+        "rotation": 180
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 58781.955500125005,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:23:53Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.11672798600193346,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 17974
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 58782.08177908334,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:23:53Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov",
+        "seconds": 3.4588033749969327
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 58785.55350920834,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:23:57Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.91100346097652,
+        "bytes": 97323508662,
+        "codec": "aprh",
+        "decodedFrames": 17974,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.01166666666666,
+        "estimatedMissingFrames": 19,
+        "expectedFPS": 60,
+        "frames": 17974,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 116.66666666667425,
+        "movie": "UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov",
+        "path": "/var/mobile/Containers/Data/Application/A015DB84-ED50-4B3F-B3B4-0C8E59C13883/Documents/Media/UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 58972.81138670834,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:04Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 65536000000,
+        "remainingBytes": 52682911744
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58972.83970620834,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:04Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_9DE64889-5CD7-4281-93F3-794963B72CF3.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 58972.844230333336,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:04Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 95797940224
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58972.858861375,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:04Z"
+    },
+    {
+      "data": {
+        "initialBytes": 150000000000,
+        "localFreeBytes": 122060800000,
+        "remainingBytes": 95797940224
+      },
+      "eventType": "storage_replenish_begin",
+      "monotonicSeconds": 58975.58797254167,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:07Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 58975.60960791667,
+      "sessionID": "B039398B-9C9B-417E-9DB3-76D848E4A6D0",
+      "wallTime": "2026-10-17T11:27:07Z"
+    }
+  ]
+}

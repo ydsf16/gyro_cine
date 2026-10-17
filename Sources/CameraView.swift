@@ -234,6 +234,7 @@ struct CameraView: View {
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
     @State private var showingMedia = false
+    @State private var showingSpeedDiagnostic = false
     @State private var showingWBPresets = false
     @State private var shutterValue = 1.0 / 120.0
     @State private var shutterMaxValue = 1.0 / 200.0
@@ -251,7 +252,7 @@ struct CameraView: View {
 
     private var captureControlsEnabled: Bool {
         scenePhase == .active && camera.cameraReady && !camera.preparingRecording &&
-        !camera.finalizing && !camera.switchingLens && camera.errorText == nil &&
+        !camera.finalizing && !camera.ssdSpeedTesting && !camera.switchingLens && camera.errorText == nil &&
         !showingSettings && !showingCaptureSetup && !showingSlate && !showingMedia &&
         !showingWBPresets && !showingLUTCredits
     }
@@ -330,6 +331,19 @@ struct CameraView: View {
         }
         .sheet(isPresented: $showingSlate) { RecordingSlateView().environmentObject(camera) }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
+        .sheet(isPresented: $showingSpeedDiagnostic) { SSDSpeedTestView() }
+        .onChange(of: camera.ssdSpeedTesting) { _, active in
+            #if DEBUG
+            if active && ProcessInfo.processInfo.arguments.contains("--ssd-speed-probe") {
+                camera.clearError(); showingSpeedDiagnostic = true
+            }
+            #endif
+        }
+        .onChange(of: camera.cameraReady) { _, ready in
+            #if DEBUG
+            if ready && ProcessInfo.processInfo.arguments.contains("--show-media-diagnostic") { showingMedia = true }
+            #endif
+        }
         .sheet(isPresented: $showingLUTCredits) {
             NavigationStack {
                 Form {
@@ -413,8 +427,10 @@ struct CameraView: View {
             if camera.checkedStorageLocation == storageLocation,
                let bytes = camera.availableStorageBytes, bytes >= 0,
                let seconds = camera.estimatedRecordingSeconds, seconds.isFinite {
-                Text(String(format: t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
-                            Double(bytes) / 1_000_000_000, Int(seconds / 60)))
+                Text(String(format: seconds < 60
+                            ? t("剩余 %.1f GB · 约 %d 秒", "Free %.1f GB · ~%d sec")
+                            : t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
+                            Double(bytes) / 1_000_000_000, Int(seconds < 60 ? seconds : seconds / 60)))
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
             } else {

@@ -15,11 +15,12 @@ struct SettingsView: View {
     @AppStorage("rulerHaptics") private var rulerHaptics = true
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
+    @State private var showingSSDSpeed = false
     @State private var message: String?
     @State private var pendingLensID: String?
     @State private var offerProVideoStorageSettings = false
 
-    private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing || camera.switchingLens || pendingLensID != nil }
+    private var locked: Bool { camera.ssdSpeedTesting || camera.recording || camera.preparingRecording || camera.finalizing || camera.switchingLens || pendingLensID != nil }
     private var codecOptions: [VideoEncoding] {
         VideoEncoding.allCases.filter { camera.codecs.contains($0.codec) }
     }
@@ -124,6 +125,7 @@ struct SettingsView: View {
                 }
                 Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
             } message: { Text(message ?? "") }
+            .sheet(isPresented: $showingSSDSpeed) { SSDSpeedTestView() }
             .onAppear {
                 refreshExternalDevices()
                 if outputFormat == "Sony MOV" { outputFormat = "SonyMov" }
@@ -216,6 +218,11 @@ struct SettingsView: View {
                     .accessibilityIdentifier("storageLocationMenu")
                     .disabled(locked)
                     if storageLocation == "专用视频存储" {
+                        Button { camera.requestStorageReplenishment() } label: {
+                            Label(t("回收可用空间", "Reclaim available space"), systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }.disabled(locked).accessibilityIdentifier("reclaimStorage")
                         Button {
                             guard ProVideoStorageBridge.isSupported() else {
                                 message = t("此设备或系统不支持专用视频存储。", "Pro Video Storage is unavailable on this device.")
@@ -250,16 +257,23 @@ struct SettingsView: View {
                             row(t("目标 SSD", "Destination SSD"), selectedExternalName)
                         }
                             .disabled(locked)
+                        Button { showingSSDSpeed = true } label: {
+                            HStack {
+                                Label(t("SSD 测速", "SSD speed test"), systemImage: "speedometer")
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            }.frame(minHeight: 44).contentShape(Rectangle())
+                        }.tint(.primary).disabled(locked).accessibilityIdentifier("ssdSpeedTest")
                     }
                     SettingsChoices(title: t("文件名类型", "Filename type")) {
                         Button(t("简洁", "Simple")) { filenameType = "simple" }
                         Button("BMC") { filenameType = "BMC" }
                     } label: { row(t("文件名类型", "Filename type"), filenameType == "BMC" ? "BMC" : t("简洁", "Simple")) }
-                    .disabled(locked).accessibilityIdentifier("filenameTypePicker")
+                    .tint(.primary).disabled(locked).accessibilityIdentifier("filenameTypePicker")
                     SettingsChoices(title: t("存储格式", "Output format")) {
-                        Button("Sony MOV") { outputFormat = "SonyMov" }
-                        Button("Gyroflow Proto MOV") { outputFormat = "GyroflowProto" }
-                    } label: { row(t("存储格式", "Output format"), outputFormat == "SonyMov" ? "Sony MOV" : "Gyroflow Proto MOV") }.tint(.primary)
+                        Button("Gyroflow") { outputFormat = "SonyMov" }
+                        Button("GyroflowNightly") { outputFormat = "GyroflowProto" }
+                    } label: { row(t("存储格式", "Output format"), outputFormat == "SonyMov" ? "Gyroflow" : "GyroflowNightly") }.tint(.primary)
                     .accessibilityIdentifier("outputFormatMenu")
                     .disabled(locked)
         } header: { Text(t("存储", "STORAGE")) }
@@ -372,50 +386,22 @@ private struct ResolutionOption: Identifiable {
 }
 
 
-/// Inline choices keep configuration on one page with full-width touch targets.
+/// Native menus keep selection on this page; the whole row is the hit target.
 private struct SettingsChoices<Options: View, Row: View>: View {
     let title: String
     @ViewBuilder var options: () -> Options
     @ViewBuilder var label: () -> Row
-    @State private var expanded = false
-
     var body: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) { expanded.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    label()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }
-                .frame(minHeight: 44).contentShape(Rectangle())
+        Menu { options() } label: {
+            HStack(spacing: 10) {
+                label()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
-            if expanded {
-                VStack(spacing: 0) {
-                    Divider()
-                    options()
-                        .buttonStyle(SettingsChoiceActionStyle {
-                            withAnimation(.easeInOut(duration: 0.18)) { expanded = false }
-                        })
-                }
-                .padding(.leading, 12)
-            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Rectangle())
         }
-    }
-}
-
-private struct SettingsChoiceActionStyle: PrimitiveButtonStyle {
-    let selected: () -> Void
-    func makeBody(configuration: Configuration) -> some View {
-        Button {
-            configuration.trigger()
-            selected()
-        } label: {
-            configuration.label.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                .contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
+        .menuOrder(.fixed)
     }
 }

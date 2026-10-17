@@ -1,0 +1,916 @@
+{
+  "gyrocine-isolated-wide-v2.log": [
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 120,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 59623.06162745834,
+      "sessionID": "2D8888B8-574C-4731-9DF5-83F19C11BA63",
+      "wallTime": "2026-10-17T11:37:54Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13038,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/7F02250A-991D-4C76-AC84-FC764714CA6C/Documents/Media/UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov",
+        "frames": 35987,
+        "maxAppendMS": 7.840958329325076,
+        "maxCallbackMS": 54.57195833150763,
+        "maxGap": 0.008357625,
+        "maxMetadataMS": 6.697916665871162,
+        "peakBuffered": 1,
+        "preparationDrops": 5,
+        "receivedAudio": 13051,
+        "receivedVideo": 35998,
+        "rotation": 180,
+        "slowCallbacks": 56
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 59923.98541379167,
+      "sessionID": "2D8888B8-574C-4731-9DF5-83F19C11BA63",
+      "wallTime": "2026-10-17T11:42:55Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.008333333333333333,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.008357172999239992,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 35987
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 59924.12498845834,
+      "sessionID": "2D8888B8-574C-4731-9DF5-83F19C11BA63",
+      "wallTime": "2026-10-17T11:42:55Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov",
+        "seconds": 4.078721124998992
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 59928.21722229167,
+      "sessionID": "2D8888B8-574C-4731-9DF5-83F19C11BA63",
+      "wallTime": "2026-10-17T11:42:59Z"
+    }
+  ],
+  "gyrocine-isolated-wide-verify.log": [
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 104473317376
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60135.72743783334,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:46:27Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 104473530368
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60139.70817212501,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:46:31Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 104473530368
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60145.710754458334,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:46:37Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 104473530368
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60157.710182333336,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:46:49Z"
+    },
+    {
+      "data": {
+        "error": "这项操作无法完成",
+        "remainingBytes": 104473530368
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60179.71041525,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:47:11Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.94467219944673,
+        "bytes": 87867135768,
+        "codec": "aprn",
+        "decodedFrames": 35987,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.03,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 120,
+        "frames": 35987,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 10.000000000047748,
+        "movie": "UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov",
+        "path": "/var/mobile/Containers/Data/Application/8BDAF498-292E-4DC5-A5F7-1BB9ADE87194/Documents/Media/UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 60346.01523408334,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:49:57Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_5F3575B1-4797-4ED9-848F-E81B15A95107.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 60346.04537204167,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:49:57Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 104828289024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60346.05476429167,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:49:57Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60349.719258875004,
+      "sessionID": "D2D7E95B-19E3-480C-A471-C599F5BE6B5C",
+      "wallTime": "2026-10-17T11:50:01Z"
+    }
+  ],
+  "gyrocine-isolated-tele.log": [
+    {
+      "data": {
+        "camera": "后置长焦相机",
+        "codec": "aprh",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:2",
+        "fps": 60,
+        "height": 3024,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 60383.952657125,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:50:35Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13037,
+        "captureDrops": 8,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/8BDAF498-292E-4DC5-A5F7-1BB9ADE87194/Documents/Media/UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov",
+        "frames": 17986,
+        "maxAppendMS": 150.74916667072102,
+        "maxCallbackMS": 150.98487499926705,
+        "maxGap": 0.150071397,
+        "maxMetadataMS": 5.6960416623041965,
+        "peakBuffered": 1,
+        "preparationDrops": 2,
+        "receivedAudio": 13050,
+        "receivedVideo": 17992,
+        "rotation": 180,
+        "slowCallbacks": 67
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 60684.717213875,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:55:36Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.15006412500224542,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 17986
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 60684.85260991667,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:55:36Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov",
+        "seconds": 3.4134185833318043
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 60688.27917604167,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:55:39Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.94767160879251,
+        "bytes": 105826550682,
+        "codec": "aprh",
+        "decodedFrames": 17986,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.0283333333333,
+        "estimatedMissingFrames": 8,
+        "expectedFPS": 60,
+        "frames": 17986,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 151.66666666667084,
+        "movie": "UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov",
+        "path": "/var/mobile/Containers/Data/Application/8BDAF498-292E-4DC5-A5F7-1BB9ADE87194/Documents/Media/UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 60887.32185179167,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:58:58Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_F787ED87-B744-4A4D-8411-5A7C23ED24F5.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 60887.358614875004,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:58:58Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 87916666880
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60887.368543625,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:58:58Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 60890.36268266667,
+      "sessionID": "59E22A88-C2F4-459F-BB66-9CA7D414B4F5",
+      "wallTime": "2026-10-17T11:59:01Z"
+    }
+  ],
+  "gyrocine-buffered-tele.log": [
+    {
+      "data": {
+        "camera": "后置长焦相机",
+        "codec": "aprh",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:2",
+        "fps": 60,
+        "height": 3024,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 60934.625201875,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T11:59:46Z"
+    },
+    {
+      "data": {
+        "milliseconds": 120
+      },
+      "eventType": "raw_writer_test_stall",
+      "monotonicSeconds": 60938.34331129167,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T11:59:49Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13037,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/55A6E584-8EB5-4AAB-84F2-6019E9FDD859/Documents/Media/UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov",
+        "frames": 17994,
+        "maxAppendMS": 8.444125000096392,
+        "maxCallbackMS": 126.5461666698684,
+        "maxGap": 0.016696115,
+        "maxMetadataMS": 6.792208332626615,
+        "peakAudioBuffered": 5,
+        "peakBuffered": 8,
+        "preparationDrops": 0,
+        "receivedAudio": 13051,
+        "receivedVideo": 18000,
+        "rotation": 180,
+        "slowCallbacks": 211
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 61235.39750116667,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:04:47Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.016694213001755998,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 17994
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 61235.53880645834,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:04:47Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov",
+        "seconds": 3.545820333332813
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 61239.09998891667,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:04:50Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 59.97400259974003,
+        "bytes": 112642008477,
+        "codec": "aprh",
+        "decodedFrames": 17994,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.03,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 17994,
+        "hasTelemetry": true,
+        "height": 3024,
+        "maximumFrameGapMS": 18.333333333373503,
+        "movie": "UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov",
+        "path": "/var/mobile/Containers/Data/Application/55A6E584-8EB5-4AAB-84F2-6019E9FDD859/Documents/Media/UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 61450.755229333336,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:08:22Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_9C729BDD-1164-4674-8594-4477BDD2E81E.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 61450.789439375,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:08:22Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 81252663296
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 61450.808440333334,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:08:22Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 61453.888765125004,
+      "sessionID": "BA9B64BF-58ED-445D-8F5C-A9243CAE1318",
+      "wallTime": "2026-10-17T12:08:25Z"
+    }
+  ],
+  "gyrocine-buffer-overflow-recovery.log": [
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 60,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 61502.84041408334,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:14Z"
+    },
+    {
+      "data": {
+        "audio": false,
+        "limit": 10
+      },
+      "eventType": "raw_writer_ingress_overflow",
+      "monotonicSeconds": 61503.929908375,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:15Z"
+    },
+    {
+      "data": {
+        "audioPackets": 3,
+        "captureDrops": 0,
+        "error": "Error Domain=GyroCine.RAWWriterExperiment Code=1 \"RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格\" UserInfo={NSLocalizedDescription=RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格}",
+        "file": "/var/mobile/Containers/Data/Application/037E9762-373D-41B5-8E95-D017513F5B02/Documents/Media/UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov",
+        "frames": 5,
+        "maxAppendMS": 0.46079167077550665,
+        "maxCallbackMS": 49.556541664060205,
+        "maxGap": 0.016670166,
+        "maxMetadataMS": 0.8818749993224628,
+        "peakAudioBuffered": 2,
+        "peakBuffered": 10,
+        "preparationDrops": 0,
+        "receivedAudio": 17,
+        "receivedVideo": 21,
+        "rotation": 180,
+        "slowCallbacks": 0
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 61503.96577645834,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:15Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.016666210001858417,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 15
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 61504.098152791674,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:15Z"
+    },
+    {
+      "data": {
+        "error": "unavailable(\"RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格\")",
+        "job": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 61504.110506833335,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:15Z"
+    },
+    {
+      "data": {
+        "failedJob": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov.pending-imu.json"
+      },
+      "eventType": "raw_writer_auto_retry",
+      "monotonicSeconds": 61504.110772458334,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:15Z"
+    },
+    {
+      "data": {
+        "audioPackets": 211,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/037E9762-373D-41B5-8E95-D017513F5B02/Documents/Media/UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov",
+        "frames": 301,
+        "maxAppendMS": 2.9702916654059663,
+        "maxCallbackMS": 59.524416661588475,
+        "maxGap": 0.016684739,
+        "maxMetadataMS": 1.400125001964625,
+        "peakAudioBuffered": 2,
+        "peakBuffered": 1,
+        "preparationDrops": 0,
+        "receivedAudio": 225,
+        "receivedVideo": 306,
+        "rotation": 180,
+        "slowCallbacks": 1
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 61509.31377916667,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:20Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.01668471299490193,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 301
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 61509.440290791674,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:21Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov",
+        "seconds": 0.11897337499976857
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 61509.57266995834,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:21Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60,
+        "bytes": 566584816,
+        "codec": "aprn",
+        "decodedFrames": 301,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 5.016666666666667,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 301,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov",
+        "path": "/var/mobile/Containers/Data/Application/037E9762-373D-41B5-8E95-D017513F5B02/Documents/Media/UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 61511.538740958335,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:23Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_F602E2C9-75F1-4213-89B3-253DB7F2450D.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 61511.56025341667,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:23Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 61511.56760791667,
+      "sessionID": "F800519E-898D-4DDA-8A9C-D4E0494E8E08",
+      "wallTime": "2026-10-17T12:09:23Z"
+    }
+  ],
+  "gyrocine-buffered-wide.log": [
+    {
+      "data": {
+        "error": "unavailable(\"RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格\")",
+        "job": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 61631.2096055,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:11:22Z"
+    },
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 120,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 61632.20522133334,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:11:23Z"
+    },
+    {
+      "data": {
+        "audioPackets": 13039,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/037E9762-373D-41B5-8E95-D017513F5B02/Documents/Media/UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov",
+        "frames": 35993,
+        "maxAppendMS": 5.557166667131241,
+        "maxCallbackMS": 49.667208339087665,
+        "maxGap": 0.008357218,
+        "maxMetadataMS": 8.730458335776348,
+        "peakAudioBuffered": 2,
+        "peakBuffered": 2,
+        "preparationDrops": 0,
+        "receivedAudio": 13053,
+        "receivedVideo": 36004,
+        "rotation": 180,
+        "slowCallbacks": 97
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 61933.17760437501,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:16:24Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.008333333333333333,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.008357343001989648,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 35993
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 61933.30684629167,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:16:24Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov",
+        "seconds": 4.185870208333654
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 61937.50738733334,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:16:29Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 119.94534760368127,
+        "bytes": 88013841583,
+        "codec": "aprn",
+        "decodedFrames": 35993,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 300.0783333333333,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 120,
+        "frames": 35993,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 10.000000000047748,
+        "movie": "UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov",
+        "path": "/var/mobile/Containers/Data/Application/037E9762-373D-41B5-8E95-D017513F5B02/Documents/Media/UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 62525.155081833334,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:26:16Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_D562851B-3177-43C8-B188-E08ED76349AA.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 62525.194482000006,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:26:16Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 104678277120
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 62525.20861866667,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:26:16Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 62527.60125741667,
+      "sessionID": "7C58A4BF-14EB-4390-955D-0234B153E392",
+      "wallTime": "2026-10-17T12:26:19Z"
+    }
+  ],
+  "gyrocine-buffered-lowspace.log": [
+    {
+      "data": {
+        "error": "unavailable(\"RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格\")",
+        "job": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 62619.709828625004,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:51Z"
+    },
+    {
+      "data": {
+        "camera": "后置相机",
+        "codec": "aprn",
+        "deviceID": "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+        "fps": 60,
+        "height": 2240,
+        "width": 4224
+      },
+      "eventType": "raw_writer_matrix_case",
+      "monotonicSeconds": 62620.71061629167,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:52Z"
+    },
+    {
+      "data": {
+        "availableBytes": 4900000000,
+        "reserveBytes": 5000000000
+      },
+      "eventType": "storage_safety_stop",
+      "monotonicSeconds": 62626.0436855,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:57Z"
+    },
+    {
+      "data": {
+        "audioPackets": 188,
+        "captureDrops": 0,
+        "error": "",
+        "file": "/var/mobile/Containers/Data/Application/6AA034EC-50F4-4C8F-A482-F765266ABE0E/Documents/Media/UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov",
+        "frames": 269,
+        "maxAppendMS": 1.9806250056717545,
+        "maxCallbackMS": 50.28912499983562,
+        "maxGap": 0.016683906,
+        "maxMetadataMS": 3.4950833360198885,
+        "peakAudioBuffered": 2,
+        "peakBuffered": 1,
+        "preparationDrops": 0,
+        "receivedAudio": 201,
+        "receivedVideo": 274,
+        "rotation": 180,
+        "slowCallbacks": 2
+      },
+      "eventType": "raw_writer_finished",
+      "monotonicSeconds": 62626.08591416667,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:57Z"
+    },
+    {
+      "data": {
+        "dataOutputDroppedReasons": {},
+        "expectedIntervalSeconds": 0.016666666666666666,
+        "failedFrames": 0,
+        "file": "UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov",
+        "firstGapExamples": [],
+        "longGapCount": 0,
+        "maxCallbackLatencySeconds": 0,
+        "maxProcessingSeconds": 0,
+        "maxPTSGapSeconds": 0.016681886998412665,
+        "maxWriteSeconds": 0,
+        "meanProcessingSeconds": 0,
+        "receivedFrames": 269
+      },
+      "eventType": "intrinsics_capture_health",
+      "monotonicSeconds": 62626.21305291667,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:57Z"
+    },
+    {
+      "data": {
+        "movie": "UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov",
+        "seconds": 0.08858808333025081
+      },
+      "eventType": "imu_finalize_total",
+      "monotonicSeconds": 62626.31457075,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:57Z"
+    },
+    {
+      "data": {
+        "audioTracks": 1,
+        "averageFPS": 60,
+        "bytes": 502019034,
+        "codec": "aprn",
+        "decodedFrames": 269,
+        "decodeError": "",
+        "decodeStatus": "completed",
+        "duration": 4.483333333333333,
+        "estimatedMissingFrames": 0,
+        "expectedFPS": 60,
+        "frames": 269,
+        "hasTelemetry": true,
+        "height": 2240,
+        "maximumFrameGapMS": 16.666666666667496,
+        "movie": "UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov",
+        "path": "/var/mobile/Containers/Data/Application/6AA034EC-50F4-4C8F-A482-F765266ABE0E/Documents/Media/UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov",
+        "width": 4224
+      },
+      "eventType": "raw_smoke_result",
+      "monotonicSeconds": 62627.43565783334,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:59Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_AD0F47F2-0994-45F9-96A8-7E4883AC8068.mov"
+      },
+      "eventType": "long_test_cleanup",
+      "monotonicSeconds": 62627.45334791667,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:59Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "remainingBytes": 150000001024
+      },
+      "eventType": "deleted_media_storage_replenished",
+      "monotonicSeconds": 62627.45755783334,
+      "sessionID": "CEDAD6C9-70E7-401F-B682-7257BFBAC38F",
+      "wallTime": "2026-10-17T12:27:59Z"
+    }
+  ],
+  "gyrocine-overflow-cleanup-done.log": [
+    {
+      "data": {
+        "error": "unavailable(\"RAW 视频缓冲超过 10 帧，编码或存储写入跟不上，已停止录制并保留原片；请检查存储速度、剩余空间或降低录制规格\")",
+        "job": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 62677.96323579167,
+      "sessionID": "969C664E-8923-469B-BB78-65AF8B0ACB94",
+      "wallTime": "2026-10-17T12:28:49Z"
+    },
+    {
+      "data": {
+        "error": "",
+        "movie": "UITEST_IMG_writer_58CC51B8-6698-4B45-A8FB-5632AE243A0E.mov"
+      },
+      "eventType": "failed_test_cleanup",
+      "monotonicSeconds": 62679.00174675,
+      "sessionID": "969C664E-8923-469B-BB78-65AF8B0ACB94",
+      "wallTime": "2026-10-17T12:28:50Z"
+    }
+  ]
+}

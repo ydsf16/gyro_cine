@@ -122,6 +122,9 @@ struct MediaLibraryView: View {
                 get: { message != nil }, set: { if !$0 { message = nil } }
             )) { Button(t("确定", "OK")) { message = nil } } message: { Text(message ?? "") }
             .onAppear { reload() }
+            .onChange(of: camera.externalStorageConnected) { _, _ in reload() }
+            .onChange(of: camera.finalizing) { _, saving in if !saving { reload() } }
+            .refreshable { reload() }
             .onDisappear {
                 scopedExternalFiles.forEach { $0.stopAccessingSecurityScopedResource() }
                 scopedExternalFiles = []
@@ -149,13 +152,24 @@ struct MediaLibraryView: View {
                 (try? FileManager.default.contentsOfDirectory(at: directory,
                     includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
             }.filter { $0.pathExtension.lowercased() == "mov" }
-        let bookmarks = UserDefaults.standard.array(forKey: "externalMediaBookmarks") as? [Data] ?? []
+        var bookmarks = UserDefaults.standard.array(forKey: "externalMediaBookmarks") as? [Data] ?? []
+        // Failed/incomplete finalization must not hide an existing SSD recording.
+        let jobs = (try? FileManager.default.contentsOfDirectory(at: RecordingStoragePaths.diagnosticDirectory,
+            includingPropertiesForKeys: nil)) ?? []
+        for file in jobs where file.lastPathComponent.hasSuffix(".pending-imu.json") {
+            if let data = try? Data(contentsOf: file),
+               let job = try? JSONDecoder().decode(PendingIMUJob.self, from: data),
+               let bookmark = job.externalMovieBookmark, !bookmarks.contains(bookmark) {
+                bookmarks.append(bookmark)
+            }
+        }
         for bookmark in bookmarks {
             var stale = false
             guard let url = try? URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil,
-                                     bookmarkDataIsStale: &stale), !stale,
+                                     bookmarkDataIsStale: &stale),
                   url.startAccessingSecurityScopedResource() else { continue }
-            scopedExternalFiles.append(url)
+            if scopedExternalFiles.contains(url) { url.stopAccessingSecurityScopedResource() }
+            else { scopedExternalFiles.append(url) }
         }
         files = (internalFiles + scopedExternalFiles.filter { FileManager.default.fileExists(atPath: $0.path) })
             .sorted {
@@ -163,6 +177,9 @@ struct MediaLibraryView: View {
                 let right = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
                 return left > right
             }
+        camera.logger.event("media_library_loaded", ["count": files.count,
+            "externalCount": scopedExternalFiles.filter { FileManager.default.fileExists(atPath: $0.path) }.count,
+            "files": files.map(\.lastPathComponent)])
     }
 
     private func toggle(_ url: URL) {

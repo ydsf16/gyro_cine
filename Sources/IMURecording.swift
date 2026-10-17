@@ -15,10 +15,13 @@ struct VideoCadenceHealth {
     let maximumGap: Double
     let missingFrames: Int
     let expectedFrames: Int
-    var isSeverelyDiscontinuous: Bool { maximumGap > 0.1 || missingFrames > max(3, expectedFrames / 20) }
+    let hasInvalidTimestamps: Bool
+    var hasHeavyFrameLoss: Bool { missingFrames > max(3, expectedFrames / 20) }
+    var isSeverelyDiscontinuous: Bool { maximumGap > 0.1 || hasHeavyFrameLoss }
 
     init(frames: [ActualVideoFrame], fps: Double) {
         let times = frames.map(\.pts).filter(\.isFinite).sorted()
+        hasInvalidTimestamps = times.count != frames.count || Set(times).count != times.count
         let gaps = zip(times, times.dropFirst()).map { $1 - $0 }.filter { $0 > 0 }
         maximumGap = gaps.max() ?? 0
         missingFrames = gaps.reduce(0) { $0 + max(0, Int(($1 * fps).rounded()) - 1) }
@@ -26,7 +29,12 @@ struct VideoCadenceHealth {
     }
 
     func validate(fps: Double) throws {
-        guard !isSeverelyDiscontinuous else {
+        guard !hasInvalidTimestamps else {
+            throw RecorderError.unavailable("MOV 含无效或重复帧时间；原始 MOV 与 IMU 已保留")
+        }
+        // A sparse but valid PTS timeline can still be matched to measured IMU.
+        // Keep cadence warnings in metadata; reject sustained loss, not one long interval.
+        guard !hasHeavyFrameLoss else {
             throw RecorderError.unavailable(String(format:
                 "视频帧时间异常：%.0f fps 最大间隔 %.0f ms，估计缺少 %d 帧；原始 MOV 与 IMU 已保留",
                 fps, maximumGap * 1000, missingFrames))
