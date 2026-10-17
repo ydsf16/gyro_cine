@@ -321,7 +321,8 @@ struct CameraView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black)
-        .preferredColorScheme(.dark)
+        // Keep viewfinder controls dark without imposing a window-wide appearance on sheets.
+        .environment(\.colorScheme, .dark)
         .sheet(isPresented: $showingSettings) { SettingsView().environmentObject(camera) }
         .sheet(isPresented: $showingCaptureSetup) {
             SettingsView(quickCapture: true).environmentObject(camera)

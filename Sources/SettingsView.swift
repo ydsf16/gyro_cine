@@ -130,7 +130,6 @@ struct SettingsView: View {
                 if outputFormat == "Gyroflow Project" { outputFormat = "GyroflowProto" }
             }
         }
-        .preferredColorScheme(.light)
     }
 
     private var videoSection: some View {

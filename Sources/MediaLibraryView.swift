@@ -50,6 +50,7 @@ struct MediaLibraryView: View {
                     }
                 }.padding(16)
             }
+            .background(Color(uiColor: .systemGroupedBackground))
             .accessibilityIdentifier("mediaGrid")
             .overlay { if files.isEmpty { ContentUnavailableView(t("暂无素材", "No recordings"), systemImage: "film") } }
             .navigationTitle(t("素材", "Media"))
