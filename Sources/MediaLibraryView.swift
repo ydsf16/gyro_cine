@@ -22,50 +22,35 @@ struct MediaLibraryView: View {
 
     var body: some View {
         NavigationStack {
-            List(files, id: \.self) { url in
-                HStack(spacing: 12) {
-                    Button {
-                        if selecting { toggle(url) } else { selected = url }
-                    } label: {
-                        HStack(spacing: 12) {
-                            if selecting {
-                                Image(systemName: selection.contains(url) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selection.contains(url) ? Color.blue : Color.secondary)
-                            }
-                            MovieThumbnail(url: url)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(url.lastPathComponent).lineLimit(1)
-                                    .font(.subheadline.weight(.semibold))
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 22) {
+                    ForEach(files, id: \.self) { url in
+                        Button {
+                            if selecting { toggle(url) } else { selected = url }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 7) {
+                                MovieThumbnail(url: url)
+                                    .overlay(alignment: .topLeading) {
+                                        if selecting {
+                                            Image(systemName: selection.contains(url) ? "checkmark.circle.fill" : "circle")
+                                                .font(.title2).foregroundStyle(selection.contains(url) ? .blue : .white)
+                                                .background(.black.opacity(0.6), in: Circle()).padding(8)
+                                        }
+                                    }
+                                Text(url.deletingPathExtension().lastPathComponent)
+                                    .font(.subheadline).lineLimit(1)
                                 Text(fileSize(url)).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("mediaRow.\(url.lastPathComponent)")
-                    .highPriorityGesture(LongPressGesture(minimumDuration: 0.55).onEnded { _ in
-                        selecting = true; selection.insert(url)
-                    })
-                    if !selecting {
-                        Button { saveToPhotos(url) } label: {
-                            Image(systemName: "square.and.arrow.down")
-                                .frame(width: 32, height: 40)
+                            }.contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(t("存入相册", "Save to Photos"))
-                        .accessibilityIdentifier("mediaSave.\(url.lastPathComponent)")
-                        ShareLink(item: url) {
-                            Image(systemName: "square.and.arrow.up")
-                                .frame(width: 32, height: 40)
-                        }
-                        .accessibilityLabel(t("分享", "Share"))
+                        .accessibilityIdentifier("mediaRow.\(url.lastPathComponent)")
+                        .highPriorityGesture(LongPressGesture(minimumDuration: 0.55).onEnded { _ in
+                            selecting = true; selection.insert(url)
+                        })
                     }
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(t("删除", "Delete"), role: .destructive) { pendingDelete = [url] }
-                }
+                }.padding(16)
             }
+            .accessibilityIdentifier("mediaGrid")
             .overlay { if files.isEmpty { ContentUnavailableView(t("暂无素材", "No recordings"), systemImage: "film") } }
             .navigationTitle(t("素材", "Media"))
             .toolbar {
@@ -90,6 +75,9 @@ struct MediaLibraryView: View {
                         ShareLink(items: files.filter { selection.contains($0) }) {
                             Label(t("分享", "Share"), systemImage: "square.and.arrow.up")
                         }.accessibilityIdentifier("mediaShareSelected")
+                        Button { saveToPhotos(files.filter { selection.contains($0) }) } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }.accessibilityLabel(t("存入相册", "Save to Photos"))
                         Button(role: .destructive) { pendingDelete = files.filter { selection.contains($0) } } label: {
                             Label(t("删除", "Delete"), systemImage: "trash")
                         }.accessibilityIdentifier("mediaDeleteSelected")
@@ -99,8 +87,25 @@ struct MediaLibraryView: View {
             }
             .disabled(deleting)
             .sheet(item: $selected) { url in
-                VideoPlayer(player: AVPlayer(url: url)).padding()
-                    .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20) }
+                NavigationStack {
+                    VideoPlayer(player: AVPlayer(url: url))
+                        .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20) }
+                        .navigationTitle(url.deletingPathExtension().lastPathComponent)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { selected = nil } }
+                            ToolbarItemGroup(placement: .bottomBar) {
+                                ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
+                                Spacer()
+                                Button { selected = nil; saveToPhotos([url]) } label: { Image(systemName: "square.and.arrow.down") }
+                                    .accessibilityLabel(t("存入相册", "Save to Photos"))
+                                    .accessibilityIdentifier("mediaSave.\(url.lastPathComponent)")
+                                Spacer()
+                                Button(role: .destructive) { selected = nil; pendingDelete = [url] } label: { Image(systemName: "trash") }
+                                    .disabled(camera.recording || camera.finalizing)
+                            }
+                        }
+                }
             }
             .confirmationDialog(t("删除素材？", "Delete recording?"), isPresented: Binding(
                 get: { !pendingDelete.isEmpty }, set: { if !$0 { pendingDelete = [] } }
@@ -165,14 +170,14 @@ struct MediaLibraryView: View {
         }
     }
 
-    private func saveToPhotos(_ url: URL) {
+    private func saveToPhotos(_ urls: [URL]) {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async { message = t("请在系统设置中允许存入相册。", "Allow Photos access in Settings.") }
                 return
             }
             PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+                for url in urls { PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url) }
             } completionHandler: { saved, error in
                 DispatchQueue.main.async {
                     message = saved ? t("已存入相册", "Saved to Photos") :
@@ -187,18 +192,20 @@ private struct MovieThumbnail: View {
     let url: URL
     @State private var image: UIImage?
     @State private var isRaw = false
+    @State private var duration = "—"
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Group {
                 if let image {
-                    Image(uiImage: image).resizable().scaledToFill()
+                    Image(uiImage: image).resizable().scaledToFit()
                 } else {
                     Rectangle().fill(.gray.opacity(0.25))
                         .overlay(Image(systemName: "film").foregroundStyle(.secondary))
                 }
             }
-            .frame(width: 82, height: 58)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.black)
             .clipped()
             if isRaw {
                 Text("RAW")
@@ -209,10 +216,15 @@ private struct MovieThumbnail: View {
                     .padding(3)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay(alignment: .bottomTrailing) {
+            Text(duration).font(.caption.monospacedDigit()).foregroundStyle(.white)
+                .padding(5).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 5)).padding(4)
+        }
         .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(3) }
         .task(id: url) {
-            let result = await Task.detached(priority: .utility) { () -> (UIImage?, Bool) in
+            let result = await Task.detached(priority: .utility) { () -> (UIImage?, Bool, String) in
                 let asset = AVURLAsset(url: url)
                 let rawCodes: Set<FourCharCode> = [0x6170726e, 0x61707268]
                 let raw = asset.tracks(withMediaType: .video).contains { track in
@@ -222,12 +234,16 @@ private struct MovieThumbnail: View {
                 }
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true
-                generator.maximumSize = CGSize(width: 246, height: 174)
+                generator.maximumSize = CGSize(width: 480, height: 270)
                 let frame = try? generator.copyCGImage(at: .zero, actualTime: nil)
-                return (frame.map(UIImage.init(cgImage:)), raw)
+                let seconds = CMTimeGetSeconds(asset.duration)
+                let n = seconds.isFinite ? max(0, Int(seconds)) : 0
+                let label = n >= 3600 ? String(format: "%d:%02d:%02d", n / 3600, n / 60 % 60, n % 60) : String(format: "%02d:%02d", n / 60, n % 60)
+                return (frame.map(UIImage.init(cgImage:)), raw, label)
             }.value
             image = result.0
             isRaw = result.1
+            duration = result.2
         }
     }
 }

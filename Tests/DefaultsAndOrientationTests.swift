@@ -238,15 +238,23 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(tracker.resolve(.init(timestamp: 90, x: 0, y: -1, z: 0), at: 100).orientation, .landscapeLeft)
     }
     func testHorizonGuideInPortraitAndLandscape() {
-        for (x, y, angle) in [(0.0, -1.0, 0.0), (1.0, 0.0, Double.pi / 2),
-                              (-1.0, 0.0, -Double.pi / 2), (0.0, 1.0, Double.pi)] {
+        for (x, y, angle) in [(0.0, -1.0, 0.0), (1.0, 0.0, -Double.pi / 2),
+                              (-1.0, 0.0, Double.pi / 2), (0.0, 1.0, Double.pi)] {
             let pose = HorizonGuidePose(gravity: .init(timestamp: 0, x: x, y: y, z: 0))!
-            XCTAssertEqual(pose.angle, angle, accuracy: 1e-9)
+            XCTAssertEqual(cos(pose.angle), cos(angle), accuracy: 1e-9)
+            XCTAssertEqual(sin(pose.angle), sin(angle), accuracy: 1e-9)
             XCTAssertTrue(pose.aligned)
         }
         XCTAssertNil(HorizonGuidePose(gravity: .init(timestamp: 0, x: 0.01, y: 0.02, z: -1)))
         let tilted = HorizonGuidePose(gravity: .init(timestamp: 0, x: 0.1, y: -0.99, z: 0))!
         XCTAssertFalse(tilted.aligned)
+        for degrees in stride(from: -180.0, through: 180.0, by: 5) {
+            let a = degrees * .pi / 180
+            let gx = sin(a), gy = -cos(a)
+            let pose = HorizonGuidePose(gravity: .init(timestamp: 0, x: gx, y: gy, z: 0))!
+            // Rendered line direction must be orthogonal to screen-space gravity.
+            XCTAssertEqual(cos(pose.angle) * gx - sin(pose.angle) * gy, 0, accuracy: 1e-9)
+        }
     }
     func testExposureDefaultsAcrossFrameRates() {
         for fps in [24.0, 25, 29.97, 30, 59.94, 60, 120] {

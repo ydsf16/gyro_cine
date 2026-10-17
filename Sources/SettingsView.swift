@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    var quickCapture = false
     @EnvironmentObject private var camera: CameraManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
@@ -66,13 +67,24 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if quickCapture {
+                    Section(t("镜头", "Lens")) {
+                        Picker(t("物理镜头", "Physical lens"), selection: Binding(
+                            get: { camera.selectedLensID ?? "" }, set: { camera.chooseLens($0) })) {
+                            ForEach(camera.lenses) { lens in Text(lens.label).tag(lens.id) }
+                        }.pickerStyle(.segmented).disabled(locked)
+                            .accessibilityIdentifier("quickLensPicker")
+                    }
+                }
                 videoSection
-                storageSection
-                recordingSection
-                viewfinderSection
-                advancedSection
+                if !quickCapture {
+                    storageSection
+                    recordingSection
+                    viewfinderSection
+                    advancedSection
+                }
             }
-            .navigationTitle(t("设置", "Settings"))
+            .navigationTitle(quickCapture ? t("拍摄配置", "Capture setup") : t("设置", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button(t("完成", "Done")) { dismiss() } } }
             .alert(t("设置", "Settings"), isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {

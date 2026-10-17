@@ -186,6 +186,7 @@ struct CameraView: View {
     @AppStorage("rulerHaptics") private var rulerHaptics = true
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
+    @State private var showingCaptureSetup = false
     @State private var lutCard: Bool?
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
@@ -257,6 +258,10 @@ struct CameraView: View {
         .background(.black)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showingSettings) { SettingsView().environmentObject(camera) }
+        .sheet(isPresented: $showingCaptureSetup) {
+            SettingsView(quickCapture: true).environmentObject(camera)
+                .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
         .sheet(isPresented: $showingWBPresets) { whiteBalancePresets }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
@@ -330,9 +335,21 @@ struct CameraView: View {
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
             }
-            Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT 709" : ""))
+            Button {
+                closePanel()
+                showingCaptureSetup = true
+            } label: {
+                HStack(spacing: 6) {
+                    Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT 709" : ""))
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                }
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(.black.opacity(0.22), in: Capsule())
+            }
+            .disabled(camera.recording || camera.preparingRecording || camera.finalizing)
+            .accessibilityIdentifier("captureSetupOpen")
                 .lineLimit(1).minimumScaleFactor(0.75)
             HStack(spacing: 0) {
                 ForEach(Parameter.allCases) { parameter in

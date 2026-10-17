@@ -14,6 +14,33 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testQuickCaptureAndMediaCards() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["captureSetupOpen"].waitForExistence(timeout: 25))
+        app.buttons["captureSetupOpen"].tap()
+        XCTAssertTrue(app.segmentedControls["quickLensPicker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["codecMenu"].exists)
+        XCTAssertTrue(app.buttons["resolutionMenu"].exists)
+        XCTAssertTrue(app.buttons["fpsMenu"].exists)
+        controlScreenshot(app, "quick-capture-card")
+        app.buttons["完成"].tap()
+        app.buttons["mediaOpen"].tap()
+        XCTAssertTrue(app.scrollViews["mediaGrid"].waitForExistence(timeout: 5))
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaRow."))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        controlScreenshot(app, "media-preview-cards")
+        let first = rows.firstMatch
+        first.press(forDuration: 0.8)
+        XCTAssertTrue(app.buttons["mediaShareSelected"].isEnabled)
+        XCTAssertTrue(app.buttons["mediaDeleteSelected"].isEnabled)
+        app.buttons["mediaDeleteSelected"].tap()
+        XCTAssertTrue(app.buttons["删除文件"].waitForExistence(timeout: 5))
+        app.buttons["取消"].tap() // Keep existing user recordings.
+        app.buttons["mediaShareSelected"].tap()
+        Thread.sleep(forTimeInterval: 2)
+        controlScreenshot(app, "media-share-selection")
+        // Do not select a recipient or send anything.
+    }
     func testLUTPreviewAndRecording() {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))

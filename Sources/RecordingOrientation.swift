@@ -51,7 +51,8 @@ struct HorizonGuidePose {
     init?(gravity: RecordingGravity) {
         guard gravity.x.isFinite, gravity.y.isFinite,
               hypot(gravity.x, gravity.y) > 0.35 else { return nil }
-        angle = atan2(gravity.x, -gravity.y)
+        // Screen Y points down; the horizon must be perpendicular to (gx, -gy).
+        angle = atan2(-gravity.x, -gravity.y)
         reference = (angle / (.pi / 2)).rounded() * (.pi / 2)
         aligned = abs(angle - reference) <= 2 * .pi / 180
     }
