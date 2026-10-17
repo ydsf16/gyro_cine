@@ -1,8 +1,11 @@
 import AVFoundation
 import SwiftUI
+import MetalKit
 
 private struct Preview: UIViewRepresentable {
     let session: AVCaptureSession
+    let lut: LUTPreview
+    let lutEnabled: Bool
     let onAttached: () -> Void
     let onTap: (CGPoint) -> Void
     let onLongPress: (CGPoint) -> Void
@@ -10,6 +13,7 @@ private struct Preview: UIViewRepresentable {
         let view = PreviewUIView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        view.installLUT(lut)
         view.onTap = onTap
         view.onLongPress = onLongPress
         onAttached()
@@ -17,13 +21,69 @@ private struct Preview: UIViewRepresentable {
     }
     func updateUIView(_ view: PreviewUIView, context: Context) {
         view.onTap = onTap; view.onLongPress = onLongPress
+        lut.setDisplayActive(lutEnabled)
+        view.lutView?.setRefreshActive(lutEnabled)
+        if !lutEnabled { view.lutView?.alpha = 0 }
     }
+}
+
+private final class LUTRefreshTarget: NSObject {
+    @objc func tick() {} // Request display cadence only; rendering is capture-driven off-main.
+}
+
+private final class LUTMetalView: UIView {
+    private var refreshLink: CADisplayLink?
+    private let refreshTarget = LUTRefreshTarget()
+    private var refreshActive = false
+    func setRefreshActive(_ active: Bool) {
+        refreshActive = active
+        if refreshLink == nil {
+            let link = CADisplayLink(target: refreshTarget, selector: #selector(LUTRefreshTarget.tick))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 60, preferred: 60)
+            link.add(to: .main, forMode: .common)
+            refreshLink = link
+        }
+        refreshLink?.isPaused = !active || window == nil
+    }
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        refreshLink?.isPaused = !refreshActive || window == nil
+    }
+    deinit { refreshLink?.invalidate() }
+
+    override class var layerClass: AnyClass { CAMetalLayer.self }
+    var metalLayer: CAMetalLayer { layer as! CAMetalLayer }
 }
 
 private final class PreviewUIView: UIView {
     var onTap: ((CGPoint) -> Void)?
     var onLongPress: ((CGPoint) -> Void)?
     private let focusFrame = UIView()
+    var lutView: LUTMetalView?
+    private var lutRenderer: LUTPreview?
+    func installLUT(_ renderer: LUTPreview) {
+        guard let device = renderer.metalDevice else { return }
+        let view = LUTMetalView(frame: bounds)
+        lutRenderer = renderer
+        view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.metalLayer.device = device
+        view.metalLayer.framebufferOnly = false
+        view.metalLayer.pixelFormat = .bgra8Unorm
+        view.metalLayer.allowsNextDrawableTimeout = true
+        view.metalLayer.maximumDrawableCount = 3
+        view.alpha = 0
+        view.isUserInteractionEnabled = false
+        (view.layer as? CAMetalLayer)?.colorspace = CGColorSpace(name: CGColorSpace.itur_709)
+        insertSubview(view, belowSubview: focusFrame)
+        lutView = view
+    }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let scale = min(window?.screen.scale ?? 2, 1920 / max(1, max(bounds.width, bounds.height)))
+        let size = CGSize(width: (bounds.width * scale).rounded(), height: (bounds.height * scale).rounded())
+        if lutView?.metalLayer.drawableSize != size { lutView?.metalLayer.drawableSize = size }
+        if let lutView { lutRenderer?.attach(view: lutView, size: size) }
+    }
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     override init(frame: CGRect) {
@@ -61,10 +121,11 @@ private final class PreviewUIView: UIView {
 }
 
 private enum Parameter: String, CaseIterable, Identifiable {
-    case lens = "Lens", shutter = "Shutter", iso = "ISO", ev = "EV", wb = "WB", focus = "Focus"
+    case lens = "Lens", shutter = "Shutter", iso = "ISO", ev = "EV", wb = "WB", focus = "Focus", lut = "LUT"
     var id: Self { self }
     func title(locale: Locale) -> String {
         switch self {
+        case .lut: "LUT"
         case .lens: AppText.value("镜头", "Lens", locale: locale)
         case .shutter: AppText.value("快门", "Shutter", locale: locale)
         case .iso: "ISO"
@@ -118,12 +179,14 @@ private struct HorizonLevel: View {
 struct CameraView: View {
     @EnvironmentObject private var camera: CameraManager
     @Environment(\.locale) private var locale
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
     @AppStorage("rulerHaptics") private var rulerHaptics = true
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
+    @State private var lutCard: Bool?
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
     @State private var showingMedia = false
@@ -155,7 +218,7 @@ struct CameraView: View {
 
     var body: some View {
         ZStack {
-            Preview(session: camera.session, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
+            Preview(session: camera.session, lut: camera.lutPreview, lutEnabled: camera.lutEnabled && camera.lutSupported, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
                 .ignoresSafeArea()
             if showCompositionGrid {
                 CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
@@ -205,6 +268,7 @@ struct CameraView: View {
             }
             Button("确定") { camera.clearError() }
         } message: { Text(camera.errorText ?? "") }
+        .onChange(of: scenePhase) { _, phase in camera.lutPreview.setForeground(phase == .active) }
         .onChange(of: camera.exposureSeconds) { _, value in if camera.exposureAuto { shutterValue = value } }
         .onChange(of: camera.shutterMaxSeconds) { _, value in shutterMaxValue = value }
         .onChange(of: camera.iso) { _, value in if camera.exposureAuto { isoValue = Double(value) } }
@@ -266,7 +330,7 @@ struct CameraView: View {
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
             }
-            Text(specification)
+            Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT 709" : ""))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1).minimumScaleFactor(0.75)
@@ -331,6 +395,9 @@ struct CameraView: View {
 
     private func value(for parameter: Parameter) -> String {
         switch parameter {
+        case .lut:
+            !camera.lutEnabled || !camera.lutSupported ? t("关", "Off") :
+                (["active", "rec709"].contains(camera.lutStatus) ? "709" : "…")
         case .lens: camera.lenses.first(where: { $0.id == camera.selectedLensID })?.label ?? "—"
         case .shutter:
             exposureType == "angle" ? shutterAngleLabel(camera.exposureSeconds) : shutterLabel(camera.exposureSeconds)
@@ -348,7 +415,7 @@ struct CameraView: View {
     }
     private func isAuto(_ parameter: Parameter) -> Bool {
         switch parameter {
-        case .lens, .ev: false
+        case .lens, .ev, .lut: false
         case .shutter: camera.shutterMode == .auto || camera.shutterMode == .autoMax
         case .iso: camera.exposureAuto
         case .wb: camera.whiteBalanceAuto
@@ -436,10 +503,12 @@ struct CameraView: View {
                     .accessibilityHint(t("选择日光、阴影等六种预设", "Choose from six lighting presets"))
                     .accessibilityIdentifier("wb.presets")
                 }
-                if parameter != .lens && parameter != .ev { modePicker(parameter) }
+                if parameter != .lens && parameter != .ev && parameter != .lut { modePicker(parameter) }
             }
             Group {
                 switch parameter {
+                case .lut:
+                    lutControls
                 case .lens:
                     HStack(spacing: 16) {
                         ForEach(camera.lenses) { lens in
@@ -509,6 +578,61 @@ struct CameraView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
     }
 
+    private var lutControls: some View {
+        VStack(spacing: 5) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach([false, true], id: \.self) { enabled in
+                        Button {
+                            camera.setLUTEnabled(enabled)
+                            withAnimation(.easeInOut(duration: 0.2)) { lutCard = enabled }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: enabled ? "square.stack.3d.up" : "circle.slash")
+                                Text(enabled ? "RAW → Rec.709" : t("关闭", "Off"))
+                            }
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 225, height: 38)
+                            .foregroundStyle((camera.lutEnabled && camera.lutSupported) == enabled ? .white : .white.opacity(0.55))
+                            .background((camera.lutEnabled && camera.lutSupported) == enabled ? accent.opacity(0.45) : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke((camera.lutEnabled && camera.lutSupported) == enabled ? accent : .clear, lineWidth: 2))
+                        }
+                        .id(enabled)
+                        .buttonStyle(.plain)
+                        .disabled(enabled && !camera.lutSupported)
+                        .accessibilityIdentifier(enabled ? "lut.rec709" : "lut.off")
+                    }
+                }.scrollTargetLayout().padding(.horizontal, 2)
+            }
+            .accessibilityIdentifier("lut.carousel")
+            .contentMargins(.horizontal, 70, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $lutCard, anchor: .center)
+            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported }
+            .onChange(of: lutCard) { _, selected in
+                if let selected, camera.lutSupported, selected != camera.lutEnabled { camera.setLUTEnabled(selected) }
+            }
+            Text(lutDescription)
+                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
+                .accessibilityIdentifier("lut.status")
+        }
+    }
+    private var lutDescription: String {
+        guard camera.lutSupported else {
+            if ["aprn", "aprh"].contains(camera.selectedCodec?.rawValue ?? "") {
+                return t("此配置暂不支持 LUT 预览", "LUT preview unavailable for this configuration")
+            }
+            return t("仅支持 RAW 预览 · 不写入视频", "RAW preview only · Not recorded")
+        }
+        if !camera.lutEnabled { return t("LUT 已关闭 · 不写入视频", "LUT off · Not recorded") }
+        switch camera.lutStatus {
+        case "active": return t("Rec.709 · 仅预览", "Rec.709 · Preview only")
+        case "rec709": return t("预览源已为 Rec.709 · 仅预览", "Source is Rec.709 · Preview only")
+        case "unsupported", "unavailable": return t("当前预览不支持转换 · 已显示原画面", "Conversion unavailable · Original preview")
+        default: return t("正在准备 LUT 预览…", "Preparing LUT preview…")
+        }
+    }
+
     private func modePicker(_ parameter: Parameter) -> some View {
         if parameter == .wb && (camera.selectedCodec?.rawValue == "aprn" || camera.selectedCodec?.rawValue == "aprh") {
             return AnyView(Label(t("锁定", "Locked"), systemImage: "lock.fill")
@@ -563,7 +687,7 @@ struct CameraView: View {
                     case .wb:
                         if !auto { wbValue = Double(camera.whiteBalanceKelvin) }
                         camera.setWhiteBalanceAuto(auto)
-                    case .lens, .shutter, .focus, .ev: break
+                    case .lens, .shutter, .focus, .ev, .lut: break
                     }
                     dismissPanelAfterAdjustment()
                 }

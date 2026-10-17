@@ -53,6 +53,30 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var isoRange: ClosedRange<Double> = 50...3200
     @Published private(set) var exposureRange: ClosedRange<Double> = 1.0 / 1000.0...1.0 / 30.0
 
+    @Published private(set) var lutEnabled = UserDefaults.standard.bool(forKey: "previewLUTEnabled")
+    @Published private(set) var lutSupported = false
+    @Published private(set) var lutStatus = "off"
+    let lutPreview = LUTPreview()
+    func setLUTEnabled(_ enabled: Bool) {
+        guard lutEnabled != enabled else { return }
+        lutEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "previewLUTEnabled")
+        lutPreview.setEnabled(enabled)
+        logger.event("lut_preview_toggle", ["enabled": enabled, "previewOnly": true])
+    }
+    // Camera queue only. Add the small ISP proxy before recording, so UI toggles never reconfigure capture.
+    private func configureLUTPreview() {
+        guard !session.outputs.contains(lutPreview.output) else { return }
+        lutPreview.log = { [weak self] name, details in self?.logger.event(name, details) }
+        lutPreview.statusChanged = { [weak self] status in self?.lutStatus = status }
+        guard lutPreview.metalDevice != nil, session.canAddOutput(lutPreview.output) else {
+            publish { self.lutSupported = false; self.lutStatus = "unavailable" }; return
+        }
+        session.addOutput(lutPreview.output)
+        lutPreview.configure(fps: chosenFPS)
+        lutPreview.setEnabled(UserDefaults.standard.bool(forKey: "previewLUTEnabled"))
+        publish { self.lutSupported = true }
+    }
     let session = AVCaptureSession()
     let logger = DiagnosticLogger()
     private let queue = DispatchQueue(label: "RAWFocusTest.camera", qos: .userInitiated)
@@ -534,7 +558,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard !self.usesRAWWriterExperiment, self.session.isRunning, !self.output.isRecording,
                   let signature = self.currentRAWSignature,
                   self.rawPreparedSignature != signature else { return }
-            do { try self.prepareRAWRecordingPipeline() }
+            do {
+                try self.prepareRAWRecordingPipeline()
+                self.session.beginConfiguration()
+                self.configureLUTPreview()
+                self.session.commitConfiguration()
+            }
             catch { self.restoreRAWWhiteBalance(); self.fail(error.localizedDescription) }
         }
     }
@@ -1721,6 +1750,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func restoreRAWPreviewForConfiguration() {
+        lutPreview.reset()
+        publish { self.lutSupported = false }
+        if session.outputs.contains(lutPreview.output) { session.removeOutput(lutPreview.output) }
         if #available(iOS 27.0, *), let preview = rawWriterPreview as? RAWWriterPreview {
             preview.invalidate()
             if session.outputs.contains(preview.dataOutput) { session.removeOutput(preview.dataOutput) }
@@ -1771,6 +1803,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         session.addOutput(preview.audioOutput)
         preview.configure()
+        configureLUTPreview()
         let supportsK = preview.dataOutput.connection(with: .video)?.isCameraIntrinsicMatrixDeliveryEnabled ?? false
         nativeRAWKSupport[nativeRAWKKey] = supportsK
         publish { self.telemetryEmbeddable = supportsK; self.status = "正在准备 RAW 预览" }

@@ -14,6 +14,99 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testLUTPreviewAndRecording() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertFalse(app.buttons["lut.rec709"].isEnabled)
+        app.buttons["parameter.LUT"].tap()
+        app.buttons["settingsOpen"].tap()
+        app.buttons["storageLocationMenu"].tap()
+        app.buttons["专用视频存储"].tap()
+        app.buttons["完成"].tap()
+        selectControlCodec("ProRes RAW", app: app)
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: app.buttons["lut.rec709"])], timeout: 20), .completed)
+        app.buttons["lut.rec709"].tap()
+        let status = app.staticTexts["lut.status"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Rec.709 · 仅预览"), object: status)], timeout: 15), .completed)
+        controlScreenshot(app, "lut-on-raw")
+        app.buttons["lut.off"].tap(); controlScreenshot(app, "lut-off-raw")
+        app.buttons["lut.rec709"].tap()
+        app.buttons["parameter.LUT"].tap()
+        // Record at 60 fps, toggle only the renderer while the movie is running.
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.isEnabled)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 25), .completed)
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.LUT"].tap()
+        app.buttons["lut.off"].tap(); app.buttons["lut.rec709"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.LUT"].tap(); record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertTrue(status.label.contains("Rec.709"))
+        controlScreenshot(app, "lut-after-record")
+        app.buttons["parameter.Lens"].tap(); app.buttons["lens.0.5×"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Rec.709 · 仅预览"), object: status)], timeout: 15), .completed)
+        controlScreenshot(app, "lut-ultrawide")
+        app.buttons["parameter.Lens"].tap(); app.buttons["lens.1×"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        selectControlCodec("H.265", app: app)
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertFalse(app.buttons["lut.rec709"].isEnabled)
+        app.buttons["lut.off"].tap()
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+    func testLUTCarousel() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+        selectControlCodec("ProRes RAW", app: app)
+        app.buttons["parameter.LUT"].tap()
+        let carousel = app.scrollViews["lut.carousel"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5))
+        let status = app.staticTexts["lut.status"]
+        // Scroll selection must work without tapping a card.
+        carousel.swipeRight()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '已关闭'"), object: status)], timeout: 5), .completed)
+        carousel.swipeLeft()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Rec.709 · 仅预览"), object: status)], timeout: 15), .completed)
+        controlScreenshot(app, "lut-final-carousel")
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval: 1)
+        app.activate()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Rec.709 · 仅预览"), object: status)], timeout: 20), .completed)
+        app.buttons["parameter.LUT"].tap(); app.buttons["parameter.LUT"].tap()
+        XCTAssertTrue(status.label.contains("Rec.709"))
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+    func testLUTHighRateAndHQ() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+        app.buttons["settingsOpen"].tap()
+        app.buttons["storageLocationMenu"].tap(); app.buttons["专用视频存储"].tap()
+        app.buttons["完成"].tap()
+        for (codec, rate) in [("ProRes RAW", "120.0 fps"), ("ProRes RAW HQ", "30.0 fps")] {
+            selectControlCodec(codec, app: app)
+            app.buttons["settingsOpen"].tap(); tapFPSOption(rate, in: app); app.buttons["完成"].tap()
+            app.buttons["parameter.LUT"].tap(); app.buttons["lut.rec709"].tap()
+            let status = app.staticTexts["lut.status"]
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Rec.709 · 仅预览"), object: status)], timeout: 20), .completed)
+            controlScreenshot(app, "lut-\(codec)-\(rate)")
+            app.buttons["parameter.LUT"].tap()
+            let record = app.buttons["recordToggle"]
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 25), .completed)
+            Thread.sleep(forTimeInterval: 5)
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+            XCTAssertFalse(app.alerts.firstMatch.exists)
+        }
+    }
     /// Runs against Release without any RAW experiment launch flags.
     func testReleaseDedicatedRAWRecording() {
         let app = XCUIApplication()
