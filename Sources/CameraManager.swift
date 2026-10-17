@@ -11,10 +11,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var ssdSpeedCurrentMBps = 0.0
     @Published private(set) var ssdSpeedReport: SSDSpeedReport?
     @Published private(set) var ssdSpeedError: String?
+    @Published private(set) var ssdSpeedSpecifications: [SSDSpeedSpecification] = []
     private var ssdSpeedCancellation: SSDSpeedCancellation?
     func refreshSSDSpeedAssessment() {
         queue.async {
             guard self.ssdSpeedCancellation == nil else { return }
+            let specifications = self.makeSSDSpeedSpecifications()
+            self.publish { self.ssdSpeedSpecifications = specifications }
             let size = self.device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
             let config = "\(self.chosenEncoding.title) · \(size?.width ?? 0)×\(size?.height ?? 0) · \(String(format: "%.1f", self.chosenFPS)) fps"
             let required = self.estimatedBytesPerSecond / 1_000_000
@@ -29,6 +32,32 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 report.configuration = config; report.requiredMBps = required; report.fps = fps; report.bufferedFrameLimit = bufferLimit
                 self.ssdSpeedReport = report
             }
+        }
+    }
+    // Enumerate cached capabilities; never reconfigure the capture session for this guide.
+    private func makeSSDSpeedSpecifications() -> [SSDSpeedSpecification] {
+        var result: [SSDSpeedSpecification] = []
+        for encoding in VideoEncoding.allCases {
+            let compatible = formatObjects.filter { $0.compatibleCodecs.contains(encoding.codec.rawValue) && $0.width >= 1920 }
+            let groups = Dictionary(grouping: compatible) { "\($0.width)×\($0.height)" }
+            for (_, formats) in groups {
+                guard let format = formats.first else { continue }
+                let rates = Set(formats.flatMap { availableFPS(for: $0) }).sorted()
+                for rate in rates {
+                    let key = "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(encoding.rawValue).\(format.width)x\(format.height).\(rate)"
+                    let learned = UserDefaults.standard.double(forKey: key)
+                    let bits = encoding == .proResRAWHQ ? 8.0 : encoding == .proResRAW ? 6.0 : 0.5
+                    let fallback = max(1_000_000, Double(format.width) * Double(format.height) * rate * bits / 8 + 100_000)
+                    result.append(SSDSpeedSpecification(encoding: encoding, width: format.width, height: format.height,
+                        fps: rate, requiredMBps: (learned.isFinite && learned > 0 ? learned : fallback) / 1_000_000,
+                        learned: learned.isFinite && learned > 0))
+                }
+            }
+        }
+        return result.sorted {
+            if $0.width != $1.width { return $0.width > $1.width }
+            if $0.height != $1.height { return $0.height > $1.height }
+            return $0.fps > $1.fps
         }
     }
     func cancelSSDSpeedTest() { queue.async { self.ssdSpeedCancellation?.cancel() } }
@@ -2035,15 +2064,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let legacy = RecordingStoragePaths.legacyDirectory
             .appendingPathComponent(base.lastPathComponent)
         for file in [movie.appendingPathExtension("pending-imu.json"),
+                     movie.appendingPathExtension("failed-imu.json"),
                      MOVTelemetryMuxer.recoveryURL(movie),
                      base.appendingPathExtension("imu_raw.jsonl"),
                      base.appendingPathExtension("camera_frames.jsonl"),
                      local.appendingPathExtension("pending-imu.json"),
                      local.appendingPathExtension("mov.pending-imu.json"),
+                     local.appendingPathExtension("mov.failed-imu.json"),
                      local.appendingPathExtension("imu_raw.jsonl"),
                      local.appendingPathExtension("camera_frames.jsonl"),
                      legacy.appendingPathExtension("pending-imu.json"),
                      legacy.appendingPathExtension("mov.pending-imu.json"),
+                     legacy.appendingPathExtension("mov.failed-imu.json"),
                      legacy.appendingPathExtension("imu_raw.jsonl"),
                      legacy.appendingPathExtension("camera_frames.jsonl"),
                      movie.appendingPathExtension("metadata-recovery.json")] {
@@ -2739,19 +2771,24 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     queue.async { self.clearError(); self.toggleRecording() }
                 }
                 #endif
-                let permanent = ["50 ms", "30 ms", "逐帧 K", "没有与 MOV 像素尺寸一致的有效 K 数据",
-                                 "视频帧不足", "视频帧率严重不足", "视频帧时间异常",
-                                 "Invalid recovery file paths"].contains { reason.contains($0) }
-                if !deferred && permanent { failedPendingSignatures[file.path] = signature }
+                let recordedFailure = (try? JSONDecoder().decode(PendingIMUJob.self, from: Data(contentsOf: file)))?.recordingFailure != nil
+                let permanent = PendingIMUJob.isPermanentFailure(reason) || recordedFailure
+                if !deferred && permanent {
+                    failedPendingSignatures[file.path] = signature
+                    do {
+                        try PendingIMUJob.retire(file)
+                        logger.event("imu_pending_retired", ["job": file.lastPathComponent, "reason": reason])
+                    } catch {
+                        logger.event("imu_pending_retire_failed", ["job": file.lastPathComponent, "error": String(describing: error)])
+                    }
+                }
                 publish {
                     self.finalizing = false
                     self.status = reason.contains("视频帧时间异常") || reason.contains("视频帧率严重不足")
                         ? "视频帧异常 · 请检查原片" : permanent ? "Camera ready" : "等待返回 App 补写 IMU"
                     self.endFinalizationLease()
                 }
-                if reason.contains("视频帧时间异常") || reason.contains("视频帧率严重不足") {
-                    fail(reason)
-                }
+                // Recovery is silent: Media exposes missing telemetry as !IMU.
 
         }
     }

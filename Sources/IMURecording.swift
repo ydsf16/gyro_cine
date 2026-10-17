@@ -350,6 +350,21 @@ struct PendingIMUJob: Codable {
     func save(in directory: URL) throws {
         try JSONEncoder().encode(self).write(to: url(in: directory), options: .atomic)
     }
+    /// Move only the job manifest out of the automatic retry queue; preserve all media and diagnostics.
+    static func retire(_ file: URL) throws {
+        let suffix = ".pending-imu.json"
+        guard file.lastPathComponent.hasSuffix(suffix) else { return }
+        let target = file.deletingLastPathComponent().appendingPathComponent(
+            String(file.lastPathComponent.dropLast(suffix.count)) + ".failed-imu.json")
+        // Atomic replacement preserves the latest manifest if an older failed job exists.
+        try Data(contentsOf: file).write(to: target, options: .atomic)
+        try FileManager.default.removeItem(at: file)
+    }
+    static func isPermanentFailure(_ reason: String) -> Bool {
+        ["50 ms", "30 ms", "逐帧 K", "没有与 MOV 像素尺寸一致的有效 K 数据",
+         "视频帧不足", "视频帧率严重不足", "视频帧时间异常", "Invalid recovery file paths",
+         "Local recording no longer exists"].contains { reason.contains($0) }
+    }
     func complete(in directory: URL, progress: ((String, Double) -> Void)? = nil) throws {
         guard [movieName, imuName, framesName].allSatisfy({ !$0.isEmpty && URL(fileURLWithPath: $0).lastPathComponent == $0 }),
               movieName.lowercased().hasSuffix(".mov"),
@@ -373,6 +388,10 @@ struct PendingIMUJob: Codable {
             throw RecorderError.unavailable("无法访问 SSD 素材，请重新连接 SSD；原始 IMU 已保留")
         }
         defer { if accessing { movie.stopAccessingSecurityScopedResource() } }
+        // Missing local media cannot recover. An offline SSD must remain retryable.
+        if externalMovieBookmark == nil && !FileManager.default.fileExists(atPath: movie.path) {
+            throw RecorderError.unavailable("Local recording no longer exists")
+        }
         if let recordingFailure { throw RecorderError.unavailable(recordingFailure) }
         try MOVTelemetryMuxer.recoverIfNeeded(movie)
         if intrinsicsUnavailableReason != nil {

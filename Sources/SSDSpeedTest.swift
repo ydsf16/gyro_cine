@@ -34,6 +34,22 @@ struct SSDSpeedReport {
     }
 }
 
+struct SSDSpeedSpecification: Identifiable {
+    let encoding: VideoEncoding
+    let width: Int32
+    let height: Int32
+    let fps: Double
+    let requiredMBps: Double
+    let learned: Bool
+    var id: String { "\(encoding.rawValue).\(width).\(height).\(fps)" }
+    var recommendedMBps: Double { requiredMBps * 1.3 }
+    func assessment(using report: SSDSpeedReport) -> SSDSpeedReport.Assessment {
+        SSDSpeedReport.assess(sustained: report.sustainedMBps, required: requiredMBps,
+            stallMS: report.maximumWriteMS, fps: fps,
+            bufferedFrameLimit: encoding == .proResRAW || encoding == .proResRAWHQ ? 10 : nil)
+    }
+}
+
 enum SSDSpeedTest {
     static let bytes: Int64 = 8_589_934_592
     struct Measurement {
@@ -121,29 +137,49 @@ struct SSDSpeedTestView: View {
                     if let error = camera.ssdSpeedError { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("ssdSpeedError") }
                 }
                 if let report = camera.ssdSpeedReport {
-                    Section(t("当前录制配置判断", "Assessment for current recording configuration")) {
-                        Label(assessmentTitle(report), systemImage: report.assessment == .usable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .font(.headline).foregroundStyle(assessmentColor(report)).accessibilityIdentifier("ssdSpeedAssessment")
+                    Section(t("测速结果", "Speed test results")) {
                         Text(report.drive).font(.subheadline)
-                        Text(report.configuration).font(.footnote).foregroundStyle(.secondary)
-                        metric(t("所需速度（估算）", "Required (estimated)"), report.requiredMBps, "MB/s")
                         metric(t("后半段最低速度", "Lowest second-half speed"), report.sustainedMBps, "MB/s")
                         metric(t("全程平均速度", "Overall average speed"), report.averageMBps, "MB/s")
                         metric(t("最长写入停顿", "Longest write stall"), report.maximumWriteMS, "ms")
                         metric(t("最长落盘耗时", "Longest flush"), report.maximumFlushMS, "ms")
                         Text(report.date, style: .time).font(.caption).foregroundStyle(.secondary)
-                        Text(report.assessment == .usable
-                             ? (report.bufferedFrameLimit == nil
-                                ? t("持续速度满足当前配置，留有至少 30% 余量。写入停顿单独列出，实际录制表现仍需验证。", "Sustained throughput has at least 30% headroom for this configuration. Stalls are listed separately; verify actual recording performance.")
-                                : t("速度留有至少 30% 余量，写入停顿未超过当前帧率的 10 帧缓冲时间。", "At least 30% throughput headroom; write stalls stayed within ten frame periods."))
-                             : report.assessment == .risky
-                                ? t("速度余量不足或有较长写入停顿，建议降低录制规格并实录验证。", "Limited throughput headroom or long write stalls. Lower recording settings and verify with a recording.")
-                                : t("持续速度低于当前配置的估算需求，建议降低规格或更换 SSD。", "Sustained speed is below the estimated requirement. Lower recording settings or use another SSD."))
-                            .font(.footnote)
+
                     }
                 }
+                Section(t("录制规格指导", "Recording specification guide")) {
+                    Text(t("当前镜头支持的配置。每行显示预计写入 / 建议持续速度（含 30% 余量），单位 MB/s。统计来自本机同镜头、编码、尺寸与帧率；无记录时使用保守估算。", "Configurations supported by the current lens. Rows show estimated write / recommended sustained speed (30% headroom), in MB/s. Uses matching on-device recording statistics, otherwise a conservative estimate."))
+                        .font(.footnote).foregroundStyle(.secondary)
+                    ForEach(VideoEncoding.allCases) { encoding in
+                        let rows = camera.ssdSpeedSpecifications.filter { $0.encoding == encoding }
+                        if !rows.isEmpty {
+                            DisclosureGroup(encoding.title) {
+                                ForEach(rows) { row in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(row.width)×\(row.height) · \(String(format: "%.1f", row.fps)) fps")
+                                            .font(.subheadline)
+                                        HStack {
+                                            Text(String(format: "%.0f / %.0f MB/s", row.requiredMBps, row.recommendedMBps))
+                                                .monospacedDigit()
+                                            Spacer()
+                                            if let report = camera.ssdSpeedReport {
+                                                let verdict = row.assessment(using: report)
+                                                Text(verdict == .usable ? t("可用", "Usable") : verdict == .risky ? t("有风险", "At risk") : t("不足", "Insufficient"))
+                                                    .foregroundStyle(verdict == .usable ? Color.green : verdict == .risky ? Color.orange : Color.red)
+                                            }
+                                        }.font(.caption)
+                                        Text(row.learned ? t("本机统计", "On-device statistics") : t("保守估算", "Conservative estimate"))
+                                            .font(.caption2).foregroundStyle(.secondary)
+                                    }.padding(.vertical, 3)
+                                }
+                            }
+                        }
+                    }
+                    Text(t("完成一次测速即可对比所有配置。RAW 判断还考虑 10 帧缓冲内的写入停顿；绿色仅表示本次测速满足估算要求，仍需实录验证。", "One speed test assesses every configuration. RAW also considers write stalls against the ten-frame buffer. Green indicates estimated suitability for this test; verify with actual recording."))
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Section {
-                    Text(t("判断适用于上方当前录制配置。所需速度根据本机录制统计或保守估算；画面内容、温度、剩余空间会影响结果。测速通过不代表无限时长录制保证。", "Assessment applies to the current recording configuration shown above. Required speed uses on-device recording statistics or a conservative estimate. Scene content, temperature and free space affect results. Passing is not an unlimited-duration guarantee."))
+                    Text(t("各规格所需速度根据本机录制统计或保守估算；画面内容、温度、剩余空间会影响结果。测速通过不代表无限时长录制保证。", "Required speed for each configuration uses on-device recording statistics or a conservative estimate. Scene content, temperature and free space affect results. Passing is not an unlimited-duration guarantee."))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -160,15 +196,5 @@ struct SSDSpeedTestView: View {
     }
     private func metric(_ name: String, _ value: Double, _ unit: String) -> some View {
         HStack { Text(name); Spacer(); Text(String(format: "%.0f %@", value, unit)).foregroundStyle(.secondary).monospacedDigit() }
-    }
-    private func assessmentColor(_ result: SSDSpeedReport) -> Color {
-        switch result.assessment { case .usable: return .green; case .risky: return .orange; case .insufficient: return .red }
-    }
-    private func assessmentTitle(_ result: SSDSpeedReport) -> String {
-        switch result.assessment {
-        case .usable: return t("可用", "Usable")
-        case .risky: return t("有风险", "At risk")
-        case .insufficient: return t("不够用（按估算）", "Insufficient (estimated)")
-        }
     }
 }

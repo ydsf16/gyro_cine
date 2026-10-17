@@ -280,6 +280,42 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/200, fps: 30,
             minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
     }
+    func testPermanentIMUFailureLeavesAutomaticRetryQueue() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let pending = directory.appendingPathComponent("clip.mov.pending-imu.json")
+        let movie = directory.appendingPathComponent("clip.mov")
+        let imu = directory.appendingPathComponent("clip.imu_raw.jsonl")
+        for file in [pending, movie, imu] { try Data("preserve".utf8).write(to: file) }
+        XCTAssertTrue(PendingIMUJob.isPermanentFailure("视频帧时间异常：60 fps 最大间隔 600 ms"))
+        XCTAssertFalse(PendingIMUJob.isPermanentFailure("无法访问 SSD 素材，请重新连接 SSD"))
+        try PendingIMUJob.retire(pending)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pending.path))
+        XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("clip.mov.failed-imu.json")), Data("preserve".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: movie.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: imu.path))
+        // A restarted scanner only selects pending manifests, including after movie deletion.
+        try FileManager.default.removeItem(at: movie)
+        XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: directory.path).contains { $0.hasSuffix(".pending-imu.json") })
+    }
+
+    func testSSDSpeedSpecificationGuidance() {
+        let report = SSDSpeedReport(drive: "SSD", driveID: nil, configuration: "test", requiredMBps: 31,
+            fps: 60, averageMBps: 300, sustainedMBps: 214, maximumWriteMS: 668, maximumFlushMS: 100)
+        let hevc = SSDSpeedSpecification(encoding: .hevc, width: 3840, height: 2160,
+            fps: 60, requiredMBps: 31, learned: false)
+        XCTAssertEqual(hevc.recommendedMBps, 40.3, accuracy: 0.001)
+        XCTAssertEqual(hevc.assessment(using: report), .usable)
+        let raw = SSDSpeedSpecification(encoding: .proResRAW, width: 4224, height: 2240,
+            fps: 60, requiredMBps: 143, learned: true)
+        XCTAssertEqual(raw.assessment(using: report), .risky)
+        let hq = SSDSpeedSpecification(encoding: .proResRAWHQ, width: 4224, height: 3024,
+            fps: 120, requiredMBps: 800, learned: false)
+        XCTAssertEqual(hq.assessment(using: report), .insufficient)
+        XCTAssertNotEqual(raw.id, hq.id)
+    }
+
     func testSSDSpeedReusesMeasurementForChangedConfiguration() {
         var report = SSDSpeedReport(drive: "SSD", driveID: "disk-a", configuration: "H.265 4K60", requiredMBps: 31,
             fps: 60, averageMBps: 333, sustainedMBps: 237, maximumWriteMS: 20, maximumFlushMS: 50)

@@ -156,7 +156,7 @@ struct MediaLibraryView: View {
         // Failed/incomplete finalization must not hide an existing SSD recording.
         let jobs = (try? FileManager.default.contentsOfDirectory(at: RecordingStoragePaths.diagnosticDirectory,
             includingPropertiesForKeys: nil)) ?? []
-        for file in jobs where file.lastPathComponent.hasSuffix(".pending-imu.json") {
+        for file in jobs where file.lastPathComponent.hasSuffix(".pending-imu.json") || file.lastPathComponent.hasSuffix(".failed-imu.json") {
             if let data = try? Data(contentsOf: file),
                let job = try? JSONDecoder().decode(PendingIMUJob.self, from: data),
                let bookmark = job.externalMovieBookmark, !bookmarks.contains(bookmark) {

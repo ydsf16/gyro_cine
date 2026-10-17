@@ -20,3 +20,17 @@
 - The ten-frame write-stall heuristic now applies only to the native RAW writer. AVFoundation MovieFileOutput (H.265/H.265 HQ and legacy paths) has no app-defined ten-frame buffering limit; its bandwidth assessment uses sustained throughput/headroom and reports stalls separately.
 - Regression:214MB/s vs31MB/s required,668ms stall,H.265 -> usable; native RAW with143MB/s requirement and same stall -> risk. Unknown MovieFileOutput buffering is not presented as known.
 - /tmp/gyrocine-speed-route-fix.xcresult: assessment and configuration-reuse tests passed. Build /tmp/gyrocine-speed-route-release.log.
+
+## Recording specification guide
+- Lists cached current-lens codec/dimension/FPS combinations (1920 pixels wide and above), grouped by encoding. Does not mutate the camera session.
+- Shows estimated write MB/s and recommended sustained MB/s with 30% headroom; labels matching on-device statistics versus conservative fallback.
+- Reuses the current SSD measurement for every row; RAW considers the ten-frame stall limit, HEVC does not assume that limit.
+- Release build passed; `testSSDSpeedSpecificationGuidance` passed in `/tmp/gyrocine-speed-spec-guide.xcresult` (headroom, HEVC suitability, RAW stall risk, insufficient HQ bandwidth).
+- Estimates are guidance, not a measured recording guarantee. No new SSD throughput run was required for this UI change.
+
+## Persistent IMU recovery failure
+- Permanent cadence/K validation failures and stored recording failures retire their pending manifest to `.failed-imu.json`; raw MOV/IMU/K are preserved. Retry state now survives app restarts.
+- Background recovery no longer raises the same cadence alert each launch. Media retains the missing-IMU indicator and resolves external bookmarks from failed manifests too.
+- Missing local MOV jobs retire; inaccessible SSD jobs remain retryable. In-app deletion removes both pending and failed manifests.
+- `testPermanentIMUFailureLeavesAutomaticRetryQueue` passed (`/tmp/gyrocine-recovery-retire.xcresult`): retirement persists, preserves media/raw IMU, does not return to pending after deletion, and does not classify disconnected SSD as permanent.
+- Release build passed (`/tmp/gyrocine-recovery-retire-build.log`).
