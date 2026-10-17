@@ -19,6 +19,23 @@ enum RulerMapping: Equatable {
     }
 }
 
+enum ControlStops {
+    static let shutter: [Double] = [8000, 6400, 5000, 4000, 3200, 2500, 2000, 1600, 1250, 1000, 800, 640, 500, 400, 320, 250, 200, 160, 125, 120, 100, 80, 60, 50, 48, 40, 30, 25, 24, 20, 15, 10, 8, 6, 5, 4, 3, 2, 1].map { 1 / Double($0) }
+    static let iso: [Double] = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200, 64000, 80000, 102400]
+    static let angle: [Double] = [1, 2, 5, 11.25, 22.5, 45, 72, 90, 120, 144, 172.8, 180, 216, 270, 360]
+    static func legal(_ values: [Double], range: ClosedRange<Double>) -> [Double] {
+        Array(Set(values.filter { range.contains($0) } + [range.lowerBound, range.upperBound])).sorted()
+    }
+    static func snap(_ value: Double, values: [Double], range: ClosedRange<Double>, mapping: RulerMapping) -> Double {
+        let clamped = min(max(value, range.lowerBound), range.upperBound)
+        guard !values.isEmpty else { return clamped }
+        let position = mapping.fraction(for: clamped, in: range)
+        return legal(values, range: range).min {
+            abs(mapping.fraction(for: $0, in: range) - position) < abs(mapping.fraction(for: $1, in: range) - position)
+        } ?? clamped
+    }
+}
+
 /// A fixed blue indicator over a scrollable scale. The visible ticks move with the user's finger.
 struct MovingRuler: UIViewRepresentable {
     @Environment(\.isEnabled) private var isEnabled
@@ -26,13 +43,20 @@ struct MovingRuler: UIViewRepresentable {
     let range: ClosedRange<Double>
     var mapping: RulerMapping = .linear
     var majorValues: [Double] = []
+    var snapValues: [Double] = []
+    var haptics = false
+    var onInteractionBegan: () -> Void = {}
     let format: (Double) -> String
     let onChange: (Double, Bool) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> RulerContainer {
         let view = RulerContainer()
+        context.coordinator.attachFeedback(to: view)
         view.scrollView.delegate = context.coordinator
+        view.onAccessibilityAdjust = { [weak coordinator = context.coordinator] direction in
+            coordinator?.adjustAccessibility(direction)
+        }
         return view
     }
     func updateUIView(_ view: RulerContainer, context: Context) {
@@ -43,19 +67,63 @@ struct MovingRuler: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var parent: MovingRuler
+        private var feedback: UISelectionFeedbackGenerator?
+        private var lastTick: Double?
+        private var lastFeedback = 0.0
+        private var updating = false
         init(_ parent: MovingRuler) { self.parent = parent }
+        func attachFeedback(to view: UIView) {
+            feedback = UISelectionFeedbackGenerator(view: view)
+        }
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            parent.onInteractionBegan()
+            lastTick = tick(for: parent.value)
+            if parent.haptics { feedback?.prepare() }
+        }
         func scrollViewDidScroll(_ scrollView: UIScrollView) { report(scrollView, finished: false) }
         func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
             if !decelerate { report(scrollView, finished: true) }
         }
         func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { report(scrollView, finished: true) }
+        func adjustAccessibility(_ direction: Double) {
+            guard parent.isEnabled else { return }
+            parent.onInteractionBegan()
+            lastTick = tick(for: parent.value)
+            if parent.haptics { feedback?.prepare() }
+            let values = parent.snapValues.isEmpty ? (0...100).map {
+                parent.mapping.value(at: Double($0) / 100, in: parent.range)
+            } : ControlStops.legal(parent.snapValues, range: parent.range)
+            let next = direction > 0 ? values.first { $0 > parent.value + 1e-9 } : values.last { $0 < parent.value - 1e-9 }
+            if let next { send(next, finished: true) }
+        }
+        private func tick(for value: Double) -> Double {
+            parent.snapValues.isEmpty ? (parent.mapping.fraction(for: value, in: parent.range) * 100).rounded() : value
+        }
+        private func send(_ value: Double, finished: Bool) {
+            let tick = tick(for: value)
+            let now = CACurrentMediaTime()
+            if parent.haptics, let previous = lastTick, previous != tick, now - lastFeedback > 0.035 {
+                feedback?.selectionChanged(); feedback?.prepare(); lastFeedback = now
+            }
+            lastTick = tick
+            if parent.value != value || finished {
+                parent.value = value
+                parent.onChange(value, finished)
+            }
+        }
         private func report(_ scrollView: UIScrollView, finished: Bool) {
-            guard parent.isEnabled, scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating || finished else { return }
+            guard !updating, parent.isEnabled, scrollView.isTracking || scrollView.isDragging || scrollView.isDecelerating || finished else { return }
             let step = (scrollView.contentOffset.x + scrollView.bounds.width / 2 - RulerContainer.labelInset) / RulerContainer.spacing
             let fraction = min(max(Double(step) / Double(RulerContainer.steps), 0), 1)
-            let value = parent.mapping.value(at: fraction, in: parent.range)
-            parent.value = value
-            parent.onChange(value, finished)
+            let value = ControlStops.snap(parent.mapping.value(at: fraction, in: parent.range),
+                values: parent.snapValues, range: parent.range, mapping: parent.mapping)
+            send(value, finished: finished)
+            if finished, !parent.snapValues.isEmpty {
+                updating = true
+                let offset = RulerContainer.labelInset + CGFloat(parent.mapping.fraction(for: value, in: parent.range)) * CGFloat(RulerContainer.steps) * RulerContainer.spacing - scrollView.bounds.width / 2
+                scrollView.setContentOffset(CGPoint(x: offset, y: 0), animated: false)
+                updating = false
+            }
         }
     }
 }
@@ -65,6 +133,7 @@ final class RulerContainer: UIView {
     static let spacing: CGFloat = 12
     static let labelInset: CGFloat = 32
     let scrollView = UIScrollView()
+    var onAccessibilityAdjust: ((Double) -> Void)?
     private let ticks = RulerTicksView()
     private let marker = UIView()
     private var targetValue = 0.0
@@ -133,9 +202,7 @@ final class RulerContainer: UIView {
         adjustAccessibility(by: -1)
     }
     private func adjustAccessibility(by direction: Double) {
-        let fraction = mapping.fraction(for: targetValue, in: currentRange) + direction / Double(Self.steps)
-        targetValue = mapping.value(at: fraction, in: currentRange)
-        setNeedsLayout()
+        onAccessibilityAdjust?(direction)
     }
 }
 

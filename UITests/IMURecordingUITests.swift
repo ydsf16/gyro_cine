@@ -21,8 +21,10 @@ final class IMURecordingUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
         app.buttons["settingsOpen"].tap()
-        app.buttons["codecMenu"].tap()
-        app.buttons["ProRes RAW"].tap()
+        if !app.buttons["codecMenu"].label.contains("ProRes RAW") || app.buttons["codecMenu"].label.contains("HQ") {
+            app.buttons["codecMenu"].tap()
+            app.buttons["ProRes RAW"].tap()
+        }
         app.buttons["完成"].tap()
         let record = app.buttons["recordToggle"]
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: record)
@@ -39,13 +41,357 @@ final class IMURecordingUITests: XCTestCase {
         XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
     }
 
+    func testStorageReclaimDedicated() { storageCycle(location: "专用视频存储", codec: "ProRes RAW") }
+    func testStorageReclaimInternal() { storageCycle(location: "内部文件", codec: "H.265") }
+    func testStorageReclaimAfterModeSwitch() { storageCycle(location: "专用视频存储", codec: "ProRes RAW", deleteInInternal: true) }
+
+    private func storageCycle(location: String, codec: String, deleteInInternal: Bool = false) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageLocation", location, "-outputFormat", "SonyMov"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        if !app.buttons["codecMenu"].label.contains(codec) || app.buttons["codecMenu"].label.contains("HQ") {
+            app.buttons["codecMenu"].tap(); app.buttons[codec].tap()
+        }
+        let entry = app.buttons["proVideoStorageSettings"]
+        XCTAssertEqual(entry.exists, location == "专用视频存储")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "storage-settings-\(location)"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["完成"].tap()
+        app.buttons["mediaOpen"].tap()
+        let before = Set(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mediaRow.'")).allElementsBoundByIndex.map(\.identifier))
+        app.buttons["完成"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        let capacityBefore = app.staticTexts["storageRemaining"].label
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.isEnabled)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 20), .completed)
+        Thread.sleep(forTimeInterval: location == "内部文件" ? 30 : 5)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+        Thread.sleep(forTimeInterval: 3)
+        let capacityRecorded = app.staticTexts["storageRemaining"].label
+        if deleteInInternal {
+            app.terminate(); app.launchArguments = ["-storageLocation", "内部文件"]; app.launch()
+            XCTAssertTrue(app.buttons["mediaOpen"].waitForExistence(timeout: 20))
+        }
+        app.buttons["mediaOpen"].tap()
+        let after = Set(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mediaRow.'")).allElementsBoundByIndex.map(\.identifier))
+        let added = after.subtracting(before)
+        XCTAssertEqual(added.count, 1, "Delete only the one recording created by this test")
+        guard let id = added.first, added.count == 1 else { return }
+        print("STORAGE_TEST_FILE \(id)")
+        app.buttons[id].press(forDuration: 1.1)
+        app.buttons["mediaDeleteSelected"].tap(); app.buttons["删除文件"].tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons[id])], timeout: 30), .completed)
+        app.buttons["完成"].tap()
+        if deleteInInternal {
+            Thread.sleep(forTimeInterval: 10)
+            app.terminate(); app.launchArguments = ["-storageLocation", location]; app.launch()
+            XCTAssertTrue(app.buttons["recordToggle"].waitForExistence(timeout: 20))
+        }
+        Thread.sleep(forTimeInterval: 10)
+        let capacityDeleted = app.staticTexts["storageRemaining"].label
+        if location == "专用视频存储" {
+            func gigabytes(_ label: String) -> Double? {
+                guard let range = label.range(of: #"[0-9]+\.[0-9]+"#, options: .regularExpression) else { return nil }
+                return Double(label[range])
+            }
+            if let start = gigabytes(capacityBefore), let used = gigabytes(capacityRecorded), let restored = gigabytes(capacityDeleted) {
+                XCTAssertLessThan(used, start - 0.1, "RAW recording must consume reserved capacity")
+                XCTAssertGreaterThanOrEqual(restored, start - 0.1, "Deletion must replenish reserved capacity")
+            } else { XCTFail("Missing capacity readout") }
+        }
+        let result = "mode=\(location) crossMode=\(deleteInInternal) before=\(capacityBefore) recorded=\(capacityRecorded) deleted=\(capacityDeleted) file=\(id)"
+        print("STORAGE_CAPACITY \(result)")
+        let attachment = XCTAttachment(string: result); attachment.lifetime = .keepAlways; add(attachment)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+        XCTAssertTrue(app.buttons["recordToggle"].isEnabled)
+    }
+
+    func testStorageMissingSSD() {
+        let app = XCUIApplication(); app.launchArguments = ["-storageLocation", "外部 SSD"]; app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        XCTAssertFalse(app.buttons["proVideoStorageSettings"].exists)
+        print("SSD_SETTINGS_UI \(app.debugDescription)")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "ssd-settings"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["完成"].tap()
+        app.buttons["recordToggle"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 10))
+        print("SSD_ALERT \(app.alerts.firstMatch.debugDescription)")
+        XCTAssertTrue(app.alerts.firstMatch.staticTexts.containing(NSPredicate(format: "label CONTAINS 'SSD'")).firstMatch.exists)
+    }
+
+    func testStorageSystemSettingsEntry() {
+        let app = XCUIApplication(); app.launchArguments = ["-storageLocation", "专用视频存储"]; app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        app.buttons["settingsOpen"].tap()
+        app.buttons["proVideoStorageSettings"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        XCTAssertEqual(settings.state, .runningForeground)
+        print("STORAGE_SYSTEM_UI \(settings.debugDescription)")
+        let configure = settings.cells["CAM_VCC"]
+        XCTAssertTrue(configure.waitForExistence(timeout: 5))
+        if !configure.isHittable { settings.swipeUp() }
+        configure.tap()
+        Thread.sleep(forTimeInterval: 3)
+        print("STORAGE_ALLOCATION_UI \(settings.debugDescription)")
+        let shot = XCTAttachment(screenshot: settings.screenshot()); shot.name = "system-storage-settings"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    private func controlApp() -> XCUIApplication {
+        let app = XCUIApplication(); app.launchArguments = ["-storageLocation", "内部文件", "-outputFormat", "SonyMov"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        return app
+    }
+    private func selectControlCodec(_ name: String, app: XCUIApplication) {
+        app.buttons["settingsOpen"].tap()
+        if !app.buttons["codecMenu"].label.contains(name) || app.buttons["codecMenu"].label.contains("HQ") {
+            for _ in 0..<2 {
+                app.buttons["codecMenu"].tap()
+                let option = app.buttons[name]
+                if option.waitForExistence(timeout: 3) {
+                    let frame = option.frame
+                    app.coordinate(withNormalizedOffset: .zero)
+                        .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
+                    break
+                }
+            }
+            XCTAssertTrue(app.buttons["codecMenu"].label.contains(name))
+        }
+        app.buttons["完成"].tap()
+    }
+    private func dragControl(_ app: XCUIApplication, left: Bool = true) {
+        let ruler = app.otherElements["parameterRuler"]
+        XCTAssertTrue(ruler.waitForExistence(timeout: 3))
+        ruler.coordinate(withNormalizedOffset: CGVector(dx: left ? 0.85 : 0.15, dy: 0.25))
+            .press(forDuration: 0.1, thenDragTo: ruler.coordinate(withNormalizedOffset: CGVector(dx: left ? 0.15 : 0.85, dy: 0.25)))
+    }
+    private func controlScreenshot(_ app: XCUIApplication, _ name: String) {
+        let a = XCTAttachment(screenshot: app.screenshot()); a.name = name; a.lifetime = .keepAlways; add(a)
+    }
+    func testStartupDefaultsAndAllRulers() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        for pass in 0..<2 {
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label CONTAINS '1×'"),
+                object: app.buttons["parameter.Lens"])], timeout: 20), .completed)
+            app.buttons["settingsOpen"].tap()
+            XCTAssertTrue(app.buttons["codecMenu"].label.contains("H.265"))
+            XCTAssertFalse(app.buttons["codecMenu"].label.contains("HQ"))
+            XCTAssertTrue(app.buttons["resolutionMenu"].label.contains("3840×2160"))
+            XCTAssertTrue(app.buttons["fpsMenu"].label.contains("60.0 fps"))
+            XCTAssertTrue(app.buttons["exposureTypeMenu"].label.contains("角度"))
+            XCTAssertTrue(app.buttons["storageLocationMenu"].label.contains("内部文件"))
+            for _ in 0..<4 where !app.switches["rulerHapticsToggle"].isHittable { app.swipeUp() }
+            XCTAssertEqual(app.switches["rulerHapticsToggle"].value as? String, "1")
+            app.buttons["完成"].tap()
+            app.buttons["parameter.Shutter"].tap()
+            XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '最长 1/120'")).firstMatch.exists)
+            XCTAssertTrue(app.buttons["A-Max"].exists)
+            if pass == 1 { break }
+            dragControl(app); Thread.sleep(forTimeInterval: 3)
+            for parameter in ["ISO", "WB", "Focus", "EV"] {
+                app.buttons["parameter.\(parameter)"].tap()
+                if parameter == "ISO" { app.buttons["M"].tap() }
+                if parameter == "WB" { app.buttons["wb.mode.Manual"].tap() }
+                if parameter == "Focus" { app.buttons["MF"].tap() }
+                if parameter == "EV" {
+                    app.buttons["parameter.ISO"].tap(); app.buttons["A"].tap()
+                    app.buttons["parameter.EV"].tap()
+                }
+                dragControl(app); Thread.sleep(forTimeInterval: 3)
+            }
+            app.buttons["parameter.Lens"].tap(); app.buttons["lens.0.5×"].tap()
+            Thread.sleep(forTimeInterval: 3)
+            app.terminate(); app.launch()
+            XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["parameter.WB"].label.contains("A"))
+            XCTAssertTrue(app.buttons["parameter.Focus"].label.contains("AF-C"))
+            XCTAssertTrue(app.buttons["parameter.EV"].label.contains("+0.0"))
+        }
+        controlScreenshot(app, "startup-defaults")
+    }
+
+    func testRAWWhiteBalanceAlwaysLocked() {
+        let app = controlApp()
+        for codec in ["ProRes RAW", "ProRes RAW HQ"] {
+            selectControlCodec(codec, app: app)
+            Thread.sleep(forTimeInterval: 2)
+            app.buttons["parameter.WB"].tap()
+            XCTAssertTrue(app.otherElements["wb.rawLocked"].exists || app.staticTexts["wb.rawLocked"].exists)
+            XCTAssertFalse(app.buttons["wb.mode.Auto"].exists)
+            XCTAssertFalse(app.buttons["A"].exists)
+            controlScreenshot(app, "raw-wb-locked-\(codec)")
+            app.buttons["parameter.Lens"].tap(); app.buttons["lens.0.5×"].tap()
+            Thread.sleep(forTimeInterval: 3)
+            app.buttons["parameter.Lens"].tap(); app.buttons["lens.1×"].tap()
+            Thread.sleep(forTimeInterval: 3)
+            XCTAssertFalse(app.alerts.firstMatch.exists)
+            app.buttons["parameter.WB"].tap()
+            XCTAssertFalse(app.buttons["A"].exists)
+            app.buttons["parameter.WB"].tap()
+        }
+        selectControlCodec("H.265", app: app)
+        app.buttons["parameter.WB"].tap()
+        XCTAssertTrue(app.buttons["wb.mode.Auto-L"].exists)
+        XCTAssertTrue(app.buttons["wb.mode.Auto"].exists)
+    }
+
+    func testControlsDefaultLensAndRAWStoragePrompt() {
+        let app = controlApp()
+        XCTAssertTrue(app.buttons["parameter.Lens"].label.contains("1×"), app.debugDescription)
+        selectControlCodec("ProRes RAW", app: app)
+        app.buttons["recordToggle"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.alerts.staticTexts.containing(NSPredicate(format: "label CONTAINS '专用视频存储' AND label CONTAINS 'SSD'")).firstMatch.exists)
+        XCTAssertTrue(app.alerts.buttons["设置存储"].exists)
+        controlScreenshot(app, "friendly-raw-storage")
+        app.alerts.buttons["设置存储"].tap()
+        XCTAssertTrue(app.buttons["storageLocationMenu"].waitForExistence(timeout: 5))
+    }
+    func testControlsWhiteBalanceModesRecording() {
+        let app = controlApp(); selectControlCodec("H.265", app: app)
+        for mode in ["Auto-L", "Auto", "Manual"] {
+            app.buttons["mediaOpen"].tap()
+            let before = Set(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mediaRow.'")).allElementsBoundByIndex.map(\.identifier))
+            app.buttons["完成"].tap()
+            app.buttons["parameter.WB"].tap()
+            XCTAssertTrue(app.buttons["wb.mode.\(mode)"].waitForExistence(timeout: 5))
+            app.buttons["wb.mode.\(mode)"].tap()
+            controlScreenshot(app, "white-balance-\(mode)")
+            app.buttons["recordToggle"].tap()
+            let rec = app.buttons["recordToggle"]
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: rec)], timeout: 20), .completed)
+            Thread.sleep(forTimeInterval: 4)
+            app.buttons["recordToggle"].tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: rec)], timeout: 40), .completed)
+            XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+            Thread.sleep(forTimeInterval: 1)
+            print("WB_MODE_FINISHED \(mode) \(app.buttons["parameter.WB"].label)")
+            app.buttons["mediaOpen"].tap()
+            let after = Set(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'mediaRow.'")).allElementsBoundByIndex.map(\.identifier))
+            let added = after.subtracting(before); XCTAssertEqual(added.count, 1)
+            if let id = added.first, added.count == 1 {
+                print("WB_TEST_FILE \(mode) \(id)")
+                app.buttons[id].press(forDuration: 1.1)
+                app.buttons["mediaDeleteSelected"].tap(); app.buttons["删除文件"].tap()
+            }
+            app.buttons["完成"].tap()
+        }
+    }
+    func testControlsAngleEVAndHaptics() {
+        let app = controlApp(); selectControlCodec("H.265", app: app)
+        app.buttons["settingsOpen"].tap(); tapExposureType("angle", in: app)
+        XCTAssertTrue(app.buttons["exposureTypeMenu"].label.contains("角度"))
+        XCTAssertFalse(app.buttons["exposureTypeMenu"].label.contains("快门"))
+        for _ in 0..<4 where !app.switches["rulerHapticsToggle"].isHittable { app.swipeUp() }
+        let toggle = app.switches["rulerHapticsToggle"]; XCTAssertTrue(toggle.isHittable)
+        if toggle.value as? String != "1" {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        XCTAssertEqual(toggle.value as? String, "1")
+        app.buttons["完成"].tap()
+        app.buttons["parameter.Shutter"].tap()
+        controlScreenshot(app, "angle-time-scale")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '°' AND label CONTAINS '1/'")).firstMatch.exists)
+        dragControl(app)
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.EV"].tap()
+        dragControl(app)
+        Thread.sleep(forTimeInterval: 1)
+        print("EV_CHANGED \(app.buttons["parameter.EV"].label)")
+        XCTAssertFalse(app.buttons["parameter.EV"].label.contains("+0.0"))
+        controlScreenshot(app, "six-parameter-ev")
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+    func testControlsManualSurvivesLensAndFPS() {
+        let app = controlApp(); selectControlCodec("H.265", app: app)
+        app.buttons["settingsOpen"].tap(); tapExposureType("speed", in: app); tapFPSOption("30.0 fps", in: app); app.buttons["完成"].tap()
+        app.buttons["parameter.Shutter"].tap(); app.buttons["M"].tap()
+        dragControl(app, left: false)
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.ISO"].tap(); dragControl(app)
+        Thread.sleep(forTimeInterval: 3)
+        app.buttons["parameter.WB"].tap(); app.buttons["wb.mode.Manual"].tap()
+        dragControl(app)
+        Thread.sleep(forTimeInterval: 3)
+        let shutter = app.buttons["parameter.Shutter"].label
+        let iso = app.buttons["parameter.ISO"].label
+        let wb = app.buttons["parameter.WB"].label
+        print("MANUAL_BASE \(shutter) \(iso) \(wb)")
+        for lens in ["0.5×", "1×"] {
+            app.buttons["parameter.Lens"].tap()
+            app.buttons["lens.\(lens)"].tap()
+            Thread.sleep(forTimeInterval: 3)
+            XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+            print("MANUAL_LENS \(lens) \(app.buttons["parameter.Shutter"].label) \(app.buttons["parameter.ISO"].label)")
+        }
+        for rate in ["60.0 fps", "30.0 fps"] {
+            app.buttons["settingsOpen"].tap(); tapFPSOption(rate, in: app); app.buttons["完成"].tap()
+            Thread.sleep(forTimeInterval: 2)
+            XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+            print("MANUAL_FPS \(rate) \(app.buttons["parameter.Shutter"].label) \(app.buttons["parameter.ISO"].label)")
+        }
+        // Sensor line-time quantization can change the reported reciprocal slightly.
+        let originalDenominator = Double(shutter.split(separator: "/").last ?? "") ?? 0
+        let finalDenominator = Double(app.buttons["parameter.Shutter"].label.split(separator: "/").last ?? "") ?? 0
+        XCTAssertGreaterThan(originalDenominator, 0)
+        XCTAssertEqual(finalDenominator, originalDenominator, accuracy: max(1, originalDenominator * 0.01))
+        XCTAssertEqual(app.buttons["parameter.ISO"].label, iso)
+        let originalKelvin = Double(wb.filter(\.isNumber)) ?? 0
+        let finalKelvin = Double(app.buttons["parameter.WB"].label.filter(\.isNumber)) ?? 0
+        XCTAssertGreaterThan(originalKelvin, 0)
+        XCTAssertEqual(finalKelvin, originalKelvin, accuracy: max(100, originalKelvin * 0.03))
+        controlScreenshot(app, "manual-restored")
+    }
+
+    func testControlsZAngleSurvivesISOAndFPS() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageLocation", "内部文件", "-exposureType", "angle"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
+        selectControlCodec("H.265", app: app)
+        app.buttons["parameter.Shutter"].tap(); app.buttons["M"].tap()
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(app.buttons["parameter.Shutter"].label.contains("180°"))
+        app.buttons["parameter.ISO"].tap(); dragControl(app)
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(app.buttons["parameter.Shutter"].label.contains("180°"))
+        app.buttons["settingsOpen"].tap(); tapFPSOption("60.0 fps", in: app); app.buttons["完成"].tap()
+        app.buttons["parameter.ISO"].tap(); dragControl(app, left: false)
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertTrue(app.buttons["parameter.Shutter"].label.contains("180°"), app.debugDescription)
+        app.buttons["parameter.Shutter"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '180°' AND label CONTAINS '1/120'")).firstMatch.exists)
+        controlScreenshot(app, "angle-after-iso-and-fps")
+        app.buttons["settingsOpen"].tap()
+        for _ in 0..<4 where !app.switches["rulerHapticsToggle"].isHittable { app.swipeUp() }
+        let haptics = app.switches["rulerHapticsToggle"]
+        XCTAssertTrue(haptics.isHittable)
+        if haptics.value as? String == "1" {
+            haptics.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        }
+        haptics.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        XCTAssertEqual(haptics.value as? String, "1")
+        app.buttons["完成"].tap()
+    }
+
     func testFrameRateRestoresAutoMax() {
         let app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["parameter.Shutter"].waitForExistence(timeout: 20))
         app.tap()
         app.buttons["parameter.Shutter"].tap()
-        app.buttons["M"].tap()
+        // FPS changes update Auto-Max defaults only when the user is in Auto-Max.
+        // Manual preservation is covered by testControlsManualSurvivesLensAndFPS.
+        app.buttons["A-Max"].tap()
         app.buttons["parameter.Shutter"].tap()
         Thread.sleep(forTimeInterval: 0.5)
         for (rate, denominator) in [("60.0 fps", "1/120"), ("30.0 fps", "1/60")] {
@@ -110,6 +456,7 @@ final class IMURecordingUITests: XCTestCase {
     private func tapExposureType(_ type: String, in app: XCUIApplication) {
         let menu = app.buttons["exposureTypeMenu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        if menu.label.contains(type == "angle" ? "角度" : "速度") { return }
         for _ in 0..<4 where !menu.isHittable || !menu.frame.midY.isFinite {
             app.swipeUp()
         }
@@ -126,6 +473,7 @@ final class IMURecordingUITests: XCTestCase {
     }
 
     private func tapFPSOption(_ rate: String, in app: XCUIApplication) {
+        if app.buttons["fpsMenu"].label.contains(rate) { return }
         let option = app.buttons["fpsOption.\(rate)"]
         for _ in 0..<3 {
             let menuFrame = app.buttons["fpsMenu"].frame

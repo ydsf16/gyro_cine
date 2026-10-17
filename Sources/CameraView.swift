@@ -61,13 +61,14 @@ private final class PreviewUIView: UIView {
 }
 
 private enum Parameter: String, CaseIterable, Identifiable {
-    case lens = "Lens", shutter = "Shutter", iso = "ISO", wb = "WB", focus = "Focus"
+    case lens = "Lens", shutter = "Shutter", iso = "ISO", ev = "EV", wb = "WB", focus = "Focus"
     var id: Self { self }
     func title(locale: Locale) -> String {
         switch self {
         case .lens: AppText.value("镜头", "Lens", locale: locale)
         case .shutter: AppText.value("快门", "Shutter", locale: locale)
         case .iso: "ISO"
+        case .ev: AppText.value("补偿", "EV", locale: locale)
         case .wb: AppText.value("白平衡", "WB", locale: locale)
         case .focus: AppText.value("对焦", "Focus", locale: locale)
         }
@@ -120,6 +121,7 @@ struct CameraView: View {
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
+    @AppStorage("rulerHaptics") private var rulerHaptics = true
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
     @State private var panelDismissID = UUID()
@@ -130,6 +132,7 @@ struct CameraView: View {
     @State private var shutterMaxValue = 1.0 / 200.0
     @State private var shutterAngleValue = 180.0
     @State private var shutterAngleMaxValue = 180.0
+    @State private var evValue = 0.0
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
@@ -139,13 +142,13 @@ struct CameraView: View {
         .map { 1.0 / $0 }
 
     private var shutterRulerRange: ClosedRange<Double> {
-        let lower = max(camera.exposureRange.lowerBound, 1.0 / 4000)
-        let upper = min(camera.exposureRange.upperBound, 1.0 / 10, 1.0 / max(camera.fps, 1))
+        let lower = max(camera.exposureRange.lowerBound, 1.0 / 8000)
+        let upper = min(camera.exposureRange.upperBound, 1.0 / max(camera.fps, 1))
         return lower <= upper ? lower...upper : camera.exposureRange
     }
 
     private var shutterAngleRange: ClosedRange<Double> {
-        let minimum = max(1, 360 * camera.exposureRange.lowerBound * camera.fps)
+        let minimum = max(1, 360 * max(camera.exposureRange.lowerBound, 1.0 / 8000) * camera.fps)
         let maximum = min(360, 360 * camera.exposureRange.upperBound * camera.fps)
         return minimum <= maximum ? minimum...maximum : 1...360
     }
@@ -261,6 +264,7 @@ struct CameraView: View {
                 Text(String(format: t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
                             Double(bytes) / 1_000_000_000, Int(seconds / 60)))
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
+                    .accessibilityIdentifier("storageRemaining")
             }
             Text(specification)
                 .font(.system(size: 13, weight: .medium))
@@ -273,6 +277,9 @@ struct CameraView: View {
                         if selected == parameter {
                             closePanel()
                         } else {
+                            if parameter == .ev { evValue = camera.exposureBias }
+                            if parameter == .iso { isoValue = Double(camera.iso) }
+                            if parameter == .wb { wbValue = Double(camera.whiteBalanceKelvin) }
                             if parameter == .shutter {
                                 shutterValue = camera.exposureSeconds
                                 shutterMaxValue = camera.shutterMaxSeconds
@@ -285,8 +292,11 @@ struct CameraView: View {
                         VStack(spacing: 3) {
                             Text(parameter.title(locale: locale).uppercased()).font(.system(size: 10, weight: .medium))
                             HStack(spacing: 2) {
-                                Text(value(for: parameter)).font(.system(size: 17, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
-                                if isAuto(parameter) { Text("A").font(.system(size: 9, weight: .bold)).foregroundStyle(accent) }
+                                Text(value(for: parameter)).font(.system(size: 15, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+                                if isAuto(parameter) {
+                                    Text(parameter == .shutter && camera.shutterMode == .autoMax ? "AM" : "A")
+                                        .font(.system(size: 9, weight: .bold)).foregroundStyle(accent)
+                                }
                             }
                             Rectangle().fill(selected == parameter ? accent : .clear).frame(height: 2)
                         }
@@ -325,6 +335,7 @@ struct CameraView: View {
         case .shutter:
             exposureType == "angle" ? shutterAngleLabel(camera.exposureSeconds) : shutterLabel(camera.exposureSeconds)
         case .iso: String(Int(camera.iso.rounded()))
+        case .ev: String(format: "%+.1f", camera.exposureBias)
         case .wb: "\(Int(camera.whiteBalanceKelvin.rounded()))K"
         case .focus:
             switch camera.focusChoice {
@@ -337,7 +348,7 @@ struct CameraView: View {
     }
     private func isAuto(_ parameter: Parameter) -> Bool {
         switch parameter {
-        case .lens: false
+        case .lens, .ev: false
         case .shutter: camera.shutterMode == .auto || camera.shutterMode == .autoMax
         case .iso: camera.exposureAuto
         case .wb: camera.whiteBalanceAuto
@@ -391,7 +402,9 @@ struct CameraView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(parameter.title(locale: locale)).font(.system(size: 17, weight: .semibold))
-                    Text(parameter == .shutter && camera.shutterMode == .autoMax
+                    Text(parameter == .shutter && exposureType == "angle"
+                         ? "\(shutterAngleLabel(camera.exposureSeconds)) · \(shutterLabel(camera.exposureSeconds))" + (camera.shutterMode == .autoMax ? " · \(t("最长", "Max")) \(shutterLabel(camera.shutterMaxSeconds))" : "")
+                         : parameter == .shutter && camera.shutterMode == .autoMax
                          ? "\(t("最长", "Max")) \(exposureType == "angle" ? shutterAngleLabel(camera.shutterMaxSeconds) : shutterLabel(camera.shutterMaxSeconds)) · \(t("实际", "Actual")) \(value(for: parameter))"
                          : parameter == .shutter && exposureType == "angle"
                          ? "\(value(for: parameter)) · \(shutterLabel(camera.exposureSeconds))"
@@ -423,7 +436,7 @@ struct CameraView: View {
                     .accessibilityHint(t("选择日光、阴影等六种预设", "Choose from six lighting presets"))
                     .accessibilityIdentifier("wb.presets")
                 }
-                if parameter != .lens { modePicker(parameter) }
+                if parameter != .lens && parameter != .ev { modePicker(parameter) }
             }
             Group {
                 switch parameter {
@@ -443,8 +456,8 @@ struct CameraView: View {
                     if exposureType == "angle" {
                         movingRuler(value: camera.shutterMode == .autoMax ? $shutterAngleMaxValue : $shutterAngleValue,
                                     range: shutterAngleRange,
-                                    majorValues: [11.25, 22.5, 45, 90, 180, 270, 360],
-                                    format: { "\(Int($0.rounded()))°" }) {
+                                    majorValues: [11.25, 22.5, 45, 90, 180, 270, 360], snapValues: ControlStops.angle,
+                                    format: { "\(String(format: "%g", $0))°\n\(shutterLabel($0 / (360 * max(camera.fps, 1))))" }) {
                             if camera.shutterMode == .autoMax {
                                 camera.setExposureAutoMax(seconds: $0 / (360 * max(camera.fps, 1)))
                             } else { camera.setShutterAngle($0) }
@@ -454,6 +467,7 @@ struct CameraView: View {
                         movingRuler(value: camera.shutterMode == .autoMax ? $shutterMaxValue : $shutterValue,
                                     range: shutterRulerRange, mapping: .logarithmic,
                                     majorValues: shutterStops + [shutterRulerRange.lowerBound, shutterRulerRange.upperBound],
+                                    snapValues: ControlStops.shutter,
                                     format: shutterLabel) { value in
                             if camera.shutterMode == .autoMax { camera.setExposureAutoMax(seconds: value) }
                             else { camera.setManualExposure(seconds: value) }
@@ -463,12 +477,21 @@ struct CameraView: View {
                 case .iso:
                     movingRuler(value: $isoValue, range: camera.isoRange, mapping: .logarithmic,
                                 majorValues: [50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600] +
-                                    [camera.isoRange.lowerBound, camera.isoRange.upperBound],
+                                    [camera.isoRange.lowerBound, camera.isoRange.upperBound], snapValues: ControlStops.iso,
                                 format: { String(Int($0.rounded())) }) { camera.setManualExposure(iso: $0) }
                         .disabled(camera.exposureAuto)
+                case .ev:
+                    movingRuler(value: $evValue, range: camera.exposureBiasRange,
+                                majorValues: Array(-6...6).map(Double.init),
+                                snapValues: (-18...18).map { Double($0) / 3 },
+                                format: { String(format: "%+.1f", $0) }) { camera.setExposureBias($0) }
+                        .disabled(!camera.exposureAuto)
+                        .overlay(alignment: .bottom) {
+                            if !camera.exposureAuto { Text(t("自动曝光时可调", "Available with auto exposure")).font(.caption2) }
+                        }
                 case .wb:
-                    movingRuler(value: $wbValue, range: 2000...10000,
-                                majorValues: [2000, 3200, 4300, 5600, 6500, 8000, 10000],
+                    movingRuler(value: $wbValue, range: 2500...10000,
+                                majorValues: [2500, 3200, 4300, 5600, 6500, 8000, 10000],
                                 format: { "\(Int($0.rounded()))" }) { camera.setWhiteBalance(kelvin: Float($0)) }
                         .disabled(camera.whiteBalanceAuto)
                 case .focus:
@@ -477,16 +500,37 @@ struct CameraView: View {
                         .disabled(camera.focusChoice != .manual)
                 }
             }
-            .frame(height: 50)
+            .frame(height: 60)
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .frame(height: 126)
+        .frame(height: 136)
         .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
     }
 
     private func modePicker(_ parameter: Parameter) -> some View {
+        if parameter == .wb && (camera.selectedCodec?.rawValue == "aprn" || camera.selectedCodec?.rawValue == "aprh") {
+            return AnyView(Label(t("锁定", "Locked"), systemImage: "lock.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).frame(height: 31)
+                .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
+                .accessibilityIdentifier("wb.rawLocked"))
+        }
+        if parameter == .wb && camera.selectedCodec?.rawValue != "aprn" && camera.selectedCodec?.rawValue != "aprh" {
+            return AnyView(HStack(spacing: 0) {
+                ForEach(WhiteBalanceChoice.allCases, id: \.self) { choice in
+                    Button(choice == .autoLock ? "AL" : choice == .auto ? "A" : "M") {
+                        camera.setWhiteBalanceChoice(choice)
+                        dismissPanelAfterAdjustment()
+                    }
+                    .accessibilityIdentifier("wb.mode.\(choice.rawValue)")
+                    .font(.system(size: 11, weight: .semibold)).buttonStyle(.plain)
+                    .frame(width: choice == .autoLock ? 48 : 43, height: 31)
+                    .background(camera.whiteBalanceChoice == choice ? accent : .clear, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }.background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 9)))
+        }
         if parameter == .shutter {
             return AnyView(HStack(spacing: 0) {
                 shutterButton("A-Max", mode: .autoMax) {
@@ -515,11 +559,11 @@ struct CameraView: View {
                     switch parameter {
                     case .iso:
                         if !auto && camera.exposureAuto { shutterValue = camera.exposureSeconds; isoValue = Double(camera.iso) }
-                        camera.setExposureAuto(auto)
+                        if auto || camera.exposureAuto { camera.setExposureAuto(auto) }
                     case .wb:
                         if !auto { wbValue = Double(camera.whiteBalanceKelvin) }
                         camera.setWhiteBalanceAuto(auto)
-                    case .lens, .shutter, .focus: break
+                    case .lens, .shutter, .focus, .ev: break
                     }
                     dismissPanelAfterAdjustment()
                 }
@@ -551,11 +595,12 @@ struct CameraView: View {
     }
 
     private func movingRuler(value: Binding<Double>, range: ClosedRange<Double>,
-                             mapping: RulerMapping = .linear, majorValues: [Double] = [],
+                             mapping: RulerMapping = .linear, majorValues: [Double] = [], snapValues: [Double] = [],
                              format: @escaping (Double) -> String,
                              onChange: @escaping (Double) -> Void) -> some View {
         MovingRuler(value: value, range: range, mapping: mapping,
-                    majorValues: majorValues, format: format) { selectedValue, finished in
+                    majorValues: majorValues, snapValues: snapValues, haptics: rulerHaptics,
+                    onInteractionBegan: { camera.setRulerHaptics(rulerHaptics) }, format: format) { selectedValue, finished in
             if finished || Date().timeIntervalSince(lastControlSend) > 0.06 {
                 lastControlSend = Date()
                 onChange(selectedValue)
@@ -564,7 +609,7 @@ struct CameraView: View {
         }.accessibilityIdentifier("parameterRuler")
     }
     private func shutterLabel(_ seconds: Double) -> String {
-        seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
+        seconds >= 1 ? String(format: "%g s", seconds) : seconds > 0 ? "1/\(Int((1 / seconds).rounded()))" : "—"
     }
     private func shutterAngleLabel(_ seconds: Double) -> String {
         seconds > 0 ? "\(Int((seconds * camera.fps * 360).rounded()))°" : "—"

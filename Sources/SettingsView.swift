@@ -11,6 +11,7 @@ struct SettingsView: View {
     @AppStorage("debugEnabled") private var debugEnabled = false
     @AppStorage("showCompositionGrid") private var showCompositionGrid = false
     @AppStorage("showHorizonLevel") private var showHorizonLevel = false
+    @AppStorage("rulerHaptics") private var rulerHaptics = true
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var message: String?
@@ -137,13 +138,13 @@ struct SettingsView: View {
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
             Menu {
-                Button(t("快门速度", "Shutter speed")) { chooseExposureType("speed") }
+                Button(t("速度", "Speed")) { chooseExposureType("speed") }
                     .accessibilityIdentifier("exposureType.speed")
-                Button(t("快门角度", "Shutter angle")) { chooseExposureType("angle") }
+                Button(t("角度", "Angle")) { chooseExposureType("angle") }
                     .accessibilityIdentifier("exposureType.angle")
             } label: {
                 row(t("曝光类型", "Exposure type"), exposureType == "angle" ?
-                    t("快门角度", "Shutter angle") : t("快门速度", "Shutter speed"))
+                    t("角度", "Angle") : t("速度", "Speed"))
             }
             .tint(.primary).disabled(locked)
             .accessibilityIdentifier("exposureTypeMenu")
@@ -174,7 +175,28 @@ struct SettingsView: View {
                         row(t("存储位置", "Storage"), storageLocation == "内部文件" ? t("内部文件", "On My iPhone") :
                             storageLocation == "专用视频存储" ? t("专用视频存储", "Pro Video Storage") : storageLocation)
                     }.tint(.primary)
+                    .accessibilityIdentifier("storageLocationMenu")
                     .disabled(locked)
+                    if storageLocation == "专用视频存储" {
+                        Button {
+                            guard ProVideoStorageBridge.isSupported() else {
+                                message = t("此设备或系统不支持专用视频存储。", "Pro Video Storage is unavailable on this device.")
+                                return
+                            }
+                            ProVideoStorageBridge.openSettings()
+                        } label: {
+                            HStack {
+                                Label(t("管理专用视频存储", "Manage Pro Video Storage"), systemImage: "internaldrive")
+                                Spacer()
+                                Image(systemName: "arrow.up.forward.app")
+                            }
+                        }
+                        .accessibilityIdentifier("proVideoStorageSettings")
+                        .disabled(locked)
+                        Text(t("进入系统设置后，点“配置专业视频储存空间”调整容量。",
+                               "In Settings, tap Configure Pro Video Storage to adjust capacity."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     if storageLocation == "外部 SSD" {
                         Menu {
                             ForEach(externalDevices, id: \.uuid) { device in
@@ -267,6 +289,9 @@ struct SettingsView: View {
     }
     private var advancedSection: some View {
         Section {
+                    Toggle(t("刻度震动反馈", "Ruler haptics"), isOn: $rulerHaptics)
+                        .accessibilityIdentifier("rulerHapticsToggle")
+                        .onChange(of: rulerHaptics) { _, enabled in camera.setRulerHaptics(enabled) }
                     Toggle(t("调试", "Debug"), isOn: $debugEnabled)
         } header: { Text(t("高级", "ADVANCED")) } footer: {
             Text(t("开启时保留原始 IMU 记录；封装失败时始终保留原始文件。",

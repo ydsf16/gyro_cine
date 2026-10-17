@@ -64,6 +64,16 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertNoThrow(try MOVTelemetryMuxer.synchronize(primary: { throw NSError(domain: NSPOSIXErrorDomain, code: Int(ENOTSUP)) }, fallback: { 0 }))
     }
 
+    func testDiscreteStopsAndDeviceLimits() {
+        let range = 75.0...900.0
+        XCTAssertEqual(ControlStops.legal(ControlStops.iso, range: range).first, 75)
+        XCTAssertEqual(ControlStops.legal(ControlStops.iso, range: range).last, 900)
+        XCTAssertEqual(ControlStops.snap(410, values: ControlStops.iso, range: range, mapping: .logarithmic), 400)
+        XCTAssertEqual(ControlStops.snap(10000, values: ControlStops.iso, range: range, mapping: .logarithmic), 900)
+        XCTAssertEqual(ControlStops.snap(1.0/119, values: ControlStops.shutter, range: 1.0/8000...1.0/60, mapping: .logarithmic), 1.0/120)
+        XCTAssertEqual(ControlStops.snap(179, values: ControlStops.angle, range: 1...360, mapping: .linear), 180)
+    }
+
     func testRulerEndpointsAndRoundTrip() {
         for mapping in [RulerMapping.linear, .logarithmic] {
             for fraction in [0.0, 0.25, 0.5, 0.75, 1] {
