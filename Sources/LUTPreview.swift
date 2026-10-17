@@ -14,7 +14,12 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private lazy var context: CIContext? = metalDevice.map {
         CIContext(mtlDevice: $0, options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
     }
-    private var cubes: [PreviewColorTransform.Profile: Data] = [:] // capture queue
+    private let preparationQueue = DispatchQueue(label: "GyroCine.LUTPrepare", qos: .userInitiated)
+    private var technicalCubes: [PreviewColorTransform.Profile: Data] = [:] // preparation queue only
+    private var cubes: [String: Data] = [:] // lock protected
+    private var pendingCubes = Set<String>()
+    private var failedCubes = Set<String>()
+    private var look: PreviewLook = .rec709 // lock protected
     private var latest: (CVPixelBuffer, PreviewColorTransform.Profile, Data?, Double)?
     private var enabled = false
     private var rendered = 0 // render queue
@@ -75,6 +80,37 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         lock.unlock()
         if stale { report("preparing") }
     }
+    func setLook(_ value: PreviewLook) {
+        lock.lock()
+        let changed = look != value
+        if changed { look = value; latest = nil; generation += 1 }
+        lock.unlock()
+        if changed { report("preparing") }
+    }
+    private func preparedCube(profile: PreviewColorTransform.Profile, look: PreviewLook) -> Data? {
+        let key = "\(profile.rawValue):\(look.rawValue)"
+        lock.lock()
+        if let cube = cubes[key] { lock.unlock(); return cube }
+        if failedCubes.contains(key) { lock.unlock(); report("unavailable"); return nil }
+        let start = pendingCubes.insert(key).inserted
+        lock.unlock()
+        if start {
+            preparationQueue.async { [weak self] in
+                guard let self else { return }
+                do {
+                    let technical = self.technicalCubes[profile] ?? PreviewColorTransform.cube(profile)
+                    self.technicalCubes[profile] = technical
+                    let cube = try look.load()?.compose(technical: technical) ?? technical
+                    self.lock.lock(); self.cubes[key] = cube; self.pendingCubes.remove(key); self.lock.unlock()
+                    self.log?("lut_preview_prepared", ["profile": profile.rawValue, "look": look.rawValue, "bytes": cube.count])
+                } catch {
+                    self.lock.lock(); self.failedCubes.insert(key); self.pendingCubes.remove(key); self.lock.unlock()
+                    self.log?("lut_preview_load_error", ["look": look.rawValue, "error": String(describing: error)])
+                }
+            }
+        }
+        return nil
+    }
     func setEnabled(_ value: Bool) {
         lock.lock(); enabled = value; latest = nil; generation += 1; lock.unlock()
         report(value ? "preparing" : "off")
@@ -119,7 +155,7 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 "pixelFormat": CVPixelBufferGetPixelFormatType(buffer),
                 "attachments": String(describing: CVBufferCopyAttachments(buffer, .shouldPropagate))])
         }
-        lock.lock(); let wanted = enabled; let version = generation; lock.unlock()
+        lock.lock(); let wanted = enabled; let version = generation; let selectedLook = look; lock.unlock()
         guard wanted, count % frameStride == 0 else { return }
         let now = ProcessInfo.processInfo.systemUptime
         let logTag = CVBufferCopyAttachment(buffer, kCVImageBufferLogTransferFunctionKey, nil) as? String
@@ -131,9 +167,9 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         else if logTag == nil, transfer == kCVImageBufferTransferFunction_ITU_R_709_2 as String,
                 primaries == kCVImageBufferColorPrimaries_ITU_R_709_2 as String { profile = .rec709 }
         else { report("unsupported"); return }
-        if profile != .rec709, cubes[profile] == nil { cubes[profile] = PreviewColorTransform.cube(profile) }
+        guard let cube = preparedCube(profile: profile, look: selectedLook) else { return }
         lock.lock()
-        if generation == version && enabled { latest = (buffer, profile, cubes[profile], now) }
+        if generation == version && enabled { latest = (buffer, profile, cube, now) }
         lock.unlock()
         requestRender()
     }

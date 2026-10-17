@@ -39,4 +39,33 @@ final class PreviewColorTransformTests: XCTestCase {
         let rgb = SIMD3<Double>(0.1, 0.5, 0.9)
         XCTAssertEqual(PreviewColorTransform.convert(rgb, profile: .rec709), rgb)
     }
+    func testCubeInterpolationAndValidation() throws {
+        var lines = ["LUT_3D_SIZE 2", "DOMAIN_MIN 0 0 0", "DOMAIN_MAX 1 1 1"]
+        for b in 0...1 { for g in 0...1 { for r in 0...1 { lines.append("\(b) \(r) \(g)") } } }
+        let cube = try CubeLook(text: lines.joined(separator: "\n"))
+        let sample = cube.sample(SIMD3(0.2, 0.4, 0.8))
+        XCTAssertEqual(sample.x, 0.8, accuracy: 1e-9)
+        XCTAssertEqual(sample.y, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(sample.z, 0.4, accuracy: 1e-9)
+        XCTAssertThrowsError(try CubeLook(text: "LUT_3D_SIZE 1000"))
+        XCTAssertThrowsError(try CubeLook(text: "LUT_3D_SIZE 2\n0 0 0"))
+        XCTAssertThrowsError(try CubeLook(text: lines.joined(separator: "\n") + "\nnan 0 0"))
+    }
+    func testBundledLooksAndComposedCubes() throws {
+        let technical = PreviewColorTransform.cube(.appleLog2)
+        var distinct = Set<Data>()
+        for look in PreviewLook.allCases where look != .rec709 {
+            let cube = try XCTUnwrap(look.load(bundle: Bundle(for: CameraManager.self)))
+            XCTAssertEqual(cube.dimension, 33)
+            let composed = cube.compose(technical: technical)
+            XCTAssertEqual(composed.count, technical.count)
+            distinct.insert(composed)
+            composed.withUnsafeBytes { raw in
+                for v in raw.bindMemory(to: Float.self) { XCTAssertTrue(v.isFinite && v >= 0 && v <= 1) }
+            }
+        }
+        XCTAssertEqual(distinct.count, 5)
+        XCTAssertFalse(distinct.contains(technical))
+    }
+
 }

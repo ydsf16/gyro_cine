@@ -88,7 +88,8 @@ struct MediaLibraryView: View {
             .disabled(deleting)
             .sheet(item: $selected) { url in
                 NavigationStack {
-                    VideoPlayer(player: AVPlayer(url: url))
+                    StableMoviePlayer(url: url)
+                        .id(url)
                         .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20) }
                         .navigationTitle(url.deletingPathExtension().lastPathComponent)
                         .navigationBarTitleDisplayMode(.inline)
@@ -287,4 +288,23 @@ private struct IMUBadge: View {
 
 extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
+}
+
+// The camera publishes live parameters frequently. Own the player for the sheet's
+// lifetime so those updates cannot replace its item or reset playback.
+private final class MoviePlaybackSession: ObservableObject {
+    let player: AVPlayer
+    init(url: URL) { player = AVPlayer(url: url) }
+}
+
+private struct StableMoviePlayer: View {
+    @StateObject private var session: MoviePlaybackSession
+    init(url: URL) {
+        _session = StateObject(wrappedValue: MoviePlaybackSession(url: url))
+    }
+    var body: some View {
+        VideoPlayer(player: session.player)
+            .accessibilityIdentifier("mediaPlayer")
+            .onDisappear { session.player.pause() }
+    }
 }

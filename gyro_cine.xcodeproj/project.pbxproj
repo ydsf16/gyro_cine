@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		000D1F4BE08234DB6DAD47F7 /* slay-01-amber.cube in Resources */ = {isa = PBXBuildFile; fileRef = 49AB8D9F8A96F0271570E6FE /* slay-01-amber.cube */; };
 		0E286DED35A89FA3E11D2263 /* RAWInternalWriterExperiment.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */; };
 		0E9EA1990236C5739FDB98E6 /* CaptureFrameEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */; };
 		1A88DD1D0C6671CDAE1BE79C /* MediaLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */; };
@@ -14,15 +15,21 @@
 		2118EED908F6250FAD230DC8 /* CameraIntrinsicsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A91E087623B637B08CBC743 /* CameraIntrinsicsRecorder.swift */; };
 		220235B045B0AEEAA28BE778 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0109F90EE225951234B97E3A /* CameraView.swift */; };
 		23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */; };
+		2824C3D47F874901282E65E3 /* slay-03-neon.cube in Resources */ = {isa = PBXBuildFile; fileRef = E183FFDC6DE40CDF80F1255A /* slay-03-neon.cube */; };
+		2CC48985B038B1E260CEECA4 /* SLAY-SOURCE.json in Resources */ = {isa = PBXBuildFile; fileRef = E060E12B4BE73A0FAAA89CE5 /* SLAY-SOURCE.json */; };
 		2FA4E79E6ABA5B777D44DA00 /* GyroCineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */; };
+		48DD2F49E814918E0E9D1587 /* slay-04-film.cube in Resources */ = {isa = PBXBuildFile; fileRef = 65421CAD3416494D0C97EDC5 /* slay-04-film.cube */; };
 		4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2817BCD3637009EF27D48531 /* SettingsView.swift */; };
 		52FE3F9193A3EF399A772E12 /* LUTPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8AD651BD4167D9D48632117 /* LUTPreview.swift */; };
 		5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9141D40EBE79980BEA8969DC /* Assets.xcassets */; };
 		635A301F479D884EB2F45FA9 /* IMURecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD19334D59F169EEE052CD8 /* IMURecording.swift */; };
+		6C4D5094C73E9D5B9D622509 /* slay-02-fade.cube in Resources */ = {isa = PBXBuildFile; fileRef = 58BD98D23A33171930C1EB9C /* slay-02-fade.cube */; };
 		77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7837A3B5E0845276712C02D9 /* Localizable.strings */; };
 		8082FD10ABEDAE1649CA9217 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */; };
 		8A4D75C717C7D2C5DCCC78E9 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2988EEEB7132649CE38D63 /* ClockAligner.swift */; };
 		8B7574C40EDE681D7840F8B1 /* MovingRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */; };
+		957990DD9BB5E5A46DB87F81 /* slay-05-portrait.cube in Resources */ = {isa = PBXBuildFile; fileRef = 987DE3E8C7C89F42C7E1D6BD /* slay-05-portrait.cube */; };
+		9590B374CB928008C53FE1EA /* SLAY-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = ECD4FC5B13B0DA91A045C74B /* SLAY-LICENSE.txt */; };
 		993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = 8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */; };
 		AE5C369E8809C261C6EBABA3 /* PreviewColorTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CCD09C1C4B879E79792AB1 /* PreviewColorTransformTests.swift */; };
 		B07D5C4C4D09DD8B6C4A99B5 /* IMURecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034C3517079161B3003ECD09 /* IMURecordingUITests.swift */; };
@@ -67,10 +74,13 @@
 		2B8A1595023331ECBDE74265 /* MOVTelemetryMuxer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MOVTelemetryMuxer.swift; sourceTree = "<group>"; };
 		44CCD09C1C4B879E79792AB1 /* PreviewColorTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewColorTransformTests.swift; sourceTree = "<group>"; };
 		45B973097EAF522C0DABF600 /* GyroCineUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GyroCineUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		49AB8D9F8A96F0271570E6FE /* slay-01-amber.cube */ = {isa = PBXFileReference; path = "slay-01-amber.cube"; sourceTree = "<group>"; };
 		57387D9F647FF4429FC12F72 /* DefaultsAndOrientationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultsAndOrientationTests.swift; sourceTree = "<group>"; };
+		58BD98D23A33171930C1EB9C /* slay-02-fade.cube */ = {isa = PBXFileReference; path = "slay-02-fade.cube"; sourceTree = "<group>"; };
 		5A91E087623B637B08CBC743 /* CameraIntrinsicsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraIntrinsicsRecorder.swift; sourceTree = "<group>"; };
 		608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTelemetryExporter.swift; sourceTree = "<group>"; };
 		64818C6434D8910B7DDAABDF /* AppText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppText.swift; sourceTree = "<group>"; };
+		65421CAD3416494D0C97EDC5 /* slay-04-film.cube */ = {isa = PBXFileReference; path = "slay-04-film.cube"; sourceTree = "<group>"; };
 		6F15C98F48AE5F5D6C3B3938 /* MediaLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLibraryView.swift; sourceTree = "<group>"; };
 		6F2988EEEB7132649CE38D63 /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
 		81348E10D056049BDBFBE556 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
@@ -81,11 +91,15 @@
 		8C50ACA654D416F5EB9EB508 /* GyroCineTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GyroCineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9141D40EBE79980BEA8969DC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
+		987DE3E8C7C89F42C7E1D6BD /* slay-05-portrait.cube */ = {isa = PBXFileReference; path = "slay-05-portrait.cube"; sourceTree = "<group>"; };
 		B0BD8DF5CEBF59A852F9A3BA /* PreviewColorTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewColorTransform.swift; sourceTree = "<group>"; };
 		DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
 		DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
+		E060E12B4BE73A0FAAA89CE5 /* SLAY-SOURCE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "SLAY-SOURCE.json"; sourceTree = "<group>"; };
+		E183FFDC6DE40CDF80F1255A /* slay-03-neon.cube */ = {isa = PBXFileReference; path = "slay-03-neon.cube"; sourceTree = "<group>"; };
 		E1DE94FAEE0A3D0DDC49BAB0 /* CaptureFrameEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFrameEvidence.swift; sourceTree = "<group>"; };
 		E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RAWInternalWriterExperiment.swift; sourceTree = "<group>"; };
+		ECD4FC5B13B0DA91A045C74B /* SLAY-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "SLAY-LICENSE.txt"; sourceTree = "<group>"; };
 		F685F1FA9AB76A1323DEE148 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		F8AD651BD4167D9D48632117 /* LUTPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LUTPreview.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -100,6 +114,20 @@
 				E9C2F5D4E2595DB165FE2AAB /* UITests */,
 				E6315DD520386174BE33B742 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		C8D26F1EC25FC76B6D6A49B2 /* LUTs */ = {
+			isa = PBXGroup;
+			children = (
+				49AB8D9F8A96F0271570E6FE /* slay-01-amber.cube */,
+				58BD98D23A33171930C1EB9C /* slay-02-fade.cube */,
+				E183FFDC6DE40CDF80F1255A /* slay-03-neon.cube */,
+				65421CAD3416494D0C97EDC5 /* slay-04-film.cube */,
+				987DE3E8C7C89F42C7E1D6BD /* slay-05-portrait.cube */,
+				ECD4FC5B13B0DA91A045C74B /* SLAY-LICENSE.txt */,
+				E060E12B4BE73A0FAAA89CE5 /* SLAY-SOURCE.json */,
+			);
+			path = LUTs;
 			sourceTree = "<group>";
 		};
 		CEA2682A0BB22666CAB02D23 /* Sources */ = {
@@ -166,6 +194,7 @@
 				9141D40EBE79980BEA8969DC /* Assets.xcassets */,
 				16572DD721A8AC0A99243C5F /* Info.plist */,
 				7837A3B5E0845276712C02D9 /* Localizable.strings */,
+				C8D26F1EC25FC76B6D6A49B2 /* LUTs */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -280,6 +309,13 @@
 			files = (
 				5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */,
 				77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */,
+				9590B374CB928008C53FE1EA /* SLAY-LICENSE.txt in Resources */,
+				2CC48985B038B1E260CEECA4 /* SLAY-SOURCE.json in Resources */,
+				000D1F4BE08234DB6DAD47F7 /* slay-01-amber.cube in Resources */,
+				6C4D5094C73E9D5B9D622509 /* slay-02-fade.cube in Resources */,
+				2824C3D47F874901282E65E3 /* slay-03-neon.cube in Resources */,
+				48DD2F49E814918E0E9D1587 /* slay-04-film.cube in Resources */,
+				957990DD9BB5E5A46DB87F81 /* slay-05-portrait.cube in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

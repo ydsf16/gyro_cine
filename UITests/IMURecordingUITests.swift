@@ -18,12 +18,12 @@ final class IMURecordingUITests: XCTestCase {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.buttons["captureSetupOpen"].waitForExistence(timeout: 25))
         app.buttons["captureSetupOpen"].tap()
-        XCTAssertTrue(app.segmentedControls["quickLensPicker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "quickLens.")).firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["codecMenu"].exists)
         XCTAssertTrue(app.buttons["resolutionMenu"].exists)
         XCTAssertTrue(app.buttons["fpsMenu"].exists)
         controlScreenshot(app, "quick-capture-card")
-        app.buttons["完成"].tap()
+        app.buttons["captureSettingsClose"].tap()
         app.buttons["mediaOpen"].tap()
         XCTAssertTrue(app.scrollViews["mediaGrid"].waitForExistence(timeout: 5))
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaRow."))
@@ -40,6 +40,82 @@ final class IMURecordingUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         controlScreenshot(app, "media-share-selection")
         // Do not select a recipient or send anything.
+    }
+    func testImmediateLensSwitchAndPlayback() {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["captureSetupOpen"].waitForExistence(timeout: 25))
+        app.buttons["captureSetupOpen"].tap()
+        let lenses = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "quickLens."))
+        XCTAssertTrue(lenses.firstMatch.waitForExistence(timeout: 10))
+        print("QUICK_LENSES \(lenses.allElementsBoundByIndex.map(\.identifier))")
+        let wide = lenses.matching(NSPredicate(format: "label == %@", "1×")).firstMatch
+        let tele = lenses.matching(NSPredicate(format: "label == %@", "4×")).firstMatch
+        XCTAssertTrue(wide.exists); XCTAssertTrue(tele.exists)
+        for _ in 0..<3 {
+            for lens in [tele, wide] {
+                XCTAssertTrue(lens.waitForExistence(timeout: 10))
+                lens.tap()
+                XCTAssertTrue(NSPredicate(format: "value == %@ AND enabled == true", "selected")
+                    .evaluate(with: lens) || XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                        predicate: NSPredicate(format: "value == %@ AND enabled == true", "selected"),
+                        object: lens)], timeout: 20) == .completed)
+                XCTAssertTrue(app.buttons["codecMenu"].isEnabled)
+            }
+        }
+        app.buttons["codecMenu"].tap()
+        XCTAssertTrue(app.buttons["ProRes RAW"].waitForExistence(timeout: 5))
+        app.buttons["ProRes RAW"].tap()
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "ProRes RAW"),
+            object: app.buttons["codecMenu"])], timeout: 15) == .completed)
+        for lens in [tele, wide, tele, wide] {
+            lens.tap()
+            XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@ AND enabled == true", "selected"),
+                object: lens)], timeout: 20) == .completed)
+        }
+        controlScreenshot(app, "lens-switch-immediate-completed")
+        app.buttons["captureSettingsClose"].tap()
+        app.buttons["mediaOpen"].tap()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaRow.")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        Thread.sleep(forTimeInterval: 2)
+        print("PLAYER_UI \(app.debugDescription)")
+        controlScreenshot(app, "stable-playback-open")
+        let play = app.buttons.matching(NSPredicate(format: "label IN %@", ["Play", "播放"])).firstMatch
+        if !play.exists { app.otherElements["mediaPlayer"].tap() }
+        XCTAssertTrue(play.waitForExistence(timeout: 5)); play.tap()
+        Thread.sleep(forTimeInterval: 4)
+        controlScreenshot(app, "stable-playback-running")
+        print("PLAYER_AFTER \(app.debugDescription)")
+        let elapsed = app.staticTexts["Elapsed Time"]
+        XCTAssertTrue(elapsed.exists)
+        XCTAssertGreaterThan(Int(elapsed.label.split(separator: ":").last ?? "0") ?? 0, 0,
+                             "Playback must advance despite live camera parameter updates")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaSave.")).firstMatch.exists)
+    }
+
+    func testBundledLUTLooks() throws {
+        #if !DEBUG
+        throw XCTSkip("Uses the existing Debug RAW capture harness to avoid system-menu automation delays.")
+        #else
+        let app = XCUIApplication()
+        app.launchArguments = ["--raw-writer-integrated-auto", "--writer-60", "--writer-short", "-previewLUTEnabled", "YES", "-previewLUTLook", "rec709"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+        Thread.sleep(forTimeInterval: 12)
+        app.buttons["parameter.LUT"].tap()
+        let status = app.staticTexts["lut.status"]
+        let carousel = app.scrollViews["lut.carousel"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'Rec.709'"), object: status)], timeout: 15), .completed)
+        for name in ["Amber", "Fade", "Neon", "Film", "Portrait"] {
+            carousel.swipeLeft()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", name), object: status)], timeout: 15), .completed)
+            controlScreenshot(app, "lut-look-\(name)")
+        }
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        #endif
     }
     func testLUTPreviewAndRecording() {
         let app = XCUIApplication(); app.launch()

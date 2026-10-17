@@ -1,0 +1,15 @@
+{
+  "author": "slay",
+  "source": "https://github.com/slaycamera/luts",
+  "revision": "a1709044efe115640dde1dee17d4185fc059af0d",
+  "license": "CC BY 4.0",
+  "licenseURL": "https://creativecommons.org/licenses/by/4.0/",
+  "modifications": "Original cube files unchanged. Runtime composition with GyroCine technical RAW to Rec.709 viewing transform.",
+  "sha256": {
+    "slay-01-amber.cube": "5912a5761bb9663901ae1a311add997055390e94972f77fe32407d88dca20b08",
+    "slay-02-fade.cube": "0fc029d88a11c13abad35729c4a665ccd4bccfe8fb841d89874ab6c74651dc96",
+    "slay-03-neon.cube": "07ac89f666c74e638d79fb28f4de5a5e18ae47bfc9ba04bb5c50e005555e7141",
+    "slay-04-film.cube": "d846f24a0ce3affbeaa5f3969b0dde5b54018a9aedf7e46614bf963fffbf4738",
+    "slay-05-portrait.cube": "432898146d41e061db1d36d37f89130d1394fb9f4eb13e80630e18e10d2cc895"
+  }
+}

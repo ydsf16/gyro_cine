@@ -16,9 +16,10 @@ struct SettingsView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var message: String?
+    @State private var pendingLensID: String?
     @State private var offerProVideoStorageSettings = false
 
-    private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing }
+    private var locked: Bool { camera.recording || camera.preparingRecording || camera.finalizing || camera.switchingLens || pendingLensID != nil }
     private var codecOptions: [VideoEncoding] {
         VideoEncoding.allCases.filter { camera.codecs.contains($0.codec) }
     }
@@ -69,11 +70,27 @@ struct SettingsView: View {
             Form {
                 if quickCapture {
                     Section(t("镜头", "Lens")) {
-                        Picker(t("物理镜头", "Physical lens"), selection: Binding(
-                            get: { camera.selectedLensID ?? "" }, set: { camera.chooseLens($0) })) {
-                            ForEach(camera.lenses) { lens in Text(lens.label).tag(lens.id) }
-                        }.pickerStyle(.segmented).disabled(locked)
-                            .accessibilityIdentifier("quickLensPicker")
+                        HStack {
+                            ForEach(camera.lenses) { lens in
+                                Button {
+                                    guard !locked, lens.id != camera.selectedLensID else { return }
+                                    pendingLensID = lens.id
+                                    camera.chooseLens(lens.id) { pendingLensID = nil }
+                                } label: {
+                                    Text(lens.label).frame(maxWidth: .infinity).padding(.vertical, 8)
+                                        .background(camera.selectedLensID == lens.id ? Color.blue : Color.secondary.opacity(0.12), in: Capsule())
+                                        .foregroundStyle(camera.selectedLensID == lens.id ? .white : .primary)
+                                }
+                                .buttonStyle(.plain).disabled(locked)
+                                .accessibilityIdentifier("quickLens.\(lens.label)")
+                                .accessibilityValue(camera.selectedLensID == lens.id ? "selected" : "")
+                            }
+                        }
+                        if camera.switchingLens || pendingLensID != nil {
+                            ProgressView(t("切换中…", "Switching…"))
+                        } else {
+                            Text(t("选择即生效", "Changes apply immediately")).font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 videoSection
@@ -86,7 +103,7 @@ struct SettingsView: View {
             }
             .navigationTitle(quickCapture ? t("拍摄配置", "Capture setup") : t("设置", "Settings"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(t("完成", "Done")) { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(quickCapture ? t("关闭", "Close") : t("完成", "Done")) { dismiss() }.accessibilityIdentifier("captureSettingsClose") } }
             .alert(t("设置", "Settings"), isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 if offerProVideoStorageSettings {
                     Button(t("打开专用存储设置", "Open Pro Video Storage Settings")) {

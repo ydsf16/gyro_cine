@@ -54,6 +54,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var exposureRange: ClosedRange<Double> = 1.0 / 1000.0...1.0 / 30.0
 
     @Published private(set) var lutEnabled = UserDefaults.standard.bool(forKey: "previewLUTEnabled")
+    @Published private(set) var lutLook = PreviewLook(rawValue: UserDefaults.standard.string(forKey: "previewLUTLook") ?? "") ?? .rec709
     @Published private(set) var lutSupported = false
     @Published private(set) var lutStatus = "off"
     let lutPreview = LUTPreview()
@@ -63,6 +64,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         UserDefaults.standard.set(enabled, forKey: "previewLUTEnabled")
         lutPreview.setEnabled(enabled)
         logger.event("lut_preview_toggle", ["enabled": enabled, "previewOnly": true])
+    }
+    func setLUTLook(_ look: PreviewLook) {
+        if lutLook != look {
+            lutLook = look
+            UserDefaults.standard.set(look.rawValue, forKey: "previewLUTLook")
+            lutPreview.setLook(look)
+            logger.event("lut_preview_look", ["look": look.rawValue, "previewOnly": true])
+        }
+        setLUTEnabled(true)
     }
     // Camera queue only. Add the small ISP proxy before recording, so UI toggles never reconfigure capture.
     private func configureLUTPreview() {
@@ -74,6 +84,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         session.addOutput(lutPreview.output)
         lutPreview.configure(fps: chosenFPS)
+        lutPreview.setLook(PreviewLook(rawValue: UserDefaults.standard.string(forKey: "previewLUTLook") ?? "") ?? .rec709)
         lutPreview.setEnabled(UserDefaults.standard.bool(forKey: "previewLUTEnabled"))
         publish { self.lutSupported = true }
     }
@@ -910,8 +921,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    func chooseLens(_ id: String) {
+    func chooseLens(_ id: String, completion: (() -> Void)? = nil) {
         queue.async {
+            defer { if let completion { self.publish(completion) } }
             guard !self.output.isRecording, !self.recordingStarting, !self.captureFinishing else {
                 self.fail("Lens cannot change during recording"); return
             }

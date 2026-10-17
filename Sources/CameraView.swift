@@ -187,7 +187,8 @@ struct CameraView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var selected: Parameter?
     @State private var showingCaptureSetup = false
-    @State private var lutCard: Bool?
+    @State private var lutCard: String?
+    @State private var showingLUTCredits = false
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
     @State private var showingMedia = false
@@ -263,6 +264,20 @@ struct CameraView: View {
                 .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingMedia) { MediaLibraryView() }
+        .sheet(isPresented: $showingLUTCredits) {
+            NavigationStack {
+                Form {
+                    Section("slay LUTs") {
+                        Text("Amber · Fade · Neon · Film · Portrait")
+                        Text(t("作者：slay。授权：CC BY 4.0。原始 LUT 未修改；预览时与 GyroCine 的 Rec.709 转换合成。", "By slay. CC BY 4.0. Original LUT files are unchanged; composed with GyroCine's Rec.709 transform for preview."))
+                        Link("slaycamera.com", destination: URL(string: "https://www.slaycamera.com")!)
+                        Link(t("原始 LUT 与来源", "Original LUTs and source"), destination: URL(string: "https://github.com/slaycamera/luts")!)
+                        Link("CC BY 4.0", destination: URL(string: "https://creativecommons.org/licenses/by/4.0/")!)
+                    }
+                }.navigationTitle(t("LUT 来源", "LUT credits"))
+                    .toolbar { Button(t("完成", "Done")) { showingLUTCredits = false } }
+            }
+        }
         .sheet(isPresented: $showingWBPresets) { whiteBalancePresets }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
             if camera.storageSetupRequired {
@@ -340,7 +355,7 @@ struct CameraView: View {
                 showingCaptureSetup = true
             } label: {
                 HStack(spacing: 6) {
-                    Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT 709" : ""))
+                    Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT \(camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized)" : ""))
                     Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
                 }
                 .font(.system(size: 13, weight: .medium))
@@ -414,7 +429,7 @@ struct CameraView: View {
         switch parameter {
         case .lut:
             !camera.lutEnabled || !camera.lutSupported ? t("关", "Off") :
-                (["active", "rec709"].contains(camera.lutStatus) ? "709" : "…")
+                (["active", "rec709"].contains(camera.lutStatus) ? (camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized) : "…")
         case .lens: camera.lenses.first(where: { $0.id == camera.selectedLensID })?.label ?? "—"
         case .shutter:
             exposureType == "angle" ? shutterAngleLabel(camera.exposureSeconds) : shutterLabel(camera.exposureSeconds)
@@ -599,25 +614,26 @@ struct CameraView: View {
         VStack(spacing: 5) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach([false, true], id: \.self) { enabled in
+                    ForEach(["off"] + PreviewLook.allCases.map(\.rawValue), id: \.self) { id in
+                        let look = PreviewLook(rawValue: id)
+                        let active = (camera.lutEnabled && camera.lutSupported ? camera.lutLook.rawValue : "off") == id
                         Button {
-                            camera.setLUTEnabled(enabled)
-                            withAnimation(.easeInOut(duration: 0.2)) { lutCard = enabled }
+                            if let look { camera.setLUTLook(look) } else { camera.setLUTEnabled(false) }
+                            withAnimation(.easeInOut(duration: 0.2)) { lutCard = id }
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: enabled ? "square.stack.3d.up" : "circle.slash")
-                                Text(enabled ? "RAW → Rec.709" : t("关闭", "Off"))
+                                Image(systemName: look == nil ? "circle.slash" : "square.stack.3d.up")
+                                Text(look?.title ?? t("关闭", "Off"))
                             }
                             .font(.system(size: 14, weight: .semibold))
                             .frame(width: 225, height: 38)
-                            .foregroundStyle((camera.lutEnabled && camera.lutSupported) == enabled ? .white : .white.opacity(0.55))
-                            .background((camera.lutEnabled && camera.lutSupported) == enabled ? accent.opacity(0.45) : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
-                            .overlay(RoundedRectangle(cornerRadius: 9).stroke((camera.lutEnabled && camera.lutSupported) == enabled ? accent : .clear, lineWidth: 2))
+                            .foregroundStyle(active ? .white : .white.opacity(0.55))
+                            .background(active ? accent.opacity(0.45) : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(active ? accent : .clear, lineWidth: 2))
                         }
-                        .id(enabled)
-                        .buttonStyle(.plain)
-                        .disabled(enabled && !camera.lutSupported)
-                        .accessibilityIdentifier(enabled ? "lut.rec709" : "lut.off")
+                        .id(id).buttonStyle(.plain)
+                        .disabled(look != nil && !camera.lutSupported)
+                        .accessibilityIdentifier("lut.\(id)")
                     }
                 }.scrollTargetLayout().padding(.horizontal, 2)
             }
@@ -625,13 +641,17 @@ struct CameraView: View {
             .contentMargins(.horizontal, 70, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $lutCard, anchor: .center)
-            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported }
+            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported ? camera.lutLook.rawValue : "off" }
             .onChange(of: lutCard) { _, selected in
-                if let selected, camera.lutSupported, selected != camera.lutEnabled { camera.setLUTEnabled(selected) }
+                guard let selected, camera.lutSupported else { return }
+                if let look = PreviewLook(rawValue: selected) { camera.setLUTLook(look) }
+                else { camera.setLUTEnabled(false) }
             }
-            Text(lutDescription)
-                .font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
-                .accessibilityIdentifier("lut.status")
+            HStack {
+                Text(lutDescription).accessibilityIdentifier("lut.status")
+                Button { showingLUTCredits = true } label: { Image(systemName: "info.circle") }
+                    .accessibilityLabel(t("LUT 来源与授权", "LUT credits and license"))
+            }.font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
         }
     }
     private var lutDescription: String {
@@ -643,7 +663,7 @@ struct CameraView: View {
         }
         if !camera.lutEnabled { return t("LUT 已关闭 · 不写入视频", "LUT off · Not recorded") }
         switch camera.lutStatus {
-        case "active": return t("Rec.709 · 仅预览", "Rec.709 · Preview only")
+        case "active": return "\(camera.lutLook.title) · \(t("仅预览", "Preview only"))"
         case "rec709": return t("预览源已为 Rec.709 · 仅预览", "Source is Rec.709 · Preview only")
         case "unsupported", "unavailable": return t("当前预览不支持转换 · 已显示原画面", "Conversion unavailable · Original preview")
         default: return t("正在准备 LUT 预览…", "Preparing LUT preview…")
