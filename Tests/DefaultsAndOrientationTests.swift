@@ -280,6 +280,59 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/200, fps: 30,
             minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
     }
+    func testAllUserControlsPersistAcrossLaunch() throws {
+        let suite = UUID().uuidString
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        CaptureDefaults.restoreIfNeeded(preferences)
+        var controls = SavedCameraControls()
+        controls.shutter = "angle"; controls.angle = 90; controls.seconds = 1.0 / 240
+        controls.iso = 640; controls.maximumSeconds = 1.0 / 100; controls.ev = -1.5
+        controls.whiteBalance = "Manual"; controls.kelvin = 4300
+        controls.focus = "Manual"; controls.focusPosition = 0.8; controls.focusX = 0.3; controls.focusY = 0.7
+        controls.save(preferences)
+        for (key, value) in ["filenameType": "simple", "outputFormat": "GyroflowProto", "previewLUTLook": "rec709"] {
+            preferences.set(value, forKey: key)
+        }
+        for key in ["showCompositionGrid", "showHorizonLevel", "rulerHaptics", "previewLUTEnabled"] { preferences.set(true, forKey: key) }
+        var slate = RecordingSlate(); slate.production = "Keep me"; slate.save(preferences)
+        let relaunched = try XCTUnwrap(UserDefaults(suiteName: suite))
+        CaptureDefaults.restoreIfNeeded(relaunched)
+        XCTAssertEqual(SavedCameraControls.load(relaunched), controls)
+        XCTAssertEqual(RecordingSlate.load(relaunched), slate)
+        XCTAssertEqual(relaunched.string(forKey: "filenameType"), "simple")
+        XCTAssertEqual(relaunched.string(forKey: "outputFormat"), "GyroflowProto")
+        for key in ["showCompositionGrid", "showHorizonLevel", "rulerHaptics", "previewLUTEnabled"] { XCTAssertTrue(relaunched.bool(forKey: key)) }
+        for mode in ["auto", "autoMax", "manual", "angle"] {
+            controls.shutter = mode; controls.save(preferences)
+            XCTAssertEqual(SavedCameraControls.load(relaunched).shutter, mode)
+        }
+        for mode in ["Auto-L", "Auto", "Manual"] {
+            controls.whiteBalance = mode; controls.save(preferences)
+            XCTAssertEqual(SavedCameraControls.load(relaunched).whiteBalance, mode)
+        }
+    }
+
+    func testCaptureConfigurationSurvivesRestart() throws {
+        let suite = UUID().uuidString
+        let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        CaptureDefaults.restoreIfNeeded(preferences)
+        XCTAssertNil(SavedCaptureConfiguration.load(preferences))
+        let expected = SavedCaptureConfiguration(lensID: "telephoto", encoding: "proResRAWHQ", width: 4224, height: 3024, fps: 59.94)
+        expected.save(preferences)
+        preferences.set("外部 SSD", forKey: "storageLocation")
+        preferences.set("speed", forKey: "exposureType")
+        let relaunched = try XCTUnwrap(UserDefaults(suiteName: suite))
+        CaptureDefaults.restoreIfNeeded(relaunched)
+        relaunched.register(defaults: ["storageLocation": "内部文件", "exposureType": "angle"])
+        XCTAssertEqual(SavedCaptureConfiguration.load(relaunched), expected)
+        XCTAssertEqual(relaunched.string(forKey: "storageLocation"), "外部 SSD")
+        XCTAssertEqual(relaunched.string(forKey: "exposureType"), "speed")
+        relaunched.set(Data("broken".utf8), forKey: SavedCaptureConfiguration.key)
+        XCTAssertNil(SavedCaptureConfiguration.load(relaunched))
+    }
+
     func testPermanentIMUFailureLeavesAutomaticRetryQueue() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -227,6 +227,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var shutterMaxCustomized = false
     private var activeShutterAngle: Double?
     private var manualExposureIntent: ManualExposurePreference?
+    private var savedControls = SavedCameraControls()
     private var chosenFocus: FocusChoice = .continuous
     private var lensDevices: [String: AVCaptureDevice] = [:]
     private struct CapturePreference {
@@ -305,12 +306,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     override init() {
         super.init()
         CaptureDefaults.restoreIfNeeded()
+        savedControls = SavedCameraControls.load()
+        chosenWhiteBalance = WhiteBalanceChoice(rawValue: savedControls.whiteBalance) ?? .auto
+        manualWhiteBalanceKelvin = savedControls.kelvin
+        exposureBiasIntent = savedControls.ev
+        if savedControls.shutter == "manual" || savedControls.shutter == "angle" {
+            manualExposureIntent = ManualExposurePreference(seconds: savedControls.seconds, iso: savedControls.iso,
+                angle: savedControls.shutter == "angle" ? savedControls.angle : nil)
+        }
         if !UserDefaults.standard.bool(forKey: "rulerHapticsDefaultEnabledV1") {
             UserDefaults.standard.set(true, forKey: "rulerHaptics")
             UserDefaults.standard.set(true, forKey: "rulerHapticsDefaultEnabledV1")
         }
-        UserDefaults.standard.set("内部文件", forKey: "storageLocation")
-        UserDefaults.standard.set("angle", forKey: "exposureType")
+        UserDefaults.standard.register(defaults: ["storageLocation": "内部文件", "exposureType": "angle"])
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--cleanup-uitest-media") {
             do {
@@ -1115,6 +1123,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     #endif
 
+    private func persistCaptureConfiguration() {
+        guard let camera = device, let index = chosenIndex, formatObjects.indices.contains(index) else { return }
+        let info = formatObjects[index]
+        SavedCaptureConfiguration(lensID: camera.uniqueID, encoding: chosenEncoding.rawValue,
+            width: info.width, height: info.height, fps: chosenFPS).save()
+    }
+
     private func configureSession(audioAllowed: Bool) {
         let physicalLenses: [(AVCaptureDevice.DeviceType, String)] = [
             (.builtInUltraWideCamera, "0.5×"), (.builtInWideAngleCamera, "1×"),
@@ -1126,7 +1141,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         lensDevices = Dictionary(uniqueKeysWithValues: discovered.map { ($0.0.uniqueID, $0.0) })
         let longRAWTest = ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke")
+        let saved = SavedCaptureConfiguration.load()
+        let restoredCamera = saved.flatMap { lensDevices[$0.lensID] }
         guard let camera = (longRAWTest ? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) : nil)
+            ?? restoredCamera
             ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
             ?? AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else {
             fail("Rear physical camera unavailable"); return
@@ -1181,7 +1199,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.lensPosition = camera.lensPosition
             }
             publish { self.isoRange = Double(camera.activeFormat.minISO)...Double(camera.activeFormat.maxISO) }
-            discoverCapabilities(camera)
+            let preference = saved.flatMap { value -> CapturePreference? in
+                guard let encoding = VideoEncoding(rawValue: value.encoding) else { return nil }
+                return CapturePreference(encoding: encoding, width: value.width, height: value.height, fps: value.fps)
+            }
+            guard discoverCapabilities(camera, preference: longRAWTest ? nil : preference, manualExposure: manualExposureIntent) else { return }
             startSampling(camera)
             session.startRunning()
             applyRulerHaptics(UserDefaults.standard.bool(forKey: "rulerHaptics"))
@@ -1490,6 +1512,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             logProVideoStorage("format_after_encoder_change")
             try resetCameraControls(camera, fps: targetFPS, manualExposure: exposureToRestore)
             chosenIndex = index; chosenFPS = targetFPS
+            persistCaptureConfiguration()
             if reason != "initial_selection" {
                 let preferences = UserDefaults.standard
                 preferences.set(codec.rawValue, forKey: "capture.codec.\(camera.uniqueID)")
@@ -1531,6 +1554,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             applyWhiteBalancePreferenceLocked(camera)
             let bias = Float(min(max(exposureBiasIntent, max(-6, Double(camera.minExposureTargetBias))), min(6, Double(camera.maxExposureTargetBias))))
             camera.setExposureTargetBias(bias, completionHandler: nil)
+            restoreFocusPreferenceLocked(camera)
             camera.unlockForConfiguration()
         }
         if let manualExposure, camera.isExposureModeSupported(.custom) {
@@ -1565,23 +1589,27 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         activeShutterAngle = nil
         manualExposureIntent = nil
-        let limit = CaptureDefaults.maximumExposure(fps: fps,
+        let defaultLimit = CaptureDefaults.maximumExposure(fps: fps,
+            minimum: max(camera.activeFormat.minExposureDuration.seconds, 1.0 / 8000),
+            maximum: camera.activeFormat.maxExposureDuration.seconds)
+        let limit = CaptureDefaults.clampedManualExposure(savedControls.maximumSeconds ?? defaultLimit, fps: fps,
             minimum: max(camera.activeFormat.minExposureDuration.seconds, 1.0 / 8000),
             maximum: camera.activeFormat.maxExposureDuration.seconds)
         if camera.isExposureModeSupported(.continuousAutoExposure) {
             camera.exposureMode = .continuousAutoExposure
-            camera.activeMaxExposureDuration = CMTime(seconds: limit, preferredTimescale: 1_000_000)
+            camera.activeMaxExposureDuration = savedControls.shutter == "auto" ? .invalid : CMTime(seconds: limit, preferredTimescale: 1_000_000)
         }
         if camera.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
             camera.whiteBalanceMode = .continuousAutoWhiteBalance
         }
         if camera.isFocusModeSupported(.continuousAutoFocus) { camera.focusMode = .continuousAutoFocus }
-        shutterMaxCustomized = false
+        shutterMaxCustomized = savedControls.maximumSeconds != nil
         chosenFocus = .continuous
         logger.event("control_defaults", ["fps": fps, "maxExposure": limit,
             "focusMode": focusName(camera.focusMode)])
+        let restoredShutterMode: ShutterMode = savedControls.shutter == "auto" ? .auto : .autoMax
         publish {
-            self.shutterMode = .autoMax; self.shutterMaxSeconds = limit
+            self.shutterMode = restoredShutterMode; self.shutterMaxSeconds = limit
             self.exposureAuto = true; self.whiteBalanceAuto = true; self.focusChoice = .continuous
         }
     }
@@ -1652,6 +1680,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 try self.resetCameraControls(camera, fps: value,
                                              manualExposure: manualExposure)
                 self.chosenFPS = value
+                self.persistCaptureConfiguration()
                 UserDefaults.standard.set(value, forKey: "capture.fps.\(camera.uniqueID)")
                 self.logger.event("fps_result", ["success": true, "after": self.configurationSnapshot()])
                 self.scheduleRAWPipelinePreparation()
@@ -1761,6 +1790,23 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         switch mode { case .continuousAutoFocus: return "continuousAutoFocus"; case .autoFocus: return "autoFocus"; case .locked: return "locked"; @unknown default: return "unknown" }
     }
 
+    private func restoreFocusPreferenceLocked(_ camera: AVCaptureDevice) {
+        let choice = FocusChoice(rawValue: savedControls.focus) ?? .continuous
+        let locked = choice == .manual || choice == .locked
+        if camera.isFocusPointOfInterestSupported && (savedControls.focusX != 0.5 || savedControls.focusY != 0.5) {
+            camera.focusPointOfInterest = CGPoint(x: min(1, max(0, savedControls.focusX)), y: min(1, max(0, savedControls.focusY)))
+        }
+        if locked && camera.isLockingFocusWithCustomLensPositionSupported {
+            camera.setFocusModeLocked(lensPosition: min(1, max(0, savedControls.focusPosition)), completionHandler: nil)
+            chosenFocus = choice
+        } else if camera.isFocusModeSupported(.continuousAutoFocus) {
+            if camera.focusMode != .continuousAutoFocus { camera.focusMode = .continuousAutoFocus }
+            chosenFocus = .continuous
+        }
+        let restored = chosenFocus
+        publish { self.focusChoice = restored }
+    }
+
     func chooseFocus(_ choice: FocusChoice, point: CGPoint? = nil, manualPosition: Float? = nil) {
         queue.async {
             guard let camera = self.device else { return }
@@ -1791,6 +1837,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     }
                 } else { camera.focusMode = desired }
                 self.chosenFocus = choice
+                self.savedControls.focus = choice.rawValue
+                self.savedControls.focusPosition = min(1, max(0, manualPosition ?? camera.lensPosition))
+                if let point { self.savedControls.focusX = point.x; self.savedControls.focusY = point.y }
+                self.savedControls.save()
                 self.logger.event("focus_result", ["success": true, "after": self.configurationSnapshot()])
                 self.publish { self.focusChoice = choice; self.errorText = nil }
             } catch {
@@ -1820,6 +1870,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.manualExposureIntent = ManualExposurePreference(
                         seconds: camera.exposureDuration.seconds, iso: Double(camera.iso), angle: nil)
                 }
+                self.savedControls.shutter = enabled ? "auto" : "manual"
+                if !enabled { self.savedControls.seconds = camera.exposureDuration.seconds; self.savedControls.iso = Double(camera.iso) }
+                self.savedControls.save()
                 let mode: ShutterMode = enabled ? .auto : .manual
                 self.activeShutterAngle = nil
                 self.publish { self.exposureAuto = enabled; self.shutterMode = mode }
@@ -1829,7 +1882,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     func activateExposureAutoMax(resetToDefault: Bool = false) {
         queue.async {
             guard let camera = self.device else { return }
-            if resetToDefault { self.shutterMaxCustomized = false }
+            if resetToDefault { self.shutterMaxCustomized = false; self.savedControls.maximumSeconds = nil }
             let requested = self.shutterMaxCustomized ? self.shutterMaxSeconds :
                 CaptureDefaults.maximumExposure(fps: self.chosenFPS,
                     minimum: max(camera.activeFormat.minExposureDuration.seconds, 1.0 / 8000),
@@ -1857,7 +1910,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             camera.activeMaxExposureDuration = CMTime(seconds: limit, preferredTimescale: 1_000_000)
             activeShutterAngle = nil
             manualExposureIntent = nil
-            if customized { shutterMaxCustomized = true }
+            if customized { shutterMaxCustomized = true; savedControls.maximumSeconds = limit }
+            savedControls.shutter = "autoMax"
+            savedControls.save()
             logger.event("exposure_auto_max", ["limitSeconds": limit, "state": configurationSnapshot()])
             publish {
                 self.shutterMaxSeconds = limit; self.shutterMode = .autoMax; self.exposureAuto = true
@@ -1885,6 +1940,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                              iso: iso)
                 self.activeShutterAngle = requested
                 self.manualExposureIntent = ManualExposurePreference(seconds: duration, iso: requestedISO, angle: requested)
+                self.savedControls.shutter = "angle"; self.savedControls.angle = requested
+                self.savedControls.seconds = duration; self.savedControls.iso = requestedISO
+                self.savedControls.save()
                 self.logger.event("shutter_angle", ["angle": requested, "fps": self.chosenFPS,
                     "exposureSeconds": duration])
                 self.publish {
@@ -1915,6 +1973,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 camera.setExposureModeCustom(duration: duration, iso: level)
                 self.activeShutterAngle = retainedAngle
                 self.manualExposureIntent = ManualExposurePreference(seconds: requested.seconds, iso: requestedISO, angle: retainedAngle)
+                self.savedControls.shutter = retainedAngle == nil ? "manual" : "angle"
+                self.savedControls.seconds = requested.seconds; self.savedControls.iso = requestedISO
+                if let retainedAngle { self.savedControls.angle = retainedAngle }
+                self.savedControls.save()
                 self.logger.event("manual_exposure_set", ["state": self.configurationSnapshot()])
                 self.publish { self.exposureAuto = false; self.shutterMode = retainedAngle == nil ? .manual : .angle }
             } catch { self.fail("Exposure: \(error)") }
@@ -1955,6 +2017,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.manualWhiteBalanceKelvin = min(max(self.whiteBalanceKelvin, 2500), 10000)
                 }
                 self.applyWhiteBalancePreferenceLocked(camera)
+                self.savedControls.whiteBalance = choice.rawValue; self.savedControls.kelvin = self.manualWhiteBalanceKelvin
+                self.savedControls.save()
                 self.logger.event("white_balance_choice", ["choice": choice.rawValue, "state": self.configurationSnapshot()])
             } catch { self.fail("White balance: \(error)") }
         }
@@ -1981,6 +2045,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let bias = Float(min(max(self.exposureBiasIntent, max(-6, Double(camera.minExposureTargetBias))), min(6, Double(camera.maxExposureTargetBias))))
                 camera.setExposureTargetBias(bias, completionHandler: nil)
                 self.publish { self.exposureBias = Double(bias) }
+                self.savedControls.ev = self.exposureBiasIntent; self.savedControls.save()
                 self.logger.event("exposure_bias", ["bias": bias, "state": self.configurationSnapshot()])
             } catch { self.fail("Exposure compensation: \(error)") }
         }
@@ -2003,6 +2068,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.manualWhiteBalanceKelvin = temperature
                 self.autoLockWhiteBalanceActive = false
                 self.publish { self.whiteBalanceChoice = .manual }
+                self.savedControls.whiteBalance = WhiteBalanceChoice.manual.rawValue; self.savedControls.kelvin = temperature
+                self.savedControls.save()
                 self.logger.event("white_balance_manual", ["kelvin": temperature, "tint": 0])
                 self.publish { self.whiteBalanceAuto = false; self.whiteBalanceKelvin = temperature }
             } catch { self.fail("White balance: \(error)") }
