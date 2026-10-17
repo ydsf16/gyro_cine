@@ -169,8 +169,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private var usesRAWWriterExperiment: Bool {
         if #available(iOS 27.0, *) {
-            return ["aprn", "aprh"].contains(chosenCodec?.rawValue ?? "") &&
-                ["专用视频存储", "外部 SSD"].contains(UserDefaults.standard.string(forKey: "storageLocation") ?? "")
+            // The preview pipeline depends on the codec, not the destination.
+            // Ordinary internal storage must not fall back to MovieFileOutput at RAW 120 fps.
+            return ["aprn", "aprh"].contains(chosenCodec?.rawValue ?? "")
         }
         return false
     }
@@ -934,6 +935,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     session.commitConfiguration(); fail("Cannot add microphone input"); return
                 }
                 session.addInput(audioInput)
+                let stereoSupported = audioInput.isMultichannelAudioModeSupported(.stereo)
+                if stereoSupported { audioInput.multichannelAudioMode = .stereo }
+                logger.event("audio_capture_mode", ["stereoSupported": stereoSupported,
+                    "mode": audioInput.multichannelAudioMode.rawValue])
             }
             session.commitConfiguration()
             audioReady = audioAllowed && session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }
@@ -1924,9 +1929,29 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         logger.event("raw_writer_matrix_case", ["camera": wide.localizedName, "deviceID": wide.uniqueID,
             "width": format.width, "height": format.height, "fps": rate, "codec": encoding.codec.rawValue])
         chosenEncoding = encoding; chosenCodec = encoding.codec; chosenFPS = rate
-        UserDefaults.standard.set("专用视频存储", forKey: "storageLocation")
+        let invalidStorageTest = ProcessInfo.processInfo.arguments.contains("--writer-invalid-internal")
+        UserDefaults.standard.set(invalidStorageTest ? "内部文件" : "专用视频存储", forKey: "storageLocation")
         guard applyFormat(format.index, reason: "raw_writer_experiment") else { return }
-        UserDefaults.standard.set("专用视频存储", forKey: "storageLocation")
+        if invalidStorageTest {
+            queue.asyncAfter(deadline: .now() + 5) {
+                var previewReady = false
+                if #available(iOS 27.0, *) { previewReady = (self.rawWriterPreview as? RAWWriterPreview)?.ready ?? false }
+                self.logger.event("raw_internal_guard_probe", ["running": self.session.isRunning,
+                    "previewReady": previewReady,
+                    "fps": self.chosenFPS, "writerRoute": self.usesRAWWriterExperiment])
+                self.toggleRecording()
+                self.queue.asyncAfter(deadline: .now() + 1) {
+                    self.chooseEncoding(.hevc)
+                    self.chooseFPS(60)
+                    self.queue.asyncAfter(deadline: .now() + 3) {
+                        self.logger.event("raw_internal_guard_recovery", ["running": self.session.isRunning,
+                            "codec": self.chosenCodec?.rawValue ?? "", "fps": self.chosenFPS,
+                            "writerActive": self.isRAWWriterActive])
+                    }
+                }
+            }
+            return
+        }
         UserDefaults.standard.set(ProcessInfo.processInfo.arguments.contains("--writer-proto") ? "GyroflowProto" : "SonyMov", forKey: "outputFormat")
         startSmokeRecordingWhenReady(deadline: ProcessInfo.processInfo.systemUptime + 20)
     }
@@ -1937,7 +1962,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private func startRAWWriterExperiment() {
         guard !recordingStarting, !captureFinishing, !output.isRecording,
               let camera = device, let codec = chosenCodec else { return }
-        let dedicatedStorage = UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储"
+        let storage = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
+        guard ["专用视频存储", "外部 SSD"].contains(storage) else {
+            logger.event("raw_record_storage_rejected", ["storage": storage, "fps": chosenFPS])
+            failStorage("ProRes RAW 需要专用视频存储或外部 SSD。请在设置中选择存储位置。")
+            return
+        }
+        let dedicatedStorage = storage == "专用视频存储"
         if dedicatedStorage {
             guard ProVideoStorageBridge.isSupported(), ProVideoStorageBridge.remainingCapacity() > 0,
                   !ProVideoStorageBridge.isBusy() else { failStorage("请先配置可用的专用视频存储"); return }

@@ -64,7 +64,7 @@ struct MediaLibraryView: View {
                         Button(selection.count == files.count ? t("取消全选", "Deselect all") : t("全选", "Select all")) {
                             selection = selection.count == files.count ? [] : Set(files)
                         }.accessibilityIdentifier("mediaSelectAll")
-                    } else { Button(t("完成", "Done")) { dismiss() } }
+                    } else { Button { dismiss() } label: { Text(t("完成", "Done")).frame(minWidth: 60, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mediaDone") }
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -91,11 +91,11 @@ struct MediaLibraryView: View {
                 NavigationStack {
                     StableMoviePlayer(url: url)
                         .id(url)
-                        .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20) }
+                        .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20).allowsHitTesting(false) }
                         .navigationTitle(url.deletingPathExtension().lastPathComponent)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { selected = nil } }
+                            ToolbarItem(placement: .topBarTrailing) { Button { selected = nil } label: { Text(t("完成", "Done")).frame(minWidth: 60, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mediaPlayerDone") }
                             ToolbarItemGroup(placement: .bottomBar) {
                                 ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
                                 Spacer()
@@ -233,23 +233,8 @@ private struct MovieThumbnail: View {
         }
         .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(3) }
         .task(id: url) {
-            let result = await Task.detached(priority: .utility) { () -> (UIImage?, Bool, String) in
-                let asset = AVURLAsset(url: url)
-                let rawCodes: Set<FourCharCode> = [0x6170726e, 0x61707268]
-                let raw = asset.tracks(withMediaType: .video).contains { track in
-                    track.formatDescriptions.contains { description in
-                        rawCodes.contains(CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription))
-                    }
-                }
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                generator.maximumSize = CGSize(width: 480, height: 270)
-                let frame = try? generator.copyCGImage(at: .zero, actualTime: nil)
-                let seconds = CMTimeGetSeconds(asset.duration)
-                let n = seconds.isFinite ? max(0, Int(seconds)) : 0
-                let label = n >= 3600 ? String(format: "%d:%02d:%02d", n / 3600, n / 60 % 60, n % 60) : String(format: "%02d:%02d", n / 60, n % 60)
-                return (frame.map(UIImage.init(cgImage:)), raw, label)
-            }.value
+            let result = await MediaThumbnailLoader.shared.load(url)
+            guard !Task.isCancelled else { return }
             image = result.0
             isRaw = result.1
             duration = result.2
@@ -314,5 +299,30 @@ private struct StableMoviePlayer: View {
         VideoPlayer(player: session.player)
             .accessibilityIdentifier("mediaPlayer")
             .onDisappear { session.player.pause() }
+    }
+}
+
+
+/// Serialize expensive RAW thumbnail decoding off the main actor. Cancel queued
+/// requests when cards disappear so dismissing Media does not start more decoders.
+private actor MediaThumbnailLoader {
+    static let shared = MediaThumbnailLoader()
+    func load(_ url: URL) -> (UIImage?, Bool, String) {
+        guard !Task.isCancelled else { return (nil, false, "—") }
+        let asset = AVURLAsset(url: url)
+        let rawCodes: Set<FourCharCode> = [0x6170726e, 0x61707268]
+        let raw = asset.tracks(withMediaType: .video).contains { track in
+            track.formatDescriptions.contains { description in
+                rawCodes.contains(CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription))
+            }
+        }
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 270)
+        let frame = try? generator.copyCGImage(at: .zero, actualTime: nil)
+        let seconds = CMTimeGetSeconds(asset.duration)
+        let n = seconds.isFinite ? max(0, Int(seconds)) : 0
+        let label = n >= 3600 ? String(format: "%d:%02d:%02d", n / 3600, n / 60 % 60, n % 60) : String(format: "%02d:%02d", n / 60, n % 60)
+        return (frame.map(UIImage.init(cgImage:)), raw, label)
     }
 }

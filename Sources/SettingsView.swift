@@ -99,6 +99,16 @@ struct SettingsView: View {
                     recordingSection
                     viewfinderSection
                     advancedSection
+                    Section {
+                        VStack(spacing: 4) {
+                            Text("GyroCine").font(.footnote.weight(.semibold))
+                            Text(appVersion).font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                        .accessibilityIdentifier("appVersion")
+                    }
                 }
             }
             .navigationTitle(quickCapture ? t("拍摄配置", "Capture setup") : t("设置", "Settings"))
@@ -125,7 +135,7 @@ struct SettingsView: View {
 
     private var videoSection: some View {
         Section(t("视频", "VIDEO")) {
-            Menu {
+            SettingsChoices(title: t("视频编码", "Codec")) {
                 ForEach(codecOptions) { encoding in
                     Button {
                         camera.chooseEncoding(encoding)
@@ -137,7 +147,7 @@ struct SettingsView: View {
             } label: { row(t("视频编码", "Codec"), camera.selectedEncoding.title) }
                 .tint(.primary).disabled(locked || codecOptions.isEmpty)
                 .accessibilityIdentifier("codecMenu")
-            Menu {
+            SettingsChoices(title: t("分辨率", "Resolution")) {
                 ForEach(resolutions) { resolution in
                     Button {
                         let preferred = resolution.formats.first { $0.index == camera.selectedFormatIndex }
@@ -154,7 +164,7 @@ struct SettingsView: View {
             } label: { row(t("分辨率", "Resolution"), resolutions.first(where: { $0.id == currentResolution })?.label ?? currentResolution) }
                 .tint(.primary).disabled(locked || resolutions.isEmpty)
                 .accessibilityIdentifier("resolutionMenu")
-            Menu {
+            SettingsChoices(title: t("帧率", "Frame rate")) {
                 ForEach(camera.availableFPS, id: \.self) { rate in
                     Button {
                         camera.chooseFPS(rate)
@@ -166,7 +176,7 @@ struct SettingsView: View {
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
-            Menu {
+            SettingsChoices(title: t("曝光类型", "Exposure type")) {
                 Button(t("速度", "Speed")) { chooseExposureType("speed") }
                     .accessibilityIdentifier("exposureType.speed")
                 Button(t("角度", "Angle")) { chooseExposureType("angle") }
@@ -189,7 +199,7 @@ struct SettingsView: View {
     }
     private var storageSection: some View {
         Section {
-                    Menu {
+                    SettingsChoices(title: t("存储位置", "Storage")) {
                         Button(t("内部文件", "On My iPhone")) {
                             offerProVideoStorageSettings = false
                             storageLocation = "内部文件"
@@ -227,7 +237,7 @@ struct SettingsView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if storageLocation == "外部 SSD" {
-                        Menu {
+                        SettingsChoices(title: t("目标 SSD", "Destination SSD")) {
                             ForEach(externalDevices, id: \.uuid) { device in
                                 Button(device.displayName ?? t("外部存储", "External storage")) {
                                     if let id = device.uuid?.uuidString {
@@ -242,20 +252,18 @@ struct SettingsView: View {
                         }
                             .disabled(locked)
                     }
-                    Picker(t("文件名类型", "Filename type"), selection: $filenameType) {
-                        Text(t("简洁", "Simple")).tag("simple")
-                        Text("BMC").tag("BMC")
-                    }.pickerStyle(.menu).disabled(locked).accessibilityIdentifier("filenameTypePicker")
-                    Menu {
+                    SettingsChoices(title: t("文件名类型", "Filename type")) {
+                        Button(t("简洁", "Simple")) { filenameType = "simple" }
+                        Button("BMC") { filenameType = "BMC" }
+                    } label: { row(t("文件名类型", "Filename type"), filenameType == "BMC" ? "BMC" : t("简洁", "Simple")) }
+                    .disabled(locked).accessibilityIdentifier("filenameTypePicker")
+                    SettingsChoices(title: t("存储格式", "Output format")) {
                         Button("Sony MOV") { outputFormat = "SonyMov" }
                         Button("Gyroflow Proto MOV") { outputFormat = "GyroflowProto" }
                     } label: { row(t("存储格式", "Output format"), outputFormat == "SonyMov" ? "Sony MOV" : "Gyroflow Proto MOV") }.tint(.primary)
                     .accessibilityIdentifier("outputFormatMenu")
                     .disabled(locked)
-        } header: { Text(t("存储", "STORAGE")) } footer: {
-                    Text(t("本机与专用存储的视频均保存在 GyroCine/Media，诊断数据保存在 GyroCine/Log；SSD 视频由系统写入 DCIM/100APPLE。",
-                           "Local and Pro Video Storage videos are in GyroCine/Media, diagnostics in GyroCine/Log; SSD videos are in DCIM/100APPLE."))
-        }
+        } header: { Text(t("存储", "STORAGE")) }
     }
     private var selectedExternalName: String {
         let id = UserDefaults.standard.string(forKey: "externalDeviceID")
@@ -328,12 +336,18 @@ struct SettingsView: View {
         } header: { Text(t("高级", "ADVANCED")) }
     }
 
+    private var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(t("版本", "Version")) \(version) (\(build))"
+    }
+
     private func row(_ name: String, _ value: String) -> some View {
         HStack {
             Text(name).foregroundStyle(.primary)
             Spacer()
             Text(value).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
-        }.contentShape(Rectangle())
+        }.frame(minHeight: 44).contentShape(Rectangle())
     }
     private func lockedRow(_ name: String, _ value: String) -> some View {
         HStack {
@@ -356,4 +370,53 @@ private struct ResolutionOption: Identifiable {
     let formats: [FormatInfo]
     var id: String { "\(width)×\(height)" }
     var label: String { "\(title) · \(width)×\(height)" }
+}
+
+
+/// Inline choices keep configuration on one page with full-width touch targets.
+private struct SettingsChoices<Options: View, Row: View>: View {
+    let title: String
+    @ViewBuilder var options: () -> Options
+    @ViewBuilder var label: () -> Row
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    label()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+            if expanded {
+                VStack(spacing: 0) {
+                    Divider()
+                    options()
+                        .buttonStyle(SettingsChoiceActionStyle {
+                            withAnimation(.easeInOut(duration: 0.18)) { expanded = false }
+                        })
+                }
+                .padding(.leading, 12)
+            }
+        }
+    }
+}
+
+private struct SettingsChoiceActionStyle: PrimitiveButtonStyle {
+    let selected: () -> Void
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.trigger()
+            selected()
+        } label: {
+            configuration.label.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
 }

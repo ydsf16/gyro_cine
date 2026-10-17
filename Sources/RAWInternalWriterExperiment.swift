@@ -158,7 +158,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 }
                 let audioSettings: [String: Any] = [AVFormatIDKey: kAudioFormatMPEG4AAC,
                     AVSampleRateKey: asbd.mSampleRate, AVNumberOfChannelsKey: asbd.mChannelsPerFrame,
-                    AVEncoderBitRateKey: asbd.mChannelsPerFrame == 1 ? 128_000 : 256_000]
+                    AVEncoderBitRateKey: asbd.mChannelsPerFrame == 1 ? 128_000 : 320_000]
+                log("raw_writer_audio_format", ["sampleRate": asbd.mSampleRate, "channels": asbd.mChannelsPerFrame, "bitRate": audioSettings[AVEncoderBitRateKey] ?? 0])
                 let audio = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings, sourceFormatHint: audioFormat)
                 audio.expectsMediaDataInRealTime = true
                 guard w.canAdd(audio) else { throw failure("无法添加音频输入") }

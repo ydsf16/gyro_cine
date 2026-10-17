@@ -421,7 +421,9 @@ struct CameraView: View {
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
             }
-            HStack(spacing: 8) {
+            HStack(spacing: 4) {
+                Color.clear.frame(width: 40, height: 40).accessibilityHidden(true)
+                Spacer(minLength: 0)
             Button {
                 closePanel()
                 showingCaptureSetup = true
@@ -438,8 +440,9 @@ struct CameraView: View {
             .disabled(camera.recording || camera.preparingRecording || camera.finalizing)
             .accessibilityIdentifier("captureSetupOpen")
                 .lineLimit(1).minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
             Button { closePanel(); showingSlate = true } label: {
-                Image(systemName: "movieclapper").padding(8)
+                Image(systemName: "movieclapper").frame(width: 40, height: 40)
             }.accessibilityLabel(t("场记", "Slate")).accessibilityIdentifier("slateOpen")
                 .disabled(camera.recording || camera.preparingRecording || camera.finalizing)
             }
