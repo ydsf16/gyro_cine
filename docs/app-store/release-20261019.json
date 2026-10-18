@@ -57,8 +57,8 @@
     },
     {
       "check": "App Store Release archive and upload",
-      "build": "20261019.2",
-      "result": "archive and upload succeeded; processing and final selection must be checked in App Store Connect"
+      "build": "20261019.4",
+      "result": "archive, upload, processing and final selection verified in App Store Connect"
     },
     {
       "check": "Release bundle",
@@ -90,7 +90,8 @@
     "buildID": "cb638afc-bda8-4649-80c0-de9a5b284d48",
     "buildUploadedAndProcessed": true,
     "versionBuildSelected": true,
-    "screenshots": 5,
+    "screenshots": 4,
+    "screenshotPrivacy": "The Media screenshot containing an identifiable child was removed from the App Store version on 2026-10-19. Four remaining screenshots were checked for identifiable children. Original source footage remains local.",
     "localizations": [
       "zh-Hans",
       "en-US"
