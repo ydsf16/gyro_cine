@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "candidateBuild": "20261019.2",
+  "bundleID": "com.tinygrape.RawMotionRecorder",
+  "businessModel": {
+    "download": "free",
+    "rawFreeSecondsPerClip": 120,
+    "proProductID": "com.tinygrape.gyrocine.pro",
+    "type": "non-consumable",
+    "chinaPriceCNY": "19.90",
+    "otherFeatures": "free"
+  },
+  "testFlightOverride": {
+    "buildSetting": "GYROCINE_TESTFLIGHT_PRO_BYPASS",
+    "default": "YES",
+    "requires": "existing sandbox receipt plus verified sandbox AppTransaction",
+    "production": "cannot bypass"
+  },
+  "supportURL": "https://tinygrapelab.com/gyro_cine/",
+  "privacyURL": "https://tinygrapelab.com/gyro_cine/privacy.html",
+  "verification": [
+    {
+      "check": "StoreKit purchase, restore, refund; RAW limit policy; production bypass denied",
+      "device": "iPhone 18 Pro Max, iOS 27.0.1",
+      "result": "3 tests passed, 0 skipped",
+      "scheme": "CommerceQA"
+    },
+    {
+      "check": "RAW free clip reaches 120 seconds and follows normal stop/finalization",
+      "codec": "aprn",
+      "dimensions": "4224x2240",
+      "fps": 30,
+      "videoFrames": 3599,
+      "audioPackets": 5209,
+      "captureDrops": 0,
+      "peakBufferedFrames": 1,
+      "IMU": "imu_pending_completed event, no error",
+      "note": "Device capture and finalization verified; full-file computer decode was not repeated for this 5.39 GB sample."
+    },
+    {
+      "check": "RAW HQ recording with developer sandbox bypass",
+      "codec": "aprh",
+      "fps": 30,
+      "videoFrames": 361,
+      "captureDrops": 0,
+      "IMU": "imu_pending_completed event, no error",
+      "note": "12-second capture; not evidence of a real 120-second HQ free-limit stop."
+    },
+    {
+      "check": "Bilingual Pro screen",
+      "device": "iOS 26.3.1 Simulator",
+      "result": "XCUITest passed; screenshots visually checked; no unsolicited Apple login after receipt guard"
+    },
+    {
+      "check": "Physical Pro UI XCUITest",
+      "result": "blocked: test runner lost connection before bootstrapping; not passed"
+    },
+    {
+      "check": "App Store Release archive and upload",
+      "build": "20261019.2",
+      "result": "archive and upload succeeded; processing and final selection must be checked in App Store Connect"
+    },
+    {
+      "check": "Release bundle",
+      "result": "file sharing enabled; no .storekit fixture bundled"
+    }
+  ],
+  "submission": "Not submitted. User confirmation required after final material review."
+}

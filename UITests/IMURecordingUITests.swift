@@ -1,6 +1,20 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testProPurchaseEntryAndBilingualDisclosure() {
+        let app = XCUIApplication()
+        for language in ["en", "zh-Hans"] {
+            app.launchArguments = ["--pro-ui-preview", "-AppleLanguages", "(\(language))",
+                                   "-AppleLocale", language == "en" ? "en_US" : "zh_CN"]
+            app.launch()
+            XCTAssertTrue(app.navigationBars["GyroCine Pro"].waitForExistence(timeout: 15))
+            XCTAssertTrue(app.buttons["restorePro"].exists)
+            XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@",
+                language == "en" ? "2 minutes" : "2 分钟")).firstMatch.exists)
+            controlScreenshot(app, "pro-\(language)")
+            app.terminate()
+        }
+    }
     override func setUp() {
         continueAfterFailure = false
         let systemAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch

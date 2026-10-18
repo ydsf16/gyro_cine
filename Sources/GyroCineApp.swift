@@ -8,7 +8,9 @@ struct GyroCineApp: App {
         WindowGroup {
             Group {
                 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--slate-ui-preview") {
+                if ProcessInfo.processInfo.arguments.contains("--pro-ui-preview") {
+                    ProAccessView()
+                } else if ProcessInfo.processInfo.arguments.contains("--slate-ui-preview") {
                     RecordingSlateView()
                 } else if ProcessInfo.processInfo.arguments.contains("--settings-ui-preview") {
                     SettingsView()
@@ -17,6 +19,7 @@ struct GyroCineApp: App {
                 CameraView()
                 #endif
             }.environmentObject(camera)
+                .task { await ProStore.shared.prepare() }
                 .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
                 .onChange(of: scenePhase) { _, phase in
                     UIApplication.shared.isIdleTimerDisabled = phase == .active

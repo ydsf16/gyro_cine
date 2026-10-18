@@ -325,6 +325,7 @@ struct CameraView: View {
         // Keep viewfinder controls dark without imposing a window-wide appearance on sheets.
         .environment(\.colorScheme, .dark)
         .sheet(isPresented: $showingSettings) { SettingsView().environmentObject(camera) }
+        .sheet(isPresented: $camera.showingProLimit) { ProAccessView(limitReached: true) }
         .sheet(isPresented: $showingCaptureSetup) {
             SettingsView(quickCapture: true).environmentObject(camera)
                 .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)

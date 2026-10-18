@@ -6,6 +6,7 @@ import VideoToolbox
 enum WhiteBalanceChoice: String, CaseIterable { case autoLock = "Auto-L", auto = "Auto", manual = "Manual" }
 
 final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate {
+    @Published var showingProLimit = false
     @Published private(set) var ssdSpeedTesting = false
     @Published private(set) var ssdSpeedProgress = 0.0
     @Published private(set) var ssdSpeedCurrentMBps = 0.0
@@ -2934,6 +2935,23 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.logger.event("record_recovery_setup_timing", ["milliseconds":
                 (ProcessInfo.processInfo.systemUptime - recoverySetupStart) * 1000])
             self.publish { self.beginFinalizationLease(); self.status = "Recording"; self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
+            if let codec = self.chosenCodec?.rawValue,
+               ProRecordingAccess.freeLimit(codec: codec,
+                    purchased: ProRecordingAccess.shared.unlimited, bypass: false) != nil {
+                var limit: TimeInterval = 120
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--pro-limit-smoke") { limit = 5 }
+                #endif
+                let elapsed = CMClockGetTime(CMClockGetHostTimeClock()).seconds - firstHost
+                self.queue.asyncAfter(deadline: .now() + max(0, limit - elapsed)) {
+                    guard self.currentFile == fileURL, !ProRecordingAccess.shared.unlimited,
+                          self.output.isRecording || self.isRAWWriterActive else { return }
+                    self.logger.event("raw_free_limit_reached", ["seconds": limit, "codec": codec])
+                    // Use the normal stop/finalization path so audio and IMU survive.
+                    self.toggleRecording()
+                    self.publish { self.showingProLimit = true }
+                }
+            }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--imu-sync-4k60-probe") {
                 self.runIMUSyncExposureProbe(fileURL: fileURL)

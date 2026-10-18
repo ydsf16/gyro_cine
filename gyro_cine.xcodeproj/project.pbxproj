@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		EF57EFE91EDC4746B9E92515 /* GyroCine.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */; };
+		2D60835C5D444224BEEF41B2 /* ProAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AB4A890E08447AB6723572 /* ProAccessTests.swift */; };
+		028D77F479594AAAAA35359B /* ProAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814D5630955C4DB69E61499E /* ProAccess.swift */; };
 		000D1F4BE08234DB6DAD47F7 /* slay-01-amber.cube in Resources */ = {isa = PBXBuildFile; fileRef = 49AB8D9F8A96F0271570E6FE /* slay-01-amber.cube */; };
 		065A5CB761B0F44A8CCA697F /* RecordingSlate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E69E57621FCFFB1DD4CFFAD /* RecordingSlate.swift */; };
 		0E286DED35A89FA3E11D2263 /* RAWInternalWriterExperiment.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2AA9F6BFC945026732A1941 /* RAWInternalWriterExperiment.swift */; };
@@ -69,6 +72,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fixtures/GyroCine.storekit; sourceTree = "<group>"; };
+		87AB4A890E08447AB6723572 /* ProAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProAccessTests.swift; sourceTree = "<group>"; };
+		814D5630955C4DB69E61499E /* ProAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProAccess.swift; sourceTree = "<group>"; };
 		0109F90EE225951234B97E3A /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		034C3517079161B3003ECD09 /* IMURecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMURecordingUITests.swift; sourceTree = "<group>"; };
 		06CE1E8D1784D913C083A319 /* RecordingRateEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingRateEstimatorTests.swift; sourceTree = "<group>"; };
@@ -174,6 +180,7 @@
 				8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */,
 				DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */,
 				DC02D9C569C6C89D1CEF1C36 /* RecordingRateEstimator.swift */,
+				814D5630955C4DB69E61499E /* ProAccess.swift */,
 				5E69E57621FCFFB1DD4CFFAD /* RecordingSlate.swift */,
 				DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */,
 				2817BCD3637009EF27D48531 /* SettingsView.swift */,
@@ -190,6 +197,8 @@
 				44CCD09C1C4B879E79792AB1 /* PreviewColorTransformTests.swift */,
 				06CE1E8D1784D913C083A319 /* RecordingRateEstimatorTests.swift */,
 				CD153062647BFB7ED4E8022F /* RecordingSlateTests.swift */,
+				2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */,
+				87AB4A890E08447AB6723572 /* ProAccessTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -268,6 +277,7 @@
 			buildConfigurationList = 981EC82CD9E83FA2E7C1D70D /* Build configuration list for PBXNativeTarget "GyroCineTests" */;
 			buildPhases = (
 				C71D83DFD291ADD11BF4EF88 /* Sources */,
+				765E474764EE4824B87AD124 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -328,6 +338,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		765E474764EE4824B87AD124 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (EF57EFE91EDC4746B9E92515 /* GyroCine.storekit in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 		515C8BB8E5AC85604B118875 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -374,6 +385,7 @@
 				993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */,
 				F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */,
 				BF9CB8F121E995A1F8219C7D /* RecordingRateEstimator.swift in Sources */,
+				028D77F479594AAAAA35359B /* ProAccess.swift in Sources */,
 				065A5CB761B0F44A8CCA697F /* RecordingSlate.swift in Sources */,
 				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,
 				36FF3D630C1B353466E458B6 /* SSDSpeedTest.swift in Sources */,
@@ -398,6 +410,7 @@
 				AE5C369E8809C261C6EBABA3 /* PreviewColorTransformTests.swift in Sources */,
 				80C2E017C8D848C3409BCC00 /* RecordingRateEstimatorTests.swift in Sources */,
 				9C1E31916C93A238CAAB5A5C /* RecordingSlateTests.swift in Sources */,
+				2D60835C5D444224BEEF41B2 /* ProAccessTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,7 +487,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261018.1;
+				CURRENT_PROJECT_VERSION = 20261019.2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -488,6 +501,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GYROCINE_TESTFLIGHT_PRO_BYPASS = YES;
+				INFOPLIST_KEY_GyroCineTestFlightProBypass = "$(GYROCINE_TESTFLIGHT_PRO_BYPASS)";
 				INFOPLIST_KEY_CFBundleDisplayName = GyroCine;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";
@@ -550,7 +565,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261018.1;
+				CURRENT_PROJECT_VERSION = 20261019.2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -570,6 +585,8 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GYROCINE_TESTFLIGHT_PRO_BYPASS = YES;
+				INFOPLIST_KEY_GyroCineTestFlightProBypass = "$(GYROCINE_TESTFLIGHT_PRO_BYPASS)";
 				INFOPLIST_KEY_CFBundleDisplayName = GyroCine;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Preview and record video with camera controls.";

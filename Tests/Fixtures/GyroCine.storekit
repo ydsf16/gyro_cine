@@ -1,0 +1,32 @@
+{
+  "identifier": "5ed78404-5c43-40c1-bf65-c0e8932c885d",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "19.90",
+      "familyShareable": false,
+      "internalID": "1234567890",
+      "localizations": [
+        {
+          "description": "Unlock longer RAW recording.",
+          "displayName": "GyroCine Pro",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.tinygrape.gyrocine.pro",
+      "referenceName": "GyroCine Pro Lifetime",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "zh_CN",
+    "_storefront": "CHN",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

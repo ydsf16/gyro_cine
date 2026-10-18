@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var showingSSDSpeed = false
+    @State private var showingPro = false
     @State private var message: String?
     @State private var pendingLensID: String?
     @State private var offerProVideoStorageSettings = false
@@ -99,10 +100,26 @@ struct SettingsView: View {
                 }
                 videoSection
                 if !quickCapture {
+                    Section {
+                        Button { showingPro = true } label: {
+                            HStack {
+                                Label("GyroCine Pro", systemImage: "camera.aperture")
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }.tint(.primary).accessibilityIdentifier("proSettings")
+                        Text(t("RAW 每段免费录制 2 分钟；Pro 一次性解锁长录制。其他功能免费。",
+                               "RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     storageSection
                     recordingSection
                     viewfinderSection
                     advancedSection
+                    Section {
+                        Link(t("帮助与支持", "Help & Support"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/")!)
+                        Link(t("隐私政策", "Privacy Policy"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/privacy.html")!)
+                    }.tint(.primary)
                     Section {
                         VStack(spacing: 4) {
                             Text("GyroCine").font(.footnote.weight(.semibold))
@@ -129,6 +146,7 @@ struct SettingsView: View {
                 Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
             } message: { Text(AppText.message(message ?? "")) }
             .sheet(isPresented: $showingSSDSpeed) { SSDSpeedTestView() }
+            .sheet(isPresented: $showingPro) { ProAccessView() }
             .onAppear {
                 refreshExternalDevices()
                 if outputFormat == "Sony MOV" { outputFormat = "SonyMov" }
