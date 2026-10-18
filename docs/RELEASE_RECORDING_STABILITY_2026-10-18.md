@@ -77,7 +77,7 @@
    英文存储显示修正覆盖安装后，再次 `build-for-testing` 成功，但 `test-without-building` 启动前 Xcode 已不再列出 iPhone 18 Pro Max 作为可用 destination；随后 `devicectl list devices` 也将该机从 `connected` 变为 `unavailable`。本次没有启动 runner 或测试方法；日志 `/tmp/gyrocine-wifi-settings-retry-20261018.log`，构建日志 `/tmp/gyrocine-settings-retry-bft-20261018.log`。此时不再重试或重启连接服务，等待设备重新可用。
 4. **29.97/59.94fps 实际帧率偏向整数值：** App 的帧时长/Writer 设置日志与所选小数值一致，MOV 帧时间实测接近 30/60。29.97 测试的 452 个相机 K 回调原始 `hostTime` 间隔中位数 33.334ms，接近 30fps 的 33.333ms，而非 29.97fps 的 33.367ms；偏差发生在相机送出的时间轴，早于 MOV 封装。还需查 AVFoundation 的设备格式限制，再决定修复方式或从 RAW 可选项中移除该档位。
 5. **120fps + 当前 SSD 写入不足：** 10 秒短录出现 123 次 `OutOfBuffers` 并保护停录，原片无内嵌 IMU；约 4.85 GB/10 秒的文件增长也超过本轮测速 382 MB/s 后半段最低值。此设备支持该格式，但当前 SSD 组合不合格；暂不做长录。
-6. **高风险规格缺少开录前提示：** `SSDSpeedTestView` 会将测速结果和规格建议速度比较并显示“有风险/不足”，但 `CameraManager.startRAWWriterExperiment()` 的开录路径只调用 `storagePreflight()`，未读取 `ssdSpeedReport.assessment`。因此即使已测速，用户选择 RAW HQ Open Gate 60 或 RAW 120 后仍可直接开录，随后才由丢帧保护停录。本轮可复核 `Sources/CameraManager.swift` 的开录路径与测速报告使用位置；这是发版前待修复的提示缺口，不能把测速页面的风险标记当作录制前保护已经生效。
+6. **SSD 速度风险处理：** `SSDSpeedTestView` 将测速结果和规格建议速度比较并显示“有风险/不足”；开录路径不按测速结果阻止录制。用户确认接受这一策略，要求实际写入跟不上时弹窗并停止。RAW Writer 的 10 帧缓冲溢出和持续严重丢帧均会停录并保留原片；故障注入的同进程重录已通过。不能把测速页面的风险标记当作开录前拦截，也不能把中断片段算作成功素材。
 
 H.265 暗场码率造成的剩余时间夸大已在工作区加入保守下限：显示估算至少按同配置保守速率的 25% 计算。Debug 构建已编译并通过 Wi-Fi 安装；同盘约 1861.6GB 空闲时，1080p240 暗场截图显示约 991 分钟，没有出现原先 119566 分钟的数量级错误。仍需按实际复杂场景核对估算偏差。
 
@@ -176,8 +176,7 @@ Gyroflow v1.6.3 成功打开该 MOV，界面显示 59.973fps、`包含陀螺仪�
 
 - 恢复稳定的 Wi-Fi XCTest，跑“SSD 异常后不重启再录”及设置/素材真机交互闭环；专用存储 RAW 文件已核验。
 - 充电后再做高带宽长录；本轮结束电池指示已红，避免电量因素干扰结果。
-- 当前盘 RAW HQ Open Gate 60 已失败，需在选规格/开录前清楚提示性能限制，或换可持续写入更快的 SSD 后重测；当前证据不能把该格式判为可稳定录制。
-- 当前测速结果仅在测速页面标风险，开录路径尚未引用该判定；发版前需增加开录前清楚提示并完成真机回归。
+- 当前盘 RAW HQ Open Gate 60 已失败；需换可持续写入更快的 SSD 后重测，当前证据不能把该格式判为可稳定录制。测速页保留风险提示，实际录制由缓冲溢出／严重丢帧保护停止并弹窗。
 - 第二镜头 0.5× 五分钟长录已通过；Open Gate 五分钟仍待补。29.97/59.94 精确性已测出失败，RAW120 在当前 SSD 已保护停录；这些规格暂不做长录。
 - Gyroflow 导入与导出抽检已通过；仍需有明显运动的素材检验自动同步与增稳质量。竖横拍真实重力方向、SSD 热拔插需要可操作手机/SSD 的现场条件；蓝牙遥控需要对应硬件。
 - H.265 极低码率剩余时间估算已加入保守下限并装机截图核验；仍需复杂场景录制对照预测与实际。
@@ -213,3 +212,21 @@ Gyroflow v1.6.3 成功打开该 MOV，界面显示 59.973fps、`包含陀螺仪�
 **收尾状态：** 最终 Debug 增量构建 `/tmp/gyrocine-final-restore3-build-20261018.log` 成功并覆盖安装。真机测试后已恢复为测试前的 1×／ProRes RAW HQ／4224×2240／60fps／外部 SSD，以及角度显示、A-Max、自动 ISO、EV 0、AF-C、LUT Off；不带测试参数重开截图 `/tmp/gyrocine-usb-final-restored3-20261018.png`。当前手机没有接 SSD，所以 `SSD !` 与剩余空间 `—` 为预期状态。恢复事件 `/tmp/gyrocine-final-restore2-events-20261018.jsonl` 核对编码/格式/FPS、自动曝光与自动白平衡成功；最后一次角度显示又由普通启动截图确认。测试生成的原片保留在 `Media`；没有删除用户既有素材。
 
 **后续配置限制：** 因 1080p240 在当前设备上缺少可用于 Gyroflow 的 K/IMU，现已移除所有 240fps 菜单项，配置恢复时把旧 240fps 请求降到最高 120fps，录制配置入口也拒绝超过 120fps。上文 240fps 测试保留为历史证据，不表示新构建仍可选择该规格。Debug 真机 `build-for-testing` 成功；单元测试验证旧配置回退，iPhone 18 Pro Max UI 测试验证 H.265 1080p 菜单不再显示 240.0fps、仍显示 120.0fps，见 `/tmp/gyrocine-disable-240-device-20261018.xcresult`。新版已安装，原有拍摄配置已恢复；启动截图 `/tmp/gyrocine-disable-240-restored-20261018.png`。
+
+## 2026-10-18 Wi-Fi SSD 续测
+
+设备：iPhone 18 Pro Max／iOS 27.0.1，通过局域网调试，外接 `tiny_grape` SSD。此节测试的是当前 Debug 构建；已有用户素材均保留。
+
+| 用例 | 结果 | 证据 |
+| --- | --- | --- |
+| SSD 缓冲溢出后的同进程重试 | PASS（注入故障） | XCTest `testSSDWriterBufferFailureThenRetry` 通过；重试片 `IMG_0024.mov` 8.035 秒、241/241 帧解码、29.994fps、最长间隔 35ms、估计缺帧 0，有 AAC 和内嵌 IMU。`/tmp/gyrocine-ssd-retry-wifi-20261018.xcresult`、`/tmp/gyrocine-ssd-retry-result-20261018.json`。 |
+| SSD 测速与风险界面 | PASS（UI 与测速） | XCTest `testExternalSSDWirelessPreflight` 通过；持续最低 392 MB/s、平均 395 MB/s，最长写入停顿 618ms、flush 667ms。`/tmp/gyrocine-ssd-speed-wifi-20261018.xcresult`。测速 UI 显示临时文件已清理；未独立核验文件系统。 |
+| SSD RAW 4224×2240／30 正常短录 | PASS | `IMG_0025.mov` 15.037 秒、451/451 帧解码、29.993fps、最长间隔 35ms、估计缺帧 0，有 AAC 和内嵌 IMU。`/tmp/gyrocine-ssd-normal-result-20261018.json`。 |
+| SSD 素材页 | PASS（UI） | XCTest `testQuickCaptureAndMediaCards` 通过；SSD 两段成功片显示绿色 IMU，故障片显示红色 `!IMU`；多选、分享与删除入口可用，删除确认已取消，未删除素材。`/tmp/gyrocine-ssd-media-wifi-20261018.xcresult`。 |
+| 录制中真实拔出 SSD、同进程重插再录 | PASS（恢复流程） | XCTest `testSSDHotplugThenRetryInSameProcess` 通过，`/tmp/gyrocine-ssd-hotplug-v3-wifi-20261018.xcresult`。拔出时 `IMG_0031.mov` 报 AVFoundation `-11800`／POSIX `6 Device not configured`，UI 停录且明确提示原片保留；App 不重启即重新识别 SSD 并录成 `IMG_0032.mov`。后者 7.302 秒、219 帧、29.993fps、最长间隔 35ms、估计缺帧 0，有 AAC 与内嵌 IMU，文件 329.7MB；`/tmp/gyrocine-ssd-hotplug-v3-result-20261018.json`、`/tmp/gyrocine-ssd-hotplug-v3-events-20261018.jsonl`。本片检查了 MOV 索引/轨道/帧时间，未逐帧解码，不能声称完整解码通过。 |
+
+**风险：** 该盘存在 618ms 写入停顿，不能因平均 395 MB/s 判定 RAW HQ Open Gate 60 长录安全；先前该配置发生 `OutOfBuffers`。按用户确认的策略，测速结果只供参考，录制中写入跟不上时停止并弹窗；热拔插产生的片段可能不完整，不能按正常成功录制计数。
+
+热拔插前两轮协调未形成有效闭环：第一轮在拔出前人为点了停止；第二轮重插在 XCTest 60 秒等待窗口结束后完成，重开 App 可见 `SSD ✓`，但不计同进程恢复。第三轮延长重插等待并由设备状态触发提示后得到上述通过结果；成功恢复的证据只归于第三轮。`IMG_0031.mov` 是中断原片，保留供恢复检查，不把它计为成功素材。
+
+测试后已用 `--restore-pretest-configuration` 恢复测试前的 1×／ProRes RAW HQ／4224×2240／60fps／外部 SSD，普通启动截图 `/tmp/gyrocine-ssd-final-restored-20261018.png` 可见 `SSD ✓`、`IMU ✓`、Ready。所有测试原片留在 SSD；未执行删除。此次新增的 UI 自动化用例和 SSD 状态可访问性标记尚未提交。
