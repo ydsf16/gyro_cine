@@ -262,6 +262,52 @@ final class IMURecordingUITests: XCTestCase {
         XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
         controlScreenshot(app, "ssd-retry-after-buffer-overflow")
     }
+
+    func testSSDHotplugThenRetryInSameProcess() throws {
+        guard ProcessInfo.processInfo.environment["GYROCINE_RUN_SSD_HOTPLUG"] == "1" else {
+            throw XCTSkip("Requires a person to unplug and reinsert the SSD during recording")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["--raw-writer-integrated-auto", "--writer-ssd", "--ssd-matrix",
+            "--ssd-duration=240", "--writer-duration=240", "-storageLocation", "外部 SSD", "-debugEnabled", "YES",
+            "-outputFormat", "SonyMov"]
+        app.launch()
+        let record = app.buttons["recordToggle"]
+        let ssd = app.staticTexts["status.SSD"]
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == 'connected'"), object: ssd)], timeout: 30), .completed)
+        let recording = NSPredicate(format: "label CONTAINS '停止录制' OR label CONTAINS[c] 'stop'")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: recording, object: record)],
+                                  timeout: 35), .completed)
+        print("SSD_HOTPLUG_READY_TO_UNPLUG")
+        controlScreenshot(app, "ssd-hotplug-recording")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == 'disconnected'"), object: ssd)], timeout: 180), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "NOT (label CONTAINS '停止录制' OR label CONTAINS[c] 'stop')"),
+            object: record)], timeout: 65), .completed)
+        controlScreenshot(app, "ssd-hotplug-interrupted")
+        let alert = app.alerts.firstMatch
+        if alert.exists {
+            let dismiss = alert.buttons["确定"].exists ? alert.buttons["确定"] : alert.buttons["OK"]
+            if dismiss.exists { dismiss.tap() }
+        }
+        print("SSD_HOTPLUG_READY_TO_REINSERT")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == 'connected'"), object: ssd)], timeout: 150), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"), object: record)], timeout: 30), .completed)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: recording, object: record)],
+                                  timeout: 30), .completed)
+        Thread.sleep(forTimeInterval: 6)
+        record.tap()
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制' OR label CONTAINS[c] 'stop')"),
+            object: record)], timeout: 70), .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+        controlScreenshot(app, "ssd-hotplug-recovered")
+    }
     func testQuickCaptureAndMediaCards() {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.buttons["captureSetupOpen"].waitForExistence(timeout: 25))

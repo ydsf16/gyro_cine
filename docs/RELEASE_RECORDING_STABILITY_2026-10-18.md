@@ -229,4 +229,4 @@ Gyroflow v1.6.3 成功打开该 MOV，界面显示 59.973fps、`包含陀螺仪�
 
 热拔插前两轮协调未形成有效闭环：第一轮在拔出前人为点了停止；第二轮重插在 XCTest 60 秒等待窗口结束后完成，重开 App 可见 `SSD ✓`，但不计同进程恢复。第三轮延长重插等待并由设备状态触发提示后得到上述通过结果；成功恢复的证据只归于第三轮。`IMG_0031.mov` 是中断原片，保留供恢复检查，不把它计为成功素材。
 
-测试后已用 `--restore-pretest-configuration` 恢复测试前的 1×／ProRes RAW HQ／4224×2240／60fps／外部 SSD，普通启动截图 `/tmp/gyrocine-ssd-final-restored-20261018.png` 可见 `SSD ✓`、`IMU ✓`、Ready。所有测试原片留在 SSD；未执行删除。此次新增的 UI 自动化用例和 SSD 状态可访问性标记尚未提交。
+测试后已用 `--restore-pretest-configuration` 恢复测试前的 1×／ProRes RAW HQ／4224×2240／60fps／外部 SSD，普通启动截图 `/tmp/gyrocine-ssd-final-restored-20261018.png` 可见 `SSD ✓`、`IMU ✓`、Ready。所有测试原片留在 SSD；未执行删除。热拔插 XCTest 需显式设置 `GYROCINE_RUN_SSD_HOTPLUG=1` 并由现场人员配合拔插；默认测试套件跳过它。SSD 状态可访问性标记只在 Debug 编译，Release 构建不包含该标记。

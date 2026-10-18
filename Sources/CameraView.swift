@@ -505,14 +505,21 @@ struct CameraView: View {
         .background(LinearGradient(colors: [.black.opacity(0.58), .black.opacity(0.28), .clear], startPoint: .top, endPoint: .bottom))
     }
 
-    private func statusBadge(_ text: String, healthy: Bool?) -> some View {
+    @ViewBuilder private func statusBadge(_ text: String, healthy: Bool?) -> some View {
         let color: Color = healthy.map { $0 ? .green : .red } ?? .gray
-        return Text(text + (healthy.map { $0 ? " ✓" : " !" } ?? " …"))
+        let badge = Text(text + (healthy.map { $0 ? " ✓" : " !" } ?? " …"))
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 5).padding(.vertical, 3)
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(color, lineWidth: 0.8))
             .accessibilityLabel(healthy == nil ? text + " · " + t("检测中", "Checking") : text)
+        #if DEBUG
+        badge
+            .accessibilityValue(healthy.map { $0 ? "connected" : "disconnected" } ?? "checking")
+            .accessibilityIdentifier("status.\(text)")
+        #else
+        badge
+        #endif
     }
 
     private var specification: String {
