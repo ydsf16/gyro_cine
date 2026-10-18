@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "candidateBuild": "20261019.2",
+  "candidateBuild": "20261019.3",
   "bundleID": "com.tinygrape.RawMotionRecorder",
   "businessModel": {
     "download": "free",
@@ -65,5 +65,15 @@
       "result": "file sharing enabled; no .storekit fixture bundled"
     }
   ],
-  "submission": "Not submitted. User confirmation required after final material review."
+  "submission": "Not submitted. User confirmation required after final material review.",
+  "privacyManifest": {
+    "tracking": false,
+    "collectedData": [],
+    "requiredReasonCategories": [
+      "UserDefaults",
+      "DiskSpace",
+      "FileTimestamp",
+      "SystemBootTime"
+    ]
+  }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		64B6DF72599649018B55C72E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4A47AF846272410E9ECA6DC4 /* PrivacyInfo.xcprivacy */; };
 		EF57EFE91EDC4746B9E92515 /* GyroCine.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */; };
 		2D60835C5D444224BEEF41B2 /* ProAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AB4A890E08447AB6723572 /* ProAccessTests.swift */; };
 		028D77F479594AAAAA35359B /* ProAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814D5630955C4DB69E61499E /* ProAccess.swift */; };
@@ -72,6 +73,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4A47AF846272410E9ECA6DC4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fixtures/GyroCine.storekit; sourceTree = "<group>"; };
 		87AB4A890E08447AB6723572 /* ProAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProAccessTests.swift; sourceTree = "<group>"; };
 		814D5630955C4DB69E61499E /* ProAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProAccess.swift; sourceTree = "<group>"; };
@@ -226,6 +228,7 @@
 			children = (
 				9141D40EBE79980BEA8969DC /* Assets.xcassets */,
 				16572DD721A8AC0A99243C5F /* Info.plist */,
+				4A47AF846272410E9ECA6DC4 /* PrivacyInfo.xcprivacy */,
 				0C7E9DBDACEA431F5BB172F4 /* InfoPlist.strings */,
 				7837A3B5E0845276712C02D9 /* Localizable.strings */,
 				C8D26F1EC25FC76B6D6A49B2 /* LUTs */,
@@ -343,6 +346,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				64B6DF72599649018B55C72E /* PrivacyInfo.xcprivacy in Resources */,
 				5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */,
 				760BE7C762F37FA89377C0D8 /* InfoPlist.strings in Resources */,
 				77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */,
@@ -487,7 +491,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261019.2;
+				CURRENT_PROJECT_VERSION = 20261019.3;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -565,7 +569,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261019.2;
+				CURRENT_PROJECT_VERSION = 20261019.3;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
