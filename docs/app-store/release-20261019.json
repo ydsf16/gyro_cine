@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "candidateBuild": "20261019.3",
+  "candidateBuild": "20261019.4",
   "bundleID": "com.tinygrape.RawMotionRecorder",
   "businessModel": {
     "download": "free",
@@ -75,5 +75,29 @@
       "FileTimestamp",
       "SystemBootTime"
     ]
+  },
+  "platformScope": "iPhone only, approved by user; Mac and Vision Pro distribution disabled",
+  "reviewPreflight": {
+    "checkedWithBuild": "20261019.3",
+    "missing": [
+      "iPad screenshots (resolved by iPhone-only candidate)",
+      "Publish privacy response and policy URL after user confirmation"
+    ],
+    "otherMissingMetadata": []
+  },
+  "storePreparation": {
+    "candidateBuild": "20261019.4",
+    "buildID": "cb638afc-bda8-4649-80c0-de9a5b284d48",
+    "buildUploadedAndProcessed": true,
+    "versionBuildSelected": true,
+    "screenshots": 5,
+    "localizations": [
+      "zh-Hans",
+      "en-US"
+    ],
+    "proReviewDraftCreated": true,
+    "privacyResponse": "No data collected, saved but not published pending user confirmation",
+    "releaseMode": "manual",
+    "appSubmitted": false
   }
 }
