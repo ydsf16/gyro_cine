@@ -26,6 +26,7 @@
 		5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9141D40EBE79980BEA8969DC /* Assets.xcassets */; };
 		635A301F479D884EB2F45FA9 /* IMURecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD19334D59F169EEE052CD8 /* IMURecording.swift */; };
 		6C4D5094C73E9D5B9D622509 /* slay-02-fade.cube in Resources */ = {isa = PBXBuildFile; fileRef = 58BD98D23A33171930C1EB9C /* slay-02-fade.cube */; };
+		760BE7C762F37FA89377C0D8 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 0C7E9DBDACEA431F5BB172F4 /* InfoPlist.strings */; };
 		77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7837A3B5E0845276712C02D9 /* Localizable.strings */; };
 		8082FD10ABEDAE1649CA9217 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */; };
 		8A4D75C717C7D2C5DCCC78E9 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2988EEEB7132649CE38D63 /* ClockAligner.swift */; };
@@ -98,6 +99,8 @@
 		97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RecordingExceptionCatcher.h; sourceTree = "<group>"; };
 		987DE3E8C7C89F42C7E1D6BD /* slay-05-portrait.cube */ = {isa = PBXFileReference; path = "slay-05-portrait.cube"; sourceTree = "<group>"; };
 		B0BD8DF5CEBF59A852F9A3BA /* PreviewColorTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewColorTransform.swift; sourceTree = "<group>"; };
+		C07DBE34683D824A79450C82 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		C2C8413D6AA7AAAC7D4B95B3 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		CD153062647BFB7ED4E8022F /* RecordingSlateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSlateTests.swift; sourceTree = "<group>"; };
 		DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
 		DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
@@ -202,6 +205,7 @@
 			children = (
 				9141D40EBE79980BEA8969DC /* Assets.xcassets */,
 				16572DD721A8AC0A99243C5F /* Info.plist */,
+				0C7E9DBDACEA431F5BB172F4 /* InfoPlist.strings */,
 				7837A3B5E0845276712C02D9 /* Localizable.strings */,
 				C8D26F1EC25FC76B6D6A49B2 /* LUTs */,
 			);
@@ -317,6 +321,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5D3BC3B3691C9609C1B702F8 /* Assets.xcassets in Resources */,
+				760BE7C762F37FA89377C0D8 /* InfoPlist.strings in Resources */,
 				77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */,
 				9590B374CB928008C53FE1EA /* SLAY-LICENSE.txt in Resources */,
 				2CC48985B038B1E260CEECA4 /* SLAY-SOURCE.json in Resources */,
@@ -396,6 +401,15 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
+		0C7E9DBDACEA431F5BB172F4 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				C07DBE34683D824A79450C82 /* en */,
+				C2C8413D6AA7AAAC7D4B95B3 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
 		7837A3B5E0845276712C02D9 /* Localizable.strings */ = {
 			isa = PBXVariantGroup;
 			children = (

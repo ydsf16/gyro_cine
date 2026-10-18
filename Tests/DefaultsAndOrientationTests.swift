@@ -3,6 +3,12 @@ import AVFoundation
 @testable import GyroCine
 
 final class DefaultsAndOrientationTests: XCTestCase {
+    func testDisabled240FrameRateFallsBackTo120() {
+        XCTAssertEqual(CaptureFrameRatePolicy.maximum, 120)
+        XCTAssertEqual(CaptureFrameRatePolicy.normalized(240), 120)
+        XCTAssertEqual(CaptureFrameRatePolicy.normalized(119.88), 119.88)
+    }
+
     func testProVideoStorageRequiresRuntimeSupport() {
         guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27 else { return }
         let output = AVCaptureMovieFileOutput()
@@ -280,6 +286,18 @@ final class DefaultsAndOrientationTests: XCTestCase {
         XCTAssertEqual(CaptureDefaults.clampedManualExposure(1/200, fps: 30,
             minimum: 1/10000, maximum: 1), 1/200, accuracy: 1e-9)
     }
+    func testLocalizedRecordingErrorsKeepDiagnosticsSeparate() {
+        let raw = "unavailable(视频帧时间异常：60 fps 最大间隔 600 ms)"
+        let english = AppText.message(raw, language: "en")
+        XCTAssertTrue(english.contains("invalid or missing frames"))
+        XCTAssertFalse(english.contains("unavailable("))
+        XCTAssertTrue(AppText.message(raw, language: "zh-Hans").contains("视频帧数据异常"))
+        XCTAssertTrue(PendingIMUJob.isPermanentFailure(raw))
+        XCTAssertTrue(AppText.message("ProRes RAW 需要专用视频存储或外部 SSD。请在设置中选择存储位置。", language: "en").contains("Pro Video Storage"))
+        XCTAssertEqual(AppText.message("测速已取消，临时文件已清理 / Cancelled; test file removed", language: "en"), "Cancelled; test file removed")
+        XCTAssertTrue(AppText.message("Lens switch: camera input unavailable", language: "zh-Hans").contains("镜头切换失败"))
+    }
+
     func testAllUserControlsPersistAcrossLaunch() throws {
         let suite = UUID().uuidString
         let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))

@@ -48,9 +48,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     let learned = UserDefaults.standard.double(forKey: key)
                     let bits = encoding == .proResRAWHQ ? 8.0 : encoding == .proResRAW ? 6.0 : 0.5
                     let fallback = max(1_000_000, Double(format.width) * Double(format.height) * rate * bits / 8 + 100_000)
+                    let validLearned = learned.isFinite && learned > 0
+                    let assessmentRate = max(validLearned ? learned : fallback, fallback * 0.25)
                     result.append(SSDSpeedSpecification(encoding: encoding, width: format.width, height: format.height,
-                        fps: rate, requiredMBps: (learned.isFinite && learned > 0 ? learned : fallback) / 1_000_000,
-                        learned: learned.isFinite && learned > 0))
+                        fps: rate, requiredMBps: assessmentRate / 1_000_000,
+                        learned: validLearned))
                 }
             }
         }
@@ -272,6 +274,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var failedPendingSignatures: [String: String] = [:]
     private var captureFinishing = false // Camera queue only.
     private var storageReplenishPending = true
+    private var storageReplenishFromDeletion = false
     private var storageReplenishRetries = 0
     private var storageReplenishNotBefore: Double = 0
     private var movieFirstFrameHost: Double?
@@ -298,6 +301,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private let verificationQueue = DispatchQueue(label: "GyroCine.testVerification", qos: .utility)
     private var rawSmokeMovieName: String?
     private var rawWriterSmokeCompleted = 0
+    private var exposureSmokeLensSwitchAttempted = false
     #endif
     private var rawWriterExperiment: AnyObject?
     private var rawWriterPreview: AnyObject?
@@ -468,7 +472,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private var estimatedBytesPerSecond: Double {
         let learned = UserDefaults.standard.double(forKey: bitrateStatisticsKey)
-        return liveBytesPerSecond ?? (learned.isFinite && learned > 0 ? learned : conservativeBytesPerSecond)
+        let observed = liveBytesPerSecond ?? (learned.isFinite && learned > 0 ? learned : conservativeBytesPerSecond)
+        // A static/dark HEVC scene can compress to almost nothing. Avoid
+        // extrapolating that transient bitrate to the entire free disk.
+        return max(observed, conservativeBytesPerSecond * 0.25)
     }
     private func updateRecordingBitrateEstimate() {
         guard output.isRecording || rawWriterExperiment != nil, let file = currentFile else {
@@ -524,6 +531,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     func requestStorageReplenishment() {
         queue.async {
             self.storageReplenishPending = true
+            self.storageReplenishFromDeletion = true
             self.storageReplenishRetries = 0
             self.storageReplenishNotBefore = 0
             self.replenishDeletedVideoStorageIfPossible()
@@ -544,32 +552,43 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         // Internal H.265 deletions do not consume the reserved pool.
         guard storage.initialCapacity > 0, storage.remainingCapacity < storage.initialCapacity else {
             storageReplenishPending = false
+            storageReplenishFromDeletion = false
             return
         }
+        let before = storage.remainingCapacity
+        let fromDeletion = storageReplenishFromDeletion
         storageReplenishPending = false
+        storageReplenishFromDeletion = false
         logger.event("storage_replenish_begin", ["initialBytes": storage.initialCapacity,
-            "remainingBytes": storage.remainingCapacity, "localFreeBytes": localFreeBytes() ?? -1])
+            "remainingBytes": before, "localFreeBytes": localFreeBytes() ?? -1,
+            "afterDeletion": fromDeletion])
         captureFinishing = true
         publish { self.finalizing = true; self.status = "正在回收专用存储空间…" }
         storage.replenishCapacity { capacity, error in
             self.queue.async {
                 self.captureFinishing = false
+                let nsError = error as NSError?
                 self.logger.event("deleted_media_storage_replenished", ["remainingBytes": capacity,
-                    "error": error?.localizedDescription ?? ""])
-                // File deletion and reader teardown may release blocks asynchronously.
-                // Retry a partial reclaim a bounded number of times, only while idle.
-                if capacity < storage.initialCapacity, self.storageReplenishRetries < 4 {
-                    let delays = [2.0, 5.0, 10.0, 20.0]
+                    "gainedBytes": capacity - before, "afterDeletion": fromDeletion,
+                    "error": error?.localizedDescription ?? "", "errorDomain": nsError?.domain ?? "",
+                    "errorCode": nsError?.code ?? 0, "localFreeBytes": self.localFreeBytes() ?? -1])
+                // Existing recordings can keep capacity below the initial allocation.
+                // Retry only a deletion that has not yet released blocks; a partial
+                // successful reclaim must not keep the camera in Finalizing.
+                if fromDeletion && error != nil && capacity <= before && self.storageReplenishRetries < 2 {
+                    let delays = [2.0, 5.0]
                     self.storageReplenishNotBefore = ProcessInfo.processInfo.systemUptime + delays[self.storageReplenishRetries]
                     self.storageReplenishRetries += 1
                     self.storageReplenishPending = true
+                    self.storageReplenishFromDeletion = true
                     self.logger.event("storage_replenish_retry_scheduled", ["attempt": self.storageReplenishRetries,
                         "remainingBytes": capacity, "initialBytes": storage.initialCapacity])
                 }
                 self.refreshStorageBudget()
                 self.publish {
                     self.finalizing = false
-                    self.status = error == nil ? "Camera ready" : "专用存储回收失败，请在设置中检查容量"
+                    self.status = error == nil || !fromDeletion ? "Camera ready" :
+                        "专用存储空间回收未完成，请释放普通存储空间"
                 }
                 self.resumePendingIMU()
             }
@@ -828,7 +847,49 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     #if DEBUG
+    private func restorePretestConfiguration() {
+        guard let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }) else { return }
+        if device?.uniqueID != wide.uniqueID {
+            chooseLens(wide.uniqueID)
+            queue.asyncAfter(deadline: .now() + 2) { self.restorePretestConfiguration() }
+            return
+        }
+        // The UI regression changed shutter, ISO and WB. The pretest screen
+        // showed A-Max, auto ISO, zero EV and continuous AF.
+        savedControls = SavedCameraControls()
+        savedControls.save()
+        UserDefaults.standard.set("angle", forKey: "exposureType")
+        manualExposureIntent = nil
+        chosenWhiteBalance = .auto
+        manualWhiteBalanceKelvin = nil
+        exposureBiasIntent = 0
+        shutterMaxCustomized = false
+        do { try resetCameraControls(wide, fps: chosenFPS, manualExposure: nil) }
+        catch { logger.event("pretest_restore_controls_failed", ["error": String(describing: error)]) }
+        guard let target = formatObjects.first(where: {
+            $0.width == 4224 && $0.height == 2240 && $0.supports(60) &&
+            $0.compatibleCodecs.contains(VideoEncoding.proResRAWHQ.codec.rawValue)
+        }) else { logger.event("pretest_restore_unavailable"); return }
+        chosenEncoding = .proResRAWHQ
+        chosenCodec = chosenEncoding.codec
+        chosenFPS = 60
+        UserDefaults.standard.set("外部 SSD", forKey: "storageLocation")
+        let restored = applyFormat(target.index, reason: "pretest_restore")
+        refreshStorageBudget()
+        logger.event("pretest_restore_result", ["success": restored, "state": configurationSnapshot()])
+    }
+
     private func runRAWSSDSmoke() {
+        if let lensType: AVCaptureDevice.DeviceType =
+            ProcessInfo.processInfo.arguments.contains("--ssd-lens=0.5") ? .builtInUltraWideCamera :
+            (ProcessInfo.processInfo.arguments.contains("--ssd-lens=4") ? .builtInTelephotoCamera : nil),
+           let targetLens = lensDevices.values.first(where: { $0.deviceType == lensType }) {
+            if device?.uniqueID != targetLens.uniqueID {
+                chooseLens(targetLens.uniqueID)
+                queue.asyncAfter(deadline: .now() + 2) { self.runRAWSSDSmoke() }
+                return
+            }
+        }
         let longHQ = ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke")
         guard UserDefaults.standard.string(forKey: "storageLocation") == "外部 SSD" else {
             logger.event("raw_smoke_failed", ["reason": "SSD is not selected"])
@@ -899,11 +960,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func runHEVCCadenceSmoke() {
-        let at240 = ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke")
         let at120 = ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")
-        let width: Int32 = at120 || at240 ? 1920 : 3840
-        let height: Int32 = at120 || at240 ? 1080 : 2160
-        let rate = at240 ? 240.0 : (at120 ? 120.0 : 60.0)
+        let width: Int32 = at120 ? 1920 : 3840
+        let height: Int32 = at120 ? 1080 : 2160
+        let rate = at120 ? 120.0 : 60.0
         guard let target = formatObjects.filter({
             $0.width == width && $0.height == height && $0.supports(rate) &&
             $0.compatibleCodecs.contains(VideoEncoding.hevc.codec.rawValue)
@@ -949,6 +1009,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func runExposureRetentionSmoke() {
+        if ProcessInfo.processInfo.arguments.contains("--exposure-start-ultrawide"),
+           let ultra = lensDevices.values.first(where: { $0.deviceType == .builtInUltraWideCamera }),
+           device?.uniqueID != ultra.uniqueID {
+            guard !exposureSmokeLensSwitchAttempted else {
+                logger.event("exposure_smoke_failed", ["reason": "Could not select ultrawide lens"])
+                return
+            }
+            exposureSmokeLensSwitchAttempted = true
+            chooseLens(ultra.uniqueID)
+            queue.asyncAfter(deadline: .now() + 2) { self.runExposureRetentionSmoke() }
+            return
+        }
         guard let camera = device,
               let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }),
               let target = formatObjects.first(where: {
@@ -1219,6 +1291,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if ProcessInfo.processInfo.arguments.contains("--ssd-speed-probe") {
                 runSSDSpeedTestWhenIdle(deadline: ProcessInfo.processInfo.systemUptime + 90)
             }
+            if ProcessInfo.processInfo.arguments.contains("--restore-pretest-configuration") {
+                restorePretestConfiguration()
+            }
             if let name = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--cleanup-test-file=") })?.dropFirst("--cleanup-test-file=".count),
                name.hasPrefix("UITEST_IMG_writer_"), !name.contains("/"), name.hasSuffix(".mov") {
                 cleanupTestMovieWhenIdle(String(name), deadline: ProcessInfo.processInfo.systemUptime + 30)
@@ -1239,8 +1314,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") { runRAWSSDSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
-               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
-               ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") { runHEVCCadenceSmoke() }
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") { runHEVCCadenceSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--k-capability-probe") { runKCapabilityProbe() }
             if ProcessInfo.processInfo.arguments.contains("--k-wide-lens-probe"),
                let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }) {
@@ -1387,15 +1461,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         case .proResRAW: [.proResRAW, .proResRAWHQ, .hevcHQ, .hevc]
         case .proResRAWHQ: [.proResRAWHQ, .proResRAW, .hevcHQ, .hevc]
         }
-        guard let encoding = encodingOrder.first(where: { union.contains($0.codec) }) else {
+        guard let encoding = encodingOrder.first(where: { candidate in
+            found.contains { $0.compatibleCodecs.contains(candidate.codec.rawValue) &&
+                !availableFPS(for: $0).isEmpty }
+        }) else {
             fail("No supported video encoding on selected lens"); return false
         }
         chosenEncoding = encoding
         chosenCodec = encoding.codec
         let originalIndex = found.firstIndex(where: { $0.format === oldFormat })
         if let preference {
-            chosenFPS = preference.fps
-            chosenIndex = closestFormatIndex(in: found, codec: encoding.codec, preference: preference)
+            chosenFPS = CaptureFrameRatePolicy.normalized(preference.fps)
+            chosenIndex = closestFormatIndex(in: found, codec: encoding.codec,
+                preference: CapturePreference(encoding: encoding, width: preference.width,
+                    height: preference.height, fps: chosenFPS))
         } else {
             chosenFPS = 60
             chosenIndex = closestFormatIndex(in: found, codec: encoding.codec,
@@ -1417,7 +1496,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                                            "locked": camera.isFocusModeSupported(.locked)],
                                      "formats": found.map(\.dictionary)]
         logger.capabilityReport(report)
-        supportedCodecs = union
+        supportedCodecs = union.filter { codec in
+            found.contains { $0.compatibleCodecs.contains(codec.rawValue) && !availableFPS(for: $0).isEmpty }
+        }
         logger.event("capability_summary", ["formatCount": found.count, "codecs": union.map(\.rawValue),
                                             "reportPath": logger.capabilityURL.path])
         publish {
@@ -1464,6 +1545,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     func chooseFormat(_ index: Int) {
         queue.async {
             guard let codec = self.chosenCodec else { return }
+            guard self.formatObjects.indices.contains(index),
+                  !self.availableFPS(for: self.formatObjects[index]).isEmpty else {
+                self.fail("No supported frame rate at the selected resolution"); return
+            }
             let selected = self.preferredIntrinsicFormatIndex(near: index, fps: self.chosenFPS,
                                                                codec: codec, in: self.formatObjects)
             self.applyFormat(selected, reason: "format_change")
@@ -1476,6 +1561,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         guard let camera = device, let codec = chosenCodec, formatObjects.indices.contains(index) else { fail("Invalid format selection"); return false }
         let info = formatObjects[index]
         guard info.compatibleCodecs.contains(codec.rawValue) else { fail("Format [\(index)] does not support \(codec.rawValue)"); return false }
+        guard !availableFPS(for: info).isEmpty else { fail("Format [\(index)] has no enabled frame rate"); return false }
         let before = configurationSnapshot()
         let previousFormat = camera.activeFormat
         let previousMin = camera.activeVideoMinFrameDuration
@@ -1496,7 +1582,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             logProVideoStorage("format_before_sensor_change")
             try camera.lockForConfiguration()
             camera.activeFormat = info.format
-            let targetFPS = info.supports(chosenFPS) ? chosenFPS : nearestFPS(to: chosenFPS, in: info)
+            let requestedFPS = CaptureFrameRatePolicy.normalized(chosenFPS)
+            let targetFPS = info.supports(requestedFPS) ? requestedFPS : nearestFPS(to: requestedFPS, in: info)
             let duration = CMTime(value: 1_000_000, timescale: CMTimeScale((targetFPS * 1_000_000).rounded()))
             camera.activeVideoMinFrameDuration = duration
             camera.activeVideoMaxFrameDuration = duration
@@ -1617,6 +1704,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     func chooseFPS(_ value: Double) {
         queue.async {
             guard !self.output.isRecording, !self.recordingStarting, !self.captureFinishing else { self.fail("FPS cannot change during recording"); return }
+            guard value.isFinite, value > 0, value <= CaptureFrameRatePolicy.maximum else {
+                self.fail("FPS \(value) is disabled"); return
+            }
             guard let camera = self.device, let index = self.chosenIndex,
                   self.formatObjects.indices.contains(index), let codec = self.chosenCodec else {
                 self.fail("No active video format"); return
@@ -1694,9 +1784,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     private func nearestFPS(to requested: Double, in format: FormatInfo) -> Double {
         let rates = availableFPS(for: format)
-        return rates.min { abs($0 - requested) < abs($1 - requested) }
-            ?? format.format.videoSupportedFrameRateRanges.first.map { min(max(requested, $0.minFrameRate), $0.maxFrameRate) }
-            ?? 30
+        return rates.min { abs($0 - requested) < abs($1 - requested) } ?? 30
     }
 
     /// Keep the requested raster, frame rate, codec and autofocus capability.
@@ -1731,7 +1819,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 + abs(fps - preference.fps) * 2 + (info.format.autoFocusSystem == .none ? 200 : 0)
                 + (info.supportsIntrinsics ? 0 : 10)
         }
-        return formats.indices.filter { formats[$0].compatibleCodecs.contains(codec.rawValue) }
+        return formats.indices.filter {
+            formats[$0].compatibleCodecs.contains(codec.rawValue) && !availableFPS(for: formats[$0]).isEmpty
+        }
             .min { score(formats[$0]) < score(formats[$1]) }
     }
 
@@ -1750,9 +1840,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func availableFPS(for format: FormatInfo) -> [Double] {
-        let common = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60, 119.88, 120, 240].filter(format.supports)
-        let rates = common.isEmpty ? format.format.videoSupportedFrameRateRanges.flatMap { [$0.minFrameRate, $0.maxFrameRate] } : common
-        return Array(Set(rates)).sorted()
+        CaptureFrameRatePolicy.available(for: format)
     }
 
     var availableFPS: [Double] {
@@ -2112,6 +2200,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "errors": errors, "storageLocation": UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"])
             if deletedLocalMovie && ProVideoStorageBridge.isSupported() {
                 self.storageReplenishPending = true
+                self.storageReplenishFromDeletion = true
                 self.storageReplenishRetries = 0
                 self.storageReplenishNotBefore = 0
                 self.replenishDeletedVideoStorageIfPossible()
@@ -2310,7 +2399,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let url: URL
         do {
             #if DEBUG
-            let testName = ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") &&
+            let testName = (ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") ||
+                ProcessInfo.processInfo.arguments.contains("--ui-testing")) &&
                 !ProcessInfo.processInfo.arguments.contains("--writer-normal-name")
                 ? "UITEST_IMG_writer_\(UUID().uuidString)" : ""
             #else
@@ -2489,7 +2579,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let arguments = ProcessInfo.processInfo.arguments
             let isTest = arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
                 arguments.contains("--hevc-4k60-smoke") || arguments.contains("--hevc-1080p120-smoke") ||
-                arguments.contains("--hevc-1080p240-smoke") ||
                 arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
                 arguments.contains("--raw-hotplug-smoke")
             let baseName = isTest && !arguments.contains("--slate-smoke") ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
@@ -2546,7 +2635,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             #if DEBUG
             if arguments.contains("--raw-ssd-smoke") || arguments.contains("--raw-hq-ssd-smoke") ||
                arguments.contains("--raw-long-hq-ssd-smoke") ||
-               arguments.contains("--raw-hotplug-smoke") {
+               arguments.contains("--raw-hotplug-smoke") ||
+               arguments.contains("--hevc-4k60-smoke") ||
+               arguments.contains("--hevc-1080p120-smoke") {
                 self.rawSmokeMovieName = url.lastPathComponent
             }
             #endif
@@ -2698,10 +2789,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     if self.currentFile == fileURL && (self.output.isRecording || self.isRAWWriterActive) { self.toggleRecording() }
                 }
             }
-            if ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
-               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
-               ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") {
-                let smokeSeconds: Double = ProcessInfo.processInfo.arguments.contains("--hevc-1080p240-smoke") ? 10 : 20
+            if !ProcessInfo.processInfo.arguments.contains("--ssd-matrix") &&
+               (ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")) {
+                let smokeSeconds: Double = 20
                 self.queue.asyncAfter(deadline: .now() + smokeSeconds) {
                     if self.output.isRecording { self.toggleRecording() }
                 }
@@ -3051,6 +3142,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     if name == UIApplication.willEnterForegroundNotification {
                         self.attemptedPendingJobs.removeAll()
                         self.storageReplenishPending = true
+                        self.storageReplenishFromDeletion = false
                         self.storageReplenishRetries = 0
                         self.storageReplenishNotBefore = 0
                     }

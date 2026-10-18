@@ -59,11 +59,11 @@ enum PreviewLook: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .rec709: "Rec.709"
-        case .amber: "暖阳 · Amber"
-        case .fade: "褪色 · Fade"
-        case .neon: "霓虹 · Neon"
-        case .film: "电影 · Film"
-        case .portrait: "人像 · Portrait"
+        case .amber: AppText.value("暖阳 · Amber", "Amber", locale: .current)
+        case .fade: AppText.value("褪色 · Fade", "Fade", locale: .current)
+        case .neon: AppText.value("霓虹 · Neon", "Neon", locale: .current)
+        case .film: AppText.value("电影 · Film", "Film", locale: .current)
+        case .portrait: AppText.value("人像 · Portrait", "Portrait", locale: .current)
         }
     }
     var filename: String? {

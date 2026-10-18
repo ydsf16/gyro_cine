@@ -366,8 +366,8 @@ struct CameraView: View {
                     showingSettings = true
                 }
             }
-            Button("确定") { camera.clearError() }
-        } message: { Text(camera.errorText ?? "") }
+            Button(t("确定", "OK")) { camera.clearError() }
+        } message: { Text(AppText.message(camera.errorText ?? "")) }
         .onChange(of: scenePhase) { _, phase in camera.lutPreview.setForeground(phase == .active) }
         .onChange(of: camera.exposureSeconds) { _, value in if camera.exposureAuto { shutterValue = value } }
         .onChange(of: camera.shutterMaxSeconds) { _, value in shutterMaxValue = value }

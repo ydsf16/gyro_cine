@@ -120,7 +120,7 @@ struct MediaLibraryView: View {
             } message: { Text(t("将删除 \(pendingDelete.count) 个视频及其关联数据。", "Delete \(pendingDelete.count) videos and associated data.")) }
             .alert(t("素材", "Media"), isPresented: Binding(
                 get: { message != nil }, set: { if !$0 { message = nil } }
-            )) { Button(t("确定", "OK")) { message = nil } } message: { Text(message ?? "") }
+            )) { Button(t("确定", "OK")) { message = nil } } message: { Text(AppText.message(message ?? "")) }
             .onAppear { reload() }
             .onChange(of: camera.externalStorageConnected) { _, _ in reload() }
             .onChange(of: camera.finalizing) { _, saving in if !saving { reload() } }

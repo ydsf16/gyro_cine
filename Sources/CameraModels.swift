@@ -75,3 +75,21 @@ struct FormatInfo: Identifiable {
          "supportsIntrinsics": supportsIntrinsics, "compatibleCodecs": compatibleCodecs.sorted()]
     }
 }
+
+enum CaptureFrameRatePolicy {
+    static let maximum = 120.0
+    private static let common = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60, 119.88, 120]
+
+    static func normalized(_ fps: Double) -> Double {
+        fps.isFinite && fps > 0 ? min(fps, maximum) : 30
+    }
+
+    static func available(for format: FormatInfo) -> [Double] {
+        let standard = common.filter(format.supports)
+        if !standard.isEmpty { return standard }
+        let endpoints = format.format.videoSupportedFrameRateRanges.flatMap { range in
+            [range.minFrameRate, min(range.maxFrameRate, maximum)]
+        }.filter { $0 > 0 && $0 <= maximum && format.supports($0) }
+        return Array(Set(endpoints)).sorted()
+    }
+}

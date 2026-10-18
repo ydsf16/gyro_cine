@@ -1,0 +1,4 @@
+"NSCameraUsageDescription" = "GyroCine uses the camera to preview and record video.";
+"NSMicrophoneUsageDescription" = "GyroCine records sound with your videos.";
+"NSMotionUsageDescription" = "GyroCine records motion data for video stabilization and determines recording orientation.";
+"NSPhotoLibraryAddUsageDescription" = "GyroCine saves the clips you select to your photo library.";

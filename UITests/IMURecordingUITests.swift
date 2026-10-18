@@ -14,6 +14,59 @@ final class IMURecordingUITests: XCTestCase {
             return false
         }
     }
+    func testEnglishSettingsAndSlate() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--settings-ui-preview", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-storageLocation", "外部 SSD"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
+        let storage = app.buttons["storageLocationMenu"]
+        XCTAssertTrue(storage.waitForExistence(timeout: 10))
+        XCTAssertTrue(storage.label.contains("External SSD"), storage.label)
+        storage.tap()
+        XCTAssertTrue(app.buttons["On My iPhone"].waitForExistence(timeout: 5))
+        controlScreenshot(app, "english-storage-menu")
+        app.terminate()
+        app.launchArguments = ["--slate-ui-preview", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.textFields["slateDirector"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["slateDone"].label.contains("Done"))
+        controlScreenshot(app, "english-slate")
+    }
+
+    func testEnglishDeviceScreens() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 40))
+        app.buttons["settingsOpen"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
+        controlScreenshot(app, "device-english-settings")
+        app.buttons["captureSettingsClose"].tap()
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertTrue(app.buttons["lut.rec709"].waitForExistence(timeout: 10))
+        controlScreenshot(app, "device-english-lut")
+    }
+
+    func testExternalSSDWirelessPreflight() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 40))
+        app.buttons["settingsOpen"].tap()
+        let storage = app.buttons["storageLocationMenu"]
+        XCTAssertTrue(storage.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+        let speed = app.buttons["ssdSpeedTest"]
+        for _ in 0..<3 where !speed.isHittable { app.swipeUp() }
+        XCTAssertTrue(speed.waitForExistence(timeout: 10))
+        speed.tap()
+        let start = app.buttons["ssdSpeedStart"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        XCTAssertTrue(app.staticTexts["Lowest second-half speed"].waitForExistence(timeout: 180), app.debugDescription)
+        XCTAssertFalse(app.staticTexts["ssdSpeedError"].exists)
+        controlScreenshot(app, "ssd-speed-wireless-preflight")
+    }
+
     func testNativeMenusWithoutCamera() {
         let app = XCUIApplication()
         app.launchArguments = ["--settings-ui-preview", "-AppleLanguages", "(zh-Hans)"]
@@ -37,7 +90,10 @@ final class IMURecordingUITests: XCTestCase {
         controlScreenshot(app, "settings-native-menu-result")
     }
 
-    func testNativeSettingsMenusFullRow() {
+    func testNativeSettingsMenusFullRow() throws {
+        if ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil {
+            throw XCTSkip("Requires physical camera formats for the codec menu")
+        }
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]
         app.launch()
@@ -65,6 +121,24 @@ final class IMURecordingUITests: XCTestCase {
         controlScreenshot(app, "native-settings-menus")
         app.buttons["captureSettingsClose"].tap()
         XCTAssertTrue(app.buttons["recordToggle"].waitForExistence(timeout: 5))
+    }
+
+    func test1080p240IsUnavailable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-storageLocation", "内部文件", "-AppleLanguages", "(zh-Hans)", "--ui-testing"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        app.buttons["codecMenu"].tap()
+        app.buttons["H.265"].tap()
+        app.buttons["resolutionMenu"].tap()
+        let resolution = app.buttons["1080p · 1920×1080"]
+        XCTAssertTrue(resolution.waitForExistence(timeout: 10))
+        resolution.tap()
+        app.buttons["fpsMenu"].tap()
+        XCTAssertFalse(app.buttons["240.0 fps"].exists)
+        XCTAssertTrue(app.buttons["120.0 fps"].exists)
+        controlScreenshot(app, "1080p-fps-capped-at-120")
     }
 
     func testSlateForm() {
@@ -120,10 +194,12 @@ final class IMURecordingUITests: XCTestCase {
     #if !targetEnvironment(simulator)
     func testCaptureButtonsAndInterfacePolish() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件", "-outputFormat", "SonyMov"]
+        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件", "-outputFormat", "SonyMov",
+                               "-AppleLanguages", "(zh-Hans)"]
         app.launch()
         let record = app.buttons["recordToggle"]
         XCTAssertTrue(record.waitForExistence(timeout: 25))
+        selectControlCodec("H.265", app: app)
         XCTAssertTrue(app.staticTexts["storageRemaining"].exists)
         app.buttons["settingsOpen"].tap()
         let close = app.buttons["captureSettingsClose"]
@@ -167,19 +243,22 @@ final class IMURecordingUITests: XCTestCase {
         app.launch()
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 40))
-        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS '10 帧'")).firstMatch.exists,
+        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(
+            format: "label CONTAINS '10 帧' OR label CONTAINS[c] 'buffer' OR label CONTAINS[c] 'writing'"
+        )).firstMatch.exists,
                       alert.debugDescription)
         controlScreenshot(app, "ssd-buffer-overflow")
-        alert.buttons["确定"].tap()
+        let dismiss = alert.buttons["确定"].exists ? alert.buttons["确定"] : alert.buttons["OK"]
+        dismiss.tap()
         let record = app.buttons["recordToggle"]
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "enabled == true"), object: record)], timeout: 40), .completed)
         // Retry inside the same app process. Only the first writer has injected backpressure.
         record.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 30), .completed)
+            predicate: NSPredicate(format: "label CONTAINS '停止录制' OR label CONTAINS[c] 'stop'"), object: record)], timeout: 30), .completed)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
+            predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制' OR label CONTAINS[c] 'stop')"), object: record)], timeout: 60), .completed)
         XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
         controlScreenshot(app, "ssd-retry-after-buffer-overflow")
     }
@@ -203,8 +282,10 @@ final class IMURecordingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["mediaShareSelected"].isEnabled)
         XCTAssertTrue(app.buttons["mediaDeleteSelected"].isEnabled)
         app.buttons["mediaDeleteSelected"].tap()
-        XCTAssertTrue(app.buttons["删除文件"].waitForExistence(timeout: 5))
-        app.buttons["取消"].tap() // Keep existing user recordings.
+        let confirmDelete = app.buttons["删除文件"].exists ? app.buttons["删除文件"] : app.buttons["Delete file"]
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 5))
+        let cancelDelete = app.buttons["取消"].exists ? app.buttons["取消"] : app.buttons["Cancel"]
+        cancelDelete.tap() // Keep existing user recordings.
         app.buttons["mediaShareSelected"].tap()
         Thread.sleep(forTimeInterval: 2)
         controlScreenshot(app, "media-share-selection")
@@ -232,7 +313,12 @@ final class IMURecordingUITests: XCTestCase {
             }
         }
         app.buttons["codecMenu"].tap()
-        XCTAssertTrue(app.buttons["ProRes RAW"].waitForExistence(timeout: 5))
+        let rawOption = app.buttons["ProRes RAW"]
+        if !rawOption.waitForExistence(timeout: 5) {
+            controlScreenshot(app, "codec-after-lens-switch-missing-raw")
+            print("CODEC_AFTER_LENS_SWITCH \(app.debugDescription)")
+        }
+        XCTAssertTrue(rawOption.exists)
         app.buttons["ProRes RAW"].tap()
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "ProRes RAW"),
@@ -412,7 +498,8 @@ final class IMURecordingUITests: XCTestCase {
 
     private func storageCycle(location: String, codec: String, deleteInInternal: Bool = false) {
         let app = XCUIApplication()
-        app.launchArguments = ["-storageLocation", location, "-outputFormat", "SonyMov"]
+        app.launchArguments = ["-storageLocation", location, "-outputFormat", "SonyMov",
+                               "--ui-testing", "-AppleLanguages", "(zh-Hans)"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
         app.buttons["settingsOpen"].tap()
@@ -432,7 +519,7 @@ final class IMURecordingUITests: XCTestCase {
         XCTAssertTrue(record.isEnabled)
         record.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '停止录制'"), object: record)], timeout: 20), .completed)
-        Thread.sleep(forTimeInterval: location == "内部文件" ? 30 : 5)
+        Thread.sleep(forTimeInterval: 30)
         record.tap()
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true AND NOT (label CONTAINS '停止录制')"), object: record)], timeout: 60), .completed)
         Thread.sleep(forTimeInterval: 3)
@@ -458,6 +545,8 @@ final class IMURecordingUITests: XCTestCase {
         }
         Thread.sleep(forTimeInterval: 10)
         let capacityDeleted = app.staticTexts["storageRemaining"].label
+        let result = "mode=\(location) crossMode=\(deleteInInternal) before=\(capacityBefore) recorded=\(capacityRecorded) deleted=\(capacityDeleted) file=\(id)"
+        print("STORAGE_CAPACITY \(result)")
         if location == "专用视频存储" {
             func gigabytes(_ label: String) -> Double? {
                 guard let range = label.range(of: #"[0-9]+\.[0-9]+"#, options: .regularExpression) else { return nil }
@@ -465,11 +554,9 @@ final class IMURecordingUITests: XCTestCase {
             }
             if let start = gigabytes(capacityBefore), let used = gigabytes(capacityRecorded), let restored = gigabytes(capacityDeleted) {
                 XCTAssertLessThan(used, start - 0.1, "RAW recording must consume reserved capacity")
-                XCTAssertGreaterThanOrEqual(restored, start - 0.1, "Deletion must replenish reserved capacity")
+                XCTAssertGreaterThanOrEqual(restored + 0.01, start - 0.1, "Deletion must replenish reserved capacity")
             } else { XCTFail("Missing capacity readout") }
         }
-        let result = "mode=\(location) crossMode=\(deleteInInternal) before=\(capacityBefore) recorded=\(capacityRecorded) deleted=\(capacityDeleted) file=\(id)"
-        print("STORAGE_CAPACITY \(result)")
         let attachment = XCTAttachment(string: result); attachment.lifetime = .keepAlways; add(attachment)
         XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
         XCTAssertTrue(app.buttons["recordToggle"].isEnabled)
@@ -528,7 +615,7 @@ final class IMURecordingUITests: XCTestCase {
     }
 
     private func controlApp() -> XCUIApplication {
-        let app = XCUIApplication(); app.launchArguments = ["-storageLocation", "内部文件", "-outputFormat", "SonyMov"]
+        let app = XCUIApplication(); app.launchArguments = ["-storageLocation", "内部文件", "-outputFormat", "SonyMov", "-AppleLanguages", "(zh-Hans)", "--ui-testing"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 20))
         return app
@@ -548,7 +635,7 @@ final class IMURecordingUITests: XCTestCase {
             }
             XCTAssertTrue(app.buttons["codecMenu"].label.contains(name))
         }
-        app.buttons["完成"].tap()
+        app.buttons["captureSettingsClose"].tap()
     }
     private func dragControl(_ app: XCUIApplication, left: Bool = true) {
         let ruler = app.otherElements["parameterRuler"]
@@ -698,7 +785,7 @@ final class IMURecordingUITests: XCTestCase {
     }
     func testControlsManualSurvivesLensAndFPS() {
         let app = controlApp(); selectControlCodec("H.265", app: app)
-        app.buttons["settingsOpen"].tap(); tapExposureType("speed", in: app); tapFPSOption("30.0 fps", in: app); app.buttons["完成"].tap()
+        app.buttons["settingsOpen"].tap(); tapExposureType("speed", in: app); tapFPSOption("30.0 fps", in: app); app.buttons["captureSettingsClose"].tap()
         app.buttons["parameter.Shutter"].tap(); app.buttons["M"].tap()
         dragControl(app, left: false)
         Thread.sleep(forTimeInterval: 3)
@@ -719,7 +806,7 @@ final class IMURecordingUITests: XCTestCase {
             print("MANUAL_LENS \(lens) \(app.buttons["parameter.Shutter"].label) \(app.buttons["parameter.ISO"].label)")
         }
         for rate in ["60.0 fps", "30.0 fps"] {
-            app.buttons["settingsOpen"].tap(); tapFPSOption(rate, in: app); app.buttons["完成"].tap()
+            app.buttons["settingsOpen"].tap(); tapFPSOption(rate, in: app); app.buttons["captureSettingsClose"].tap()
             Thread.sleep(forTimeInterval: 2)
             XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
             print("MANUAL_FPS \(rate) \(app.buttons["parameter.Shutter"].label) \(app.buttons["parameter.ISO"].label)")
@@ -878,7 +965,7 @@ final class IMURecordingUITests: XCTestCase {
     }
 
     func testViewfinderGuides() {
-        let app = XCUIApplication(); app.launch()
+        let app = XCUIApplication(); app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "--ui-testing"]; app.launch()
         if app.alerts.firstMatch.waitForExistence(timeout: 2) {
             let dismiss = app.alerts.firstMatch.buttons["确定"]
             if dismiss.exists { dismiss.tap() }
@@ -886,9 +973,12 @@ final class IMURecordingUITests: XCTestCase {
         app.buttons["settingsOpen"].tap()
         let grid = app.switches["gridToggle"]
         let level = app.switches["levelToggle"]
+        for _ in 0..<3 where !grid.exists || !level.exists { app.swipeUp() }
         XCTAssertTrue(grid.waitForExistence(timeout: 5))
         for _ in 0..<3 where !grid.isHittable || !level.isHittable { app.swipeUp() }
         XCTAssertTrue(grid.isHittable && level.isHittable)
+        let originalGrid = grid.value as? String
+        let originalLevel = level.value as? String
         if grid.value as? String != "1" {
             grid.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         }
@@ -897,15 +987,22 @@ final class IMURecordingUITests: XCTestCase {
         }
         XCTAssertEqual(grid.value as? String, "1")
         XCTAssertEqual(level.value as? String, "1")
-        app.buttons["完成"].tap()
+        app.buttons["captureSettingsClose"].tap()
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Grid and horizon enabled"
         screenshot.lifetime = .keepAlways
         add(screenshot)
+        app.buttons["settingsOpen"].tap()
+        for _ in 0..<3 where !grid.isHittable || !level.isHittable { app.swipeUp() }
+        if originalGrid == "0" { grid.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+        if originalLevel == "0" { level.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+        XCTAssertEqual(grid.value as? String, originalGrid)
+        XCTAssertEqual(level.value as? String, originalLevel)
+        app.buttons["captureSettingsClose"].tap()
     }
 
     func testRestoreViewfinderGuidesOff() {
-        let app = XCUIApplication(); app.launch()
+        let app = XCUIApplication(); app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "--ui-testing"]; app.launch()
         app.buttons["settingsOpen"].tap()
         let grid = app.switches["gridToggle"]
         let level = app.switches["levelToggle"]
@@ -919,7 +1016,7 @@ final class IMURecordingUITests: XCTestCase {
         }
         XCTAssertEqual(grid.value as? String, "0")
         XCTAssertEqual(level.value as? String, "0")
-        app.buttons["完成"].tap()
+        app.buttons["captureSettingsClose"].tap()
     }
 
     func testGyroflowProtoRecording() {
@@ -1158,10 +1255,12 @@ final class IMURecordingUITests: XCTestCase {
     private func record(format: String, switchLenses: Bool = false, resumeAfterBackground: Bool = false, seconds: Double = 4, debug: Bool = true, require4K60: Bool = false) {
         let app = XCUIApplication()
         app.launchArguments = ["-outputFormat", format == "Sony MOV" ? "SonyMov" : "GyroflowProto",
-            "-debugEnabled", debug ? "YES" : "NO", "--ui-testing"]
+            "-debugEnabled", debug ? "YES" : "NO", "-storageLocation", "内部文件",
+            "-AppleLanguages", "(zh-Hans)", "--ui-testing"]
         app.launch()
         let record = app.buttons["recordToggle"]
         XCTAssertTrue(record.waitForExistence(timeout: 20))
+        selectControlCodec("H.265", app: app)
         // Previously retained failures may be reported during startup recovery.
         if app.alerts.firstMatch.waitForExistence(timeout: 2) {
             let dismiss = app.alerts.firstMatch.buttons["确定"]

@@ -134,7 +134,7 @@ struct SSDSpeedTestView: View {
                         }.disabled(camera.recording || camera.finalizing || camera.preparingRecording)
                             .accessibilityIdentifier("ssdSpeedStart")
                     }
-                    if let error = camera.ssdSpeedError { Text(error).foregroundStyle(.secondary).accessibilityIdentifier("ssdSpeedError") }
+                    if let error = camera.ssdSpeedError { Text(AppText.message(error)).foregroundStyle(.secondary).accessibilityIdentifier("ssdSpeedError") }
                 }
                 if let report = camera.ssdSpeedReport {
                     Section(t("测速结果", "Speed test results")) {

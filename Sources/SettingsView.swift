@@ -25,7 +25,10 @@ struct SettingsView: View {
         VideoEncoding.allCases.filter { camera.codecs.contains($0.codec) }
     }
     private var compatibleFormats: [FormatInfo] {
-        camera.formats.filter { $0.compatibleCodecs.contains(camera.selectedCodec?.rawValue ?? "") }
+        camera.formats.filter {
+            $0.compatibleCodecs.contains(camera.selectedCodec?.rawValue ?? "") &&
+            !CaptureFrameRatePolicy.available(for: $0).isEmpty
+        }
     }
     private var resolutions: [ResolutionOption] {
         let openGate = compatibleFormats
@@ -124,7 +127,7 @@ struct SettingsView: View {
                     }
                 }
                 Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
-            } message: { Text(message ?? "") }
+            } message: { Text(AppText.message(message ?? "")) }
             .sheet(isPresented: $showingSSDSpeed) { SSDSpeedTestView() }
             .onAppear {
                 refreshExternalDevices()
@@ -213,7 +216,8 @@ struct SettingsView: View {
                         }
                     } label: {
                         row(t("存储位置", "Storage"), storageLocation == "内部文件" ? t("内部文件", "On My iPhone") :
-                            storageLocation == "专用视频存储" ? t("专用视频存储", "Pro Video Storage") : storageLocation)
+                            storageLocation == "专用视频存储" ? t("专用视频存储", "Pro Video Storage") :
+                            storageLocation == "外部 SSD" ? t("外部 SSD", "External SSD") : storageLocation)
                     }.tint(.primary)
                     .accessibilityIdentifier("storageLocationMenu")
                     .disabled(locked)
