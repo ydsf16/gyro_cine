@@ -49,21 +49,29 @@ def summarize(path):
                 z=child(stbl,'stsz');sizes=[uint(z,4)]*uint(z,8) if uint(z,4) else [uint(z,12+4*i) for i in range(uint(z,8))]
                 r['chunks']=len(off)
                 if codec=='rtmd' and len(off)==len(sizes) and all(x[1]==1 for x in r['stsc']):
-                    arrays={'gyro':[],'accel':[]};time=0
+                    arrays={'gyro':[],'accel':[]};time=0;exposures=[];first_row_offsets=[]
                     for i,(o,n) in enumerate(zip(off,sizes)):
                         f.seek(o);packet=f.read(n);tags={};q=28
                         while q+4<=len(packet):
                             k,l=struct.unpack_from('>HH',packet,q);q+=4;tags[k]=packet[q:q+l];q+=l
                         for key,base in [('gyro',0xe435),('accel',0xe445)]:
                             scale_v=struct.unpack('>f',tags[base+4])[0];v=tags[base+6];count=uint(v,0)
-                            if count!=1:raise ValueError('expected one vector')
-                            xyz=[v/scale_v for v in struct.unpack_from('>hhh',v,8)]
-                            arrays[key].append([time,*xyz])
+                            if uint(v,4)!=6 or len(v)!=8+count*6:raise ValueError('invalid vector array')
+                            offset=struct.unpack('>i',tags[base+2])[0]/1e6 if base+2 in tags else 0
+                            frequency=uint(tags[base],0)
+                            for j in range(count):
+                                xyz=[value/scale_v for value in struct.unpack_from('>hhh',v,8+j*6)]
+                                arrays[key].append([time+offset+j/frequency,*xyz])
+                        if 0xe40d in tags:exposures.append(struct.unpack('>i',tags[0xe40d])[0]/1e6)
+                        if 0xe40c in tags:first_row_offsets.append(struct.unpack('>i',tags[0xe40c])[0]/1e6)
                         time+=ds[i]
                     r['imu_first']= {k:v[0] for k,v in arrays.items()};r['imu_last']={k:v[-1] for k,v in arrays.items()}
+                    r['imu_samples']={k:len(v) for k,v in arrays.items()}
+                    if exposures:r['exposure_seconds']={'min':min(exposures),'max':max(exposures),'count':len(exposures)}
+                    if first_row_offsets:r['first_row_latch_offset_seconds']={'min':min(first_row_offsets),'max':max(first_row_offsets)}
                     # Both Gyroflow Sony normalizers assign cumulative uniform times.
-                    uniform=sum(ds)/len(ds);r['max_export_vs_uniform_time_error_us']=max(abs(v[0]-i*uniform) for i,v in enumerate(arrays['gyro']))*1e6
-                    r['gyro_axis_rms_dps']=[(sum(x[j]**2 for x in arrays['gyro'])/len(ds))**.5 for j in [1,2,3]]
+                    uniform=sum(ds)/len(arrays['gyro']);r['max_export_vs_uniform_time_error_us']=max(abs(v[0]-i*uniform) for i,v in enumerate(arrays['gyro']))*1e6
+                    r['gyro_axis_rms_dps']=[(sum(x[j]**2 for x in arrays['gyro'])/len(arrays['gyro']))**.5 for j in [1,2,3]]
             out['tracks'].append(r)
     return out
 if __name__=='__main__':print(json.dumps([summarize(p) for p in sys.argv[1:]],ensure_ascii=False,indent=2))

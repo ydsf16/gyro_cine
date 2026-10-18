@@ -264,6 +264,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         if writer == nil {
             do {
                 let w = try AVAssetWriter(outputURL: url, fileType: .mov)
+                // Preserve source PTS at microsecond precision in both the movie
+                // timeline and video track. Audio keeps its native sample-rate scale.
+                w.movieTimeScale = 1_000_000
                 if dedicatedStorage {
                     guard w.isProVideoStorageSupported else { throw failure("Writer 不支持专用存储") }
                     w.usesProVideoStorage = true
@@ -276,6 +279,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 guard let settings, let hint = CMSampleBufferGetFormatDescription(sample) else { throw failure("缺少 RAW 编码配置") }
                 let i = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: hint)
                 i.expectsMediaDataInRealTime = true
+                i.mediaTimeScale = 1_000_000
                 let size = CMVideoFormatDescriptionGetDimensions(hint)
                 i.transform = orientation.movieTransform(width: Int(size.width), height: Int(size.height))
                 guard w.canAdd(i) else { throw failure("无法添加 RAW Writer 输入") }
@@ -296,7 +300,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 // Persist external access before the first recorded frame, off its deadline.
                 try prepareRecovery()
                 log("raw_writer_encoder_ready", ["file": url.path, "codec": codec.rawValue,
-                    "dedicated": w.usesProVideoStorage, "settings": settings])
+                    "dedicated": w.usesProVideoStorage, "settings": settings,
+                    "movieTimeScale": w.movieTimeScale, "videoTimeScale": i.mediaTimeScale])
                 captureQueue.async { self.ingressArmed = true }
                 // Encoder creation can take longer than a frame. Begin the recorded interval
                 // with the next delivered frame, retaining its real capture timestamp.
@@ -353,6 +358,11 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             let sample = buffered.sample
             let pts = CMSampleBufferGetPresentationTimeStamp(sample)
             guard input.append(sample) else { finish(writer.error ?? failure("RAW 帧写入失败")); return }
+            if frames == 0 {
+                log("raw_writer_first_appended_video", ["pts": pts.seconds,
+                    "sessionStartPTS": firstPTS?.seconds ?? -1,
+                    "deltaFromSessionStartMS": firstPTS.map { CMTimeSubtract(pts, $0).seconds * 1000 } ?? -1])
+            }
             if let lastPTS { maxGap = max(maxGap, CMTimeSubtract(pts, lastPTS).seconds) }
             lastPTS = pts; lastVideoDuration = CMSampleBufferGetDuration(sample); frames += 1
         }

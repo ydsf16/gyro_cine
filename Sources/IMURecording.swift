@@ -164,6 +164,7 @@ enum MovieIMUFinalizer {
                          cameraFrames: URL, orientation: RecordingOrientation,
                          camera: String, lens: String, mode: String, retainDebug: Bool,
                          expectedFPS: Double? = nil, timingSource: String? = nil,
+                         exposureTimingModel: ExposureTimingModel = .recordingModel,
                          progress: ((String, Double) -> Void)? = nil) throws -> (Int, Double, Double) {
         var checkpoint = ProcessInfo.processInfo.systemUptime
         func completed(_ stage: String) {
@@ -244,6 +245,12 @@ enum MovieIMUFinalizer {
         let profileData = try JSONSerialization.data(withJSONObject: profile, options: [.sortedKeys])
         let note = try JSONSerialization.data(withJSONObject: ["source_camera": camera,
             "transport": mode, "timing": timingSource ?? "MOV first frame PTS mapped from MovieFileOutput startPTS; optical sync unverified",
+            "exposure_timing_model": exposureTimingModel.rawValue,
+            "exposure_source": "AVCaptureDevice state sampled at camera callback; not frame-embedded exposure metadata",
+            "exposure_timing_measured": false,
+            "frame_readout_seconds": 0,
+            "frame_readout_source": "unknown; modeled as zero, not measured and not inferred from FPS",
+            "telemetry_packets_per_video_frame": true,
             "pre_roll_ms": Int((actualPreRoll * 1000).rounded()),
             "post_roll_ms": Int((actualPostRoll * 1000).rounded()), "lens_profile": profile,
             "intrinsic_source": intrinsicSource, "intrinsic_frame_count": frameEvidence.count,
@@ -259,16 +266,27 @@ enum MovieIMUFinalizer {
         var packets: [Data] = [], durations: [UInt32] = []
         if mode == "SonyMov" {
             let count = max(1, Int(ceil(end * 100)))
-            var frameIndex = 0
-            for i in 0..<count {
-                let time = Double(i) * end / Double(count)
-                let sample = EmbeddedTelemetryExporter.Sample(time: time,
-                    gyro: try interpolate(gyro, time), accel: try interpolate(accel, time))
-                while frameIndex + 1 < video.frames.count && video.frames[frameIndex + 1].pts - first <= time { frameIndex += 1 }
-                packets.append(try EmbeddedTelemetryExporter.sonyPacket(sample, matrix: frameEvidence[max(0, frameIndex)].matrix,
-                    width: video.width, height: video.height))
-                let next = Double(i+1) * end / Double(count)
-                durations.append(UInt32(max(1, Int64((next * 1e6).rounded()) - Int64((time * 1e6).rounded()))))
+            var sampleIndex = 0
+            // Gyroflow indexes Sony exposure offsets by VIDEO frame. Group the
+            // unchanged global ~100 Hz grid into one RTMD packet per frame;
+            // high-FPS frames may legitimately contain zero IMU samples.
+            for (index, frame) in video.frames.enumerated() {
+                let start = frame.pts - first
+                let next = index + 1 < video.frames.count ? video.frames[index + 1].pts - first : end
+                var samples: [EmbeddedTelemetryExporter.Sample] = []
+                while sampleIndex < count {
+                    let time = Double(sampleIndex) * end / Double(count)
+                    guard time < next else { break }
+                    samples.append(.init(time: time, gyro: try interpolate(gyro, time), accel: try interpolate(accel, time)))
+                    sampleIndex += 1
+                }
+                let exposure = frameEvidence[index].exposure
+                let timing = EmbeddedTelemetryExporter.SonyTiming(exposure: exposure,
+                    firstRowLatchOffset: exposureTimingModel.firstRowLatchOffset(exposure: exposure),
+                    firstIMUOffset: (samples.first?.time ?? start) - start)
+                packets.append(try EmbeddedTelemetryExporter.sonyPacket(samples, matrix: frameEvidence[index].matrix,
+                    width: video.width, height: video.height, timing: timing))
+                durations.append(UInt32(max(1, Int64((next * 1e6).rounded()) - Int64((start * 1e6).rounded()))))
             }
         } else {
             var samples = [EmbeddedTelemetryExporter.Sample(time: 0,
@@ -298,7 +316,8 @@ enum MovieIMUFinalizer {
                 packets.append(try EmbeddedTelemetryExporter.protobufPacket(index: index, pts: start,
                     evidence: evidence, samples: frameSamples,
                     header: index == 0 ? EmbeddedTelemetryExporter.protobufHeader(video: boundedVideo,
-                        fps: 1/frameDuration, camera: camera, lens: lens, profile: profileData, note: note, rotationDegrees: orientation.degrees) : nil))
+                        fps: 1/frameDuration, camera: camera, lens: lens, profile: profileData, note: note, rotationDegrees: orientation.degrees) : nil,
+                    timingModel: exposureTimingModel))
                 durations.append(UInt32(max(1, Int64((next*1e6).rounded()) - Int64((start*1e6).rounded()))))
             }
         }
@@ -343,6 +362,7 @@ struct PendingIMUJob: Codable {
     var recordingWarning: String?
     var intrinsicsUnavailableReason: String?
     var timingSource: String? = nil
+    var exposureTimingModel: ExposureTimingModel? = nil
 
     func url(in directory: URL) -> URL {
         directory.appendingPathComponent(movieName).appendingPathExtension("pending-imu.json")
@@ -429,7 +449,8 @@ struct PendingIMUJob: Codable {
                 rawIMU: directory.appendingPathComponent(imuName), firstFrameHost: firstHost,
                 cameraFrames: directory.appendingPathComponent(framesName), orientation: orientation,
                 camera: camera, lens: lens, mode: mode, retainDebug: true,
-                expectedFPS: expectedFPS, timingSource: timingSource, progress: progress)
+                expectedFPS: expectedFPS, timingSource: timingSource,
+                exposureTimingModel: exposureTimingModel ?? .presentationMidpoint, progress: progress)
         }
         // The full compressed-video scan above is needed for frame PTS only once.
         // Verify the committed metadata sample index and original AV tracks

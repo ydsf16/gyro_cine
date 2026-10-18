@@ -11,12 +11,43 @@ struct ActualVideoInfo {
     var rotationDegrees: Int = 0
 }
 
+/// A declared export convention, not a hardware timestamp measurement.
+enum ExposureTimingModel: String, Codable {
+    case presentationMidpoint
+    case estimatedReadoutEnd
+
+    // Shared by every codec, lens, frame rate and storage destination.
+    // Gyroflow applies the exposure-center adjustment from the metadata once.
+    static let recordingModel: Self = .estimatedReadoutEnd
+
+    func firstRowLatchOffset(exposure: Double) -> Double {
+        // Readout duration is unknown and modeled as zero. In the baseline
+        // convention the derived exposure midpoint remains at the MOV PTS.
+        self == .estimatedReadoutEnd ? 0 : exposure / 2
+    }
+}
+
 enum EmbeddedTelemetryExporter {
     struct Sample { let time: Double; let gyro: [Double]; let accel: [Double] }
-    static func sonyPacket(_ sample: Sample, matrix: [Double], width: Int, height: Int,
+    struct SonyTiming {
+        let exposure: Double
+        let firstRowLatchOffset: Double
+        let firstIMUOffset: Double
+    }
+
+    static func sonyPacket(_ samples: [Sample], matrix: [Double], width: Int, height: Int,
+                           timing: SonyTiming,
                            orientation: RecordingOrientation = .landscapeRight) throws -> Data {
-        guard matrix.count == 9, width > 0, height > 0, width * 10 <= UInt16.max, height * 10 <= UInt16.max else { throw MOVTelemetryMuxer.invalid() }
+        guard matrix.count == 9, width > 0, height > 0, width * 10 <= UInt16.max, height * 10 <= UInt16.max,
+              samples.count <= 10_000, timing.exposure.isFinite, timing.exposure > 0 else { throw MOVTelemetryMuxer.invalid() }
         func tag(_ id: UInt64, _ data: Data) -> Data { Data.be(id, 2) + Data.be(UInt64(data.count), 2) + data }
+        func microseconds(_ seconds: Double) throws -> Data {
+            let value = (seconds * 1e6).rounded()
+            guard value.isFinite, value >= Double(Int32.min), value <= Double(Int32.max) else {
+                throw MOVTelemetryMuxer.invalid()
+            }
+            return Data.be(UInt64(UInt32(bitPattern: Int32(value))), 4)
+        }
         // Virtual unit conversion for Sony's lens fallback. Never claim this is measured sensor geometry.
         var p = tag(0xe405, Data.be(UInt64(width), 2) + Data.be(UInt64(height), 2))
         p += tag(0xe407, Data.be(10000, 2) + Data.be(10000, 2))
@@ -26,14 +57,17 @@ enum EmbeddedTelemetryExporter {
         guard focal.isFinite, focal > 0, focal <= Double(UInt32.max) else { throw MOVTelemetryMuxer.invalid() }
         p += tag(0xe421, Data.be(UInt64(focal.rounded()), 4) + Data.be(0, 4) + Data([0]) + Data.be(UInt64(Float(1).bitPattern), 4) + Data.be(0, 4) + Data.be(2, 4))
         p += tag(0xe420, Data([0]))
-        for (start, values, preferredScale) in [(UInt64(0xe435), orientation.remap(sample.gyro).map { $0 * 180 / .pi }, Float(100)),
-                                        (UInt64(0xe445), orientation.remap(sample.accel).map { ClockAligner.exportedAcceleration($0) / 9.80665 }, Float(1000))] {
-            guard values.count == 3, values.allSatisfy(\.isFinite) else {
+        p += tag(0xe40c, try microseconds(timing.firstRowLatchOffset))
+        p += tag(0xe40d, try microseconds(timing.exposure))
+        p += tag(0xe40e, try microseconds(0)) // Unknown readout: explicit zero model, disclosed in rmin.
+        for (start, vectors, preferredScale) in [(UInt64(0xe435), samples.map { orientation.remap($0.gyro).map { $0 * 180 / .pi } }, Float(100)),
+                                        (UInt64(0xe445), samples.map { orientation.remap($0.accel).map { ClockAligner.exportedAcceleration($0) / 9.80665 } }, Float(1000))] {
+            guard vectors.allSatisfy({ $0.count == 3 && $0.allSatisfy(\.isFinite) }) else {
                 throw RecorderError.unavailable("Sony 元数据包含无效 IMU 数值；原始记录已保留")
             }
             // RTMD carries a float scale per sample/group. Reduce precision only as
             // needed to preserve peaks instead of clipping valid fast motion.
-            let peak = values.map { abs($0) }.max() ?? 0
+            let peak = vectors.flatMap { $0 }.map { abs($0) }.max() ?? 0
             var scale = preferredScale
             while peak * Double(scale) > Double(Int16.max) {
                 scale /= 2
@@ -42,7 +76,7 @@ enum EmbeddedTelemetryExporter {
                 }
             }
             var vector = Data()
-            for value in values {
+            for value in vectors.flatMap({ $0 }) {
                 let integer = (value * Double(scale)).rounded()
                 guard integer.isFinite, integer >= Double(Int16.min), integer <= Double(Int16.max) else {
                     throw RecorderError.unavailable("Sony metadata range exceeded; original retained")
@@ -51,8 +85,11 @@ enum EmbeddedTelemetryExporter {
             }
             // Gyroflow's Sony parser swaps X/Y and inverts Z during normalization.
             // Encode YXz so its resulting IMU orientation is XYZ, like GCSV.
-            p += tag(start, Data.be(100, 4)) + tag(start + 4, Data.be(UInt64(scale.bitPattern), 4))
-                + tag(start + 5, Data.be(0x502, 2)) + tag(start + 6, Data.be(1, 4) + Data.be(6, 4) + vector)
+            p += tag(start, Data.be(100, 4)) + tag(start + 1, Data.be(1_000_000, 4))
+                + tag(start + 2, try microseconds(timing.firstIMUOffset))
+                + tag(start + 4, Data.be(UInt64(scale.bitPattern), 4))
+                + tag(start + 5, Data.be(0x502, 2))
+                + tag(start + 6, Data.be(UInt64(samples.count), 4) + Data.be(6, 4) + vector)
         }
         return Data([0, 0x1c]) + Data(repeating: 0, count: 26) + p
     }
@@ -70,13 +107,14 @@ enum EmbeddedTelemetryExporter {
         return ProtoWire.bytes(1, c) + ProtoWire.bytes(2, clip)
     }
 
-    static func protobufPacket(index: Int, pts: Double, evidence: CaptureFrameEvidence, samples: [Sample], header: Data?) throws -> Data {
+    static func protobufPacket(index: Int, pts: Double, evidence: CaptureFrameEvidence, samples: [Sample], header: Data?,
+                               timingModel: ExposureTimingModel = .recordingModel) throws -> Data {
         guard let matrix = evidence.cameraIntrinsicMatrix, matrix.count == 9,
               let exposure = evidence.deviceExposureDurationAtCallbackSeconds, exposure.isFinite, exposure > 0,
               matrix.allSatisfy({ $0.isFinite && Float($0).isFinite }) else { throw MOVTelemetryMuxer.invalid() }
-        // Schema uses readout-latch time. Model an estimated latch so midpoint equals MOV PTS.
-        // This is an estimate, explicitly disclosed in header.additional_data; rolling shutter remains unknown.
-        let latch = (pts + exposure / 2) * 1e6
+        // Both first/last row latch use the declared zero-readout model.
+        // The current model derives midpoint = MOV PTS - exposure/2.
+        let latch = (pts + timingModel.firstRowLatchOffset(exposure: exposure)) * 1e6
         var frame = ProtoWire.double(1, latch) + ProtoWire.double(2, latch) + ProtoWire.integer(3, UInt64(index + 1))
             + ProtoWire.double(5, exposure * 1e6)
         if let iso = evidence.deviceISOAtCallback, iso.isFinite, iso > 0, Double(iso) <= Double(UInt32.max) {

@@ -217,6 +217,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private let output = AVCaptureMovieFileOutput()
     private let intrinsicOutput = AVCaptureVideoDataOutput()
     private let intrinsicRecorder = CameraIntrinsicsRecorder()
+    #if DEBUG
+    private let captureStartProbe = CaptureStartTimestampProbe()
+    #endif
     private var intrinsicURL: URL?
     private var intrinsicsUnavailableReason: String?
     private var device: AVCaptureDevice?
@@ -348,6 +351,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-experiment") {
             UserDefaults.standard.set(true, forKey: "debug.rawInternalWriterExperiment")
+        }
+        if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
+            UserDefaults.standard.set("内部文件", forKey: "storageLocation")
+            UserDefaults.standard.set("SonyMov", forKey: "outputFormat")
+        }
+        if ProcessInfo.processInfo.arguments.contains("--exposure-proto-probe") {
+            UserDefaults.standard.set("GyroflowProto", forKey: "outputFormat")
         }
         #endif
         gravityMonitor.start()
@@ -981,9 +991,83 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         startSmokeRecordingWhenReady(deadline: ProcessInfo.processInfo.systemUptime + 20)
     }
 
+    /// Debug-only clock/exposure experiment. The completion timestamp marks
+    /// the first camera buffer that used the requested exposure, in input-clock
+    /// units. It must be converted before comparison with movie or IMU times.
+    private func runIMUSyncExposureProbe(fileURL: URL) {
+        let inputClock = session.inputs.compactMap { $0 as? AVCaptureDeviceInput }
+            .first { $0.device.uniqueID == device?.uniqueID }?
+            .ports.first { $0.mediaType == .video }?.clock
+        let syncClock = session.synchronizationClock
+        logger.event("imu_sync_probe_start", [
+            "movie": fileURL.lastPathComponent,
+            "firstVideoHostSeconds": movieFirstFrameHost ?? -1,
+            "hostClockNowSeconds": CMClockGetTime(CMClockGetHostTimeClock()).seconds,
+            "systemUptimeSeconds": ProcessInfo.processInfo.systemUptime,
+            "firstGyroSeconds": imuRecorder?.firstGyroTime ?? -1,
+            "inputClockAvailable": inputClock != nil,
+            "syncClockAvailable": syncClock != nil
+        ])
+        for (delay, denominator) in [(1.5, 240.0), (5.5, 120.0), (9.5, 60.0)] {
+            queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.currentFile == fileURL, self.output.isRecording,
+                      let camera = self.device else { return }
+                let requested = 1.0 / denominator
+                let minimum = camera.activeFormat.minExposureDuration.seconds
+                let maximum = min(camera.activeFormat.maxExposureDuration.seconds,
+                                  camera.activeVideoMaxFrameDuration.seconds)
+                let seconds = max(minimum, min(requested, maximum))
+                let iso = min(max(Float(400), camera.activeFormat.minISO), camera.activeFormat.maxISO)
+                do {
+                    try camera.lockForConfiguration()
+                    camera.setExposureModeCustom(duration: CMTime(seconds: seconds, preferredTimescale: 1_000_000),
+                                                 iso: iso) { [weak self] firstApplied in
+                        guard let self else { return }
+                        let sessionTime = inputClock.flatMap { source in
+                            syncClock.map { CMSyncConvertTime(firstApplied, from: source, to: $0) }
+                        }
+                        let hostTime = inputClock.map {
+                            CMSyncConvertTime(firstApplied, from: $0, to: CMClockGetHostTimeClock())
+                        }
+                        self.queue.async {
+                            self.logger.event("imu_sync_exposure_applied", [
+                                "requestedSeconds": requested,
+                                "appliedSeconds": seconds,
+                                "iso": iso,
+                                "devicePTSSeconds": firstApplied.seconds,
+                                "sessionPTSSeconds": sessionTime?.seconds ?? -1,
+                                "hostPTSSeconds": hostTime?.seconds ?? -1,
+                                "movieRelativeSeconds": (hostTime?.seconds ?? -1) -
+                                    (self.movieFirstFrameHost ?? 0),
+                                "callbackHostSeconds": CMClockGetTime(CMClockGetHostTimeClock()).seconds
+                            ])
+                        }
+                    }
+                    camera.unlockForConfiguration()
+                    logger.event("imu_sync_exposure_requested", ["requestedSeconds": requested,
+                        "appliedSeconds": seconds, "iso": iso])
+                } catch {
+                    logger.event("imu_sync_exposure_failed", ["message": error.localizedDescription])
+                }
+            }
+        }
+        queue.asyncAfter(deadline: .now() + 14.5) { [weak self] in
+            guard let self, self.currentFile == fileURL, self.output.isRecording else { return }
+            self.toggleRecording()
+        }
+    }
+
     private func startSmokeRecordingWhenReady(deadline: TimeInterval) {
         if session.isRunning && !captureFinishing && !recoveryInProgress && !recordingStarting {
             toggleRecording()
+            // toggleRecording enqueues on the camera queue. Startup maintenance
+            // can take the queue between this readiness check and that work.
+            // Retry only if the queued attempt never entered recording.
+            queue.asyncAfter(deadline: .now() + 0.6) {
+                if !self.output.isRecording && !self.recordingStarting && self.currentFile == nil {
+                    self.startSmokeRecordingWhenReady(deadline: deadline)
+                }
+            }
         } else if ProcessInfo.processInfo.systemUptime < deadline {
             queue.asyncAfter(deadline: .now() + 0.1) { self.startSmokeRecordingWhenReady(deadline: deadline) }
         } else {
@@ -1215,7 +1299,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let longRAWTest = ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke")
         let saved = SavedCaptureConfiguration.load()
         let restoredCamera = saved.flatMap { lensDevices[$0.lensID] }
-        guard let camera = (longRAWTest ? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) : nil)
+        #if DEBUG
+        let forceWideProbe = ProcessInfo.processInfo.arguments.contains("--first-buffer-probe-wide")
+        #else
+        let forceWideProbe = false
+        #endif
+        guard let camera = ((longRAWTest || forceWideProbe) ? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) : nil)
             ?? restoredCamera
             ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
             ?? AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else {
@@ -1255,6 +1344,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 logger.event("audio_capture_mode", ["stereoSupported": stereoSupported,
                     "mode": audioInput.multichannelAudioMode.rawValue])
             }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
+                intrinsicRecorder.timestampProbe = captureStartProbe
+                if audioReady || audioAllowed {
+                    if session.canAddOutput(captureStartProbe.audioOutput) {
+                        session.addOutput(captureStartProbe.audioOutput)
+                        logger.event("first_buffer_probe_audio_output", ["added": true])
+                    } else {
+                        logger.event("first_buffer_probe_audio_output", ["added": false])
+                    }
+                }
+            }
+            #endif
             session.commitConfiguration()
             audioReady = audioAllowed && session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }
             publish { self.audioAvailable = self.audioReady }
@@ -1314,6 +1416,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                ProcessInfo.processInfo.arguments.contains("--raw-long-hq-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") { runRAWSSDSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ||
+               ProcessInfo.processInfo.arguments.contains("--imu-sync-4k60-probe") ||
                ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") { runHEVCCadenceSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--k-capability-probe") { runKCapabilityProbe() }
             if ProcessInfo.processInfo.arguments.contains("--k-wide-lens-probe"),
@@ -2578,7 +2682,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
             let arguments = ProcessInfo.processInfo.arguments
             let isTest = arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
-                arguments.contains("--hevc-4k60-smoke") || arguments.contains("--hevc-1080p120-smoke") ||
+                arguments.contains("--hevc-4k60-smoke") || arguments.contains("--imu-sync-4k60-probe") ||
+                arguments.contains("--first-buffer-probe") ||
+                arguments.contains("--hevc-1080p120-smoke") ||
                 arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
                 arguments.contains("--raw-hotplug-smoke")
             let baseName = isTest && !arguments.contains("--slate-smoke") ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
@@ -2636,7 +2742,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if arguments.contains("--raw-ssd-smoke") || arguments.contains("--raw-hq-ssd-smoke") ||
                arguments.contains("--raw-long-hq-ssd-smoke") ||
                arguments.contains("--raw-hotplug-smoke") ||
-               arguments.contains("--hevc-4k60-smoke") ||
+               arguments.contains("--hevc-4k60-smoke") || arguments.contains("--imu-sync-4k60-probe") ||
+               arguments.contains("--first-buffer-probe") ||
                arguments.contains("--hevc-1080p120-smoke") {
                 self.rawSmokeMovieName = url.lastPathComponent
             }
@@ -2713,6 +2820,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.metadata = self.recordingSlate.metadata
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
+                    self.captureStartProbe.arm()
+                }
+                #endif
                 self.output.startRecording(to: url, recordingDelegate: self)
             }) {
                 recordingStarting = false
@@ -2746,6 +2858,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.logger.event("record_delegate_start", ["path": fileURL.path, "state": self.configurationSnapshot(),
                 "startPTS": startPTS.seconds, "firstHost": self.movieFirstFrameHost ?? -1,
                 "outputIsRecording": self.output.isRecording])
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
+                self.queue.asyncAfter(deadline: .now() + 0.35) {
+                    self.logger.event("first_buffer_probe", ["movie": fileURL.lastPathComponent,
+                        "timestamps": self.captureStartProbe.snapshot(startPTS: startPTS,
+                            clock: self.session.synchronizationClock)])
+                }
+            }
+            #endif
             guard let firstHost = self.movieFirstFrameHost,
                   let raw = self.imuRecorder?.url, let frames = self.intrinsicURL else {
                 self.abortRecordingSetup("无法取得视频首帧时间或 IMU/K 文件")
@@ -2765,12 +2886,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 framesName: frames.lastPathComponent, firstHost: firstHost, orientation: self.recordingOrientation,
                 camera: Self.hardwareModel(), lens: self.recordingLens,
                 mode: UserDefaults.standard.string(forKey: "outputFormat") == "GyroflowProto" ? "GyroflowProto" : "SonyMov",
-                retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled") || self.isRAWWriterActive,
+                retainDebug: UserDefaults.standard.bool(forKey: "debugEnabled") || self.isRAWWriterActive ||
+                    ProcessInfo.processInfo.arguments.contains("--imu-sync-4k60-probe") ||
+                    ProcessInfo.processInfo.arguments.contains("--first-buffer-probe"),
                 externalMovieBookmark: self.activeExternalMovieBookmark,
                 expectedVideoCodec: self.chosenCodec?.rawValue,
                 expectedFPS: self.chosenFPS,
                 intrinsicsUnavailableReason: self.intrinsicsUnavailableReason,
-                timingSource: self.recordingTimeSource)
+                timingSource: self.recordingTimeSource,
+                exposureTimingModel: ExposureTimingModel.recordingModel)
             do {
                 try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                 self.pendingRecordingJob = job
@@ -2782,6 +2906,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 (ProcessInfo.processInfo.systemUptime - recoverySetupStart) * 1000])
             self.publish { self.beginFinalizationLease(); self.status = "Recording"; self.recording = true; self.recordingStartedAt = Date(); self.finalizing = false }
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--imu-sync-4k60-probe") {
+                self.runIMUSyncExposureProbe(fileURL: fileURL)
+            }
             if ProcessInfo.processInfo.arguments.contains("--ssd-matrix") {
                 let seconds = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--ssd-duration=") }
                     .flatMap { Double($0.dropFirst("--ssd-duration=".count)) } ?? 8
@@ -2791,8 +2918,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             if !ProcessInfo.processInfo.arguments.contains("--ssd-matrix") &&
                (ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ||
                ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")) {
-                let smokeSeconds: Double = 20
+                let smokeSeconds: Double = ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20
                 self.queue.asyncAfter(deadline: .now() + smokeSeconds) {
                     if self.output.isRecording { self.toggleRecording() }
                 }

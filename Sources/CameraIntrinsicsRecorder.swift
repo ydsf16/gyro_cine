@@ -14,6 +14,9 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
     private var handle: FileHandle?
     private var clock: CMClock?
     private var camera: AVCaptureDevice?
+    #if DEBUG
+    weak var timestampProbe: CaptureStartTimestampProbe?
+    #endif
     private var failure: Error?
     // Queue-owned, bounded diagnostics. No per-frame console or extra disk writes.
     private var received = 0
@@ -70,6 +73,9 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+        #if DEBUG
+        timestampProbe?.recordVideo(sampleBuffer)
+        #endif
         guard let handle, let camera else { return }
         let arrival = Self.hostNow()
         received += 1
