@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "candidateBuild": "20261019.4",
+  "candidateBuild": "20261019.5",
   "bundleID": "com.tinygrape.RawMotionRecorder",
   "businessModel": {
     "download": "free",
@@ -57,15 +57,16 @@
     },
     {
       "check": "App Store Release archive and upload",
-      "build": "20261019.4",
-      "result": "archive, upload, processing and final selection verified in App Store Connect"
+      "build": "20261019.5",
+      "result": "archive and upload succeeded; build processed, selected for version, and submitted for review"
     },
     {
       "check": "Release bundle",
       "result": "file sharing enabled; no .storekit fixture bundled"
     }
   ],
-  "submission": "Not submitted. User confirmation required after final material review.",
+  "submission": "Submitted 2026-10-19 01:55 CST; iOS App 1.0 (20261019.5) and GyroCine Pro Lifetime both Waiting for Review.",
+  "submissionID": "d280b1da-625c-40f8-94fb-016ab8015ca1",
   "privacyManifest": {
     "tracking": false,
     "collectedData": [],
@@ -79,15 +80,12 @@
   "platformScope": "iPhone only, approved by user; Mac and Vision Pro distribution disabled",
   "reviewPreflight": {
     "checkedWithBuild": "20261019.3",
-    "missing": [
-      "iPad screenshots (resolved by iPhone-only candidate)",
-      "Publish privacy response and policy URL after user confirmation"
-    ],
+    "missing": [],
     "otherMissingMetadata": []
   },
   "storePreparation": {
-    "candidateBuild": "20261019.4",
-    "buildID": "cb638afc-bda8-4649-80c0-de9a5b284d48",
+    "candidateBuild": "20261019.5",
+    "buildID": "0cd0d628-d0a4-4245-96cd-9ce3a21b4217",
     "buildUploadedAndProcessed": true,
     "versionBuildSelected": true,
     "screenshots": 4,
@@ -97,8 +95,10 @@
       "en-US"
     ],
     "proReviewDraftCreated": true,
-    "privacyResponse": "No data collected, saved but not published pending user confirmation",
+    "storeCopy": "Localized subtitles and promotional text emphasize professional camera, ProRes RAW capture, IMU motion data, and Gyroflow post stabilization.",
+    "icon": "Recreated original camera/grape mark without baked inset card or outer white margin; 1024x1024 opaque AppIcon.",
+    "privacyResponse": "No data collected; published in App Store Connect after user confirmation",
     "releaseMode": "manual",
-    "appSubmitted": false
+    "appSubmitted": true
   }
 }
