@@ -474,42 +474,61 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     // Learned locally per hardware/lens/codec/format/rate, never from a single lab clip.
     private var bitrateProbeFile: URL?
-    private var bitrateProbeStart: (time: Double, bytes: Int64)?
-    private var liveBytesPerSecond: Double?
+    private var bitrateEstimator = RecordingRateEstimator()
+    private var bitrateHistoryLastSaved: Double?
+    private var capacityBitrateEstimator = RecordingRateEstimator()
+    private var bitrateInitialCapacity: Int64?
+    private var bitrateSampleBytes: Int64?
+    private var liveBytesPerSecond: Double? { bitrateEstimator.bytesPerSecond ?? capacityBitrateEstimator.bytesPerSecond }
     private var bitrateStatisticsKey: String {
         let size = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         return "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(chosenEncoding.rawValue).\(size?.width ?? 0)x\(size?.height ?? 0).\(chosenFPS)"
     }
-    private var estimatedBytesPerSecond: Double {
-        let learned = UserDefaults.standard.double(forKey: bitrateStatisticsKey)
-        let observed = liveBytesPerSecond ?? (learned.isFinite && learned > 0 ? learned : conservativeBytesPerSecond)
-        // A static/dark HEVC scene can compress to almost nothing. Avoid
-        // extrapolating that transient bitrate to the entire free disk.
-        return max(observed, conservativeBytesPerSecond * 0.25)
+    private var estimatedRecordingBytesPerSecond: Double {
+        RecordingRateEstimator.displayRate(live: liveBytesPerSecond,
+            learned: UserDefaults.standard.double(forKey: bitrateStatisticsKey),
+            fallback: conservativeBytesPerSecond)
     }
-    private func updateRecordingBitrateEstimate() {
+    // SSD assessment keeps its existing headroom policy; the display uses actual
+    // measured rates without imposing a theoretical codec-rate floor.
+    private var estimatedBytesPerSecond: Double {
+        max(estimatedRecordingBytesPerSecond, conservativeBytesPerSecond * 0.25)
+    }
+    private func updateRecordingBitrateEstimate(freeBytes: Int64?) {
         guard output.isRecording || rawWriterExperiment != nil, let file = currentFile else {
-            bitrateProbeFile = nil; bitrateProbeStart = nil; liveBytesPerSecond = nil
+            bitrateProbeFile = nil; resetBitrateProbe()
             return
         }
         if bitrateProbeFile != file {
-            bitrateProbeFile = file; bitrateProbeStart = nil; liveBytesPerSecond = nil
+            bitrateProbeFile = file; resetBitrateProbe()
         }
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
-              let bytes = (attributes[.size] as? NSNumber)?.int64Value else { return }
         let now = ProcessInfo.processInfo.systemUptime
-        guard let start = bitrateProbeStart else {
-            bitrateProbeStart = (now, bytes); return
+        // MovieFileOutput may stage the MOV elsewhere until stop. Its own byte
+        // counter remains available while the destination URL does not yet exist.
+        let bytes: Int64?
+        if output.isRecording {
+            bytes = output.recordedFileSize
+        } else {
+            bytes = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value
         }
-        // Ten-second windows smooth container flushes without scanning video samples.
-        guard now - start.time >= 10 else { return }
-        let measured = Double(bytes - start.bytes) / (now - start.time)
-        bitrateProbeStart = (now, bytes)
-        guard measured.isFinite, measured >= 100_000 else { return }
-        liveBytesPerSecond = liveBytesPerSecond.map { $0 * 0.7 + measured * 0.3 } ?? measured
-        let previous = UserDefaults.standard.double(forKey: bitrateStatisticsKey)
-        let learned = previous > 0 ? previous * 0.8 + measured * 0.2 : measured
-        UserDefaults.standard.set(learned, forKey: bitrateStatisticsKey)
+        bitrateSampleBytes = bytes
+        if let bytes { bitrateEstimator.observe(bytes: bytes, at: now) }
+        if ["专用视频存储", "外部 SSD"].contains(UserDefaults.standard.string(forKey: "storageLocation") ?? ""),
+           let freeBytes {
+            if bitrateInitialCapacity == nil { bitrateInitialCapacity = freeBytes }
+            let consumed = max(0, (bitrateInitialCapacity ?? freeBytes) - freeBytes)
+            capacityBitrateEstimator.observe(bytes: consumed, at: now)
+        }
+        guard let measured = liveBytesPerSecond,
+              bitrateHistoryLastSaved.map({ now - $0 >= 10 }) ?? true else { return }
+        // The rolling estimate is already smoothed. Do not blend an old
+        // conservative estimate back in and keep the next launch biased short.
+        UserDefaults.standard.set(measured, forKey: bitrateStatisticsKey)
+        bitrateHistoryLastSaved = now
+    }
+    private func resetBitrateProbe() {
+        bitrateEstimator = RecordingRateEstimator(); capacityBitrateEstimator = RecordingRateEstimator()
+        bitrateHistoryLastSaved = nil; bitrateInitialCapacity = nil; bitrateSampleBytes = nil
     }
     private var storageReserveBytes: Int64 {
         // Leave enough headroom for queued writes, audio and metadata finalization.
@@ -612,8 +631,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         let location = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
         let free = freeRecordingBytes()
-        updateRecordingBitrateEstimate()
-        let remaining = free.map { max(0, Double($0 - storageReserveBytes) / estimatedBytesPerSecond) }
+        updateRecordingBitrateEstimate(freeBytes: free)
+        let remaining = free.map { max(0, Double($0 - storageReserveBytes) / estimatedRecordingBytesPerSecond) }
         publish {
             self.availableStorageBytes = free; self.estimatedRecordingSeconds = remaining
             self.checkedStorageLocation = location
@@ -622,7 +641,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         active = active || rawWriterExperiment != nil
         if active {
             logger.event("recording_storage_health", ["availableBytes": free ?? -1,
-                "reserveBytes": storageReserveBytes, "localFreeBytes": localFreeBytes() ?? -1])
+                "reserveBytes": storageReserveBytes, "localFreeBytes": localFreeBytes() ?? -1,
+                "estimatedBytesPerSecond": estimatedRecordingBytesPerSecond,
+                "liveBytesPerSecond": liveBytesPerSecond ?? -1,
+                "rateWindowSeconds": bitrateEstimator.bytesPerSecond != nil
+                    ? bitrateEstimator.measuredSeconds : capacityBitrateEstimator.measuredSeconds,
+                "rateSampleBytes": bitrateSampleBytes ?? -1,
+                "rateSource": bitrateEstimator.bytesPerSecond != nil
+                    ? (output.isRecording ? "MovieFileOutput.recordedFileSize" : "MOV file length")
+                    : (capacityBitrateEstimator.bytesPerSecond != nil ? "selected storage capacity consumption" : "history or codec estimate"),
+                "remainingSeconds": remaining ?? -1])
         }
         if active && !storageStopRequested &&
             (free.map { $0 <= storageReserveBytes } == true || localFreeBytes().map { $0 < 500_000_000 } == true) {
@@ -2533,7 +2561,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         if ProcessInfo.processInfo.arguments.contains("--writer-landscape") { recordingOrientation = .landscapeRight }
         #endif
         currentFile = url
-        recordingTimeSource = "MOV first frame PTS mapped from VideoDataOutput source sample; optical sync unverified"
+        recordingTimeSource = "Regular RAW presentation grid with per-frame original VideoDataOutput capture-time mapping; optical sync unverified"
         recordingStarting = true
         captureFinishing = true // Block lens/spec changes for the entire experimental capture.
         publish { self.status = "准备 RAW 录制" }
@@ -2556,9 +2584,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             imuReady: {
                 guard let gyro = imu.firstGyroTime, let accel = imu.firstAccelTime else { return false }
                 return ProcessInfo.processInfo.systemUptime - max(gyro, accel) >= 0.07
-            }, metadata: { [weak self] sample in
+            }, metadata: { [weak self] sample, presentationTime in
                 guard let self else { return }
-                self.intrinsicRecorder.recordNativeMetadata(sample, clock: recordingClock, camera: camera)
+                self.intrinsicRecorder.recordNativeMetadata(sample, clock: recordingClock, camera: camera,
+                    presentationTime: presentationTime)
             }, log: { [weak self] name, details in
                 self?.logger.event(name, details)
                 if name == "raw_writer_finished", let dropped = details["captureDrops"] as? Int, dropped > 0 {

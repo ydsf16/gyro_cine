@@ -157,3 +157,18 @@ iPhone 18 Pro Max，1× RAW 4224×2240／60fps／专用视频存储，短录 `UI
 - Debug／Release 构建通过。已安装并正常无参数启动，自动录制模式已退出；原素材保留，未重新编码已有视频。
 
 结果及拷回测试片位于 `/tmp/gyrocine-raw-timescale/`。仅本配置完成新增真机验证；RAW HQ、SSD 同用设置入口，未为本次时间刻度变更逐一新增采集。
+
+
+## RAW 尾段预览卡顿核查
+
+用户确认目前只观察了 Gyroflow 预览，尚未做导出结果对照。通过运行中 Gyroflow 的打开文件记录，定位到已有本地 `/Users/grape/Downloads/A001_10181514_C019.mov`，直接只读核查，取消了多余的手机文件拷贝，原素材未修改。
+
+- RAW 4224×2240 60fps，236 视频帧，视频 stts 总时长 3.933187 秒。末 20 帧间隔约 16.658–16.678ms，全片最大 16.682ms，没有末尾停帧对应的大间隔。
+- RTMD 236 个逐帧 packet，总时长 3.933192 秒，仅比视频 stts 总时长长约 5µs；394 个 gyro／accel 样本约 100Hz，数量多于视频帧符合采样率关系。
+- Gyroflow 1.6.3 实际读取 394 个 IMU 样本、236 个曝光偏移。最后视频帧 PTS=3.916526 秒；最后 IMU=3.923209 秒，覆盖最后帧曝光中心。尾部 gyro 仍变化，未出现数秒常值或重复时间戳。
+- 全片解码出 236 帧；缩小到 64×64 后计算逐帧哈希，连续相同帧为 0，末尾画面没有整帧重复冻结。该诊断仅写哈希，不改写用户视频。
+- FFmpeg 独立 null 解码耗时约 12.24 秒（约 19fps），有明显处理开销；这不是 Gyroflow 预览路径的直接基准，不能由此定为其根因。GPU 解码请求参数不等于确认 RAW 解码器确实使用了相同硬件路径。
+
+目前没有证据支持“IMU 多出几秒导致尾部卡顿”。下一步对照低分辨率预览及末尾短导出；实际 Gyroflow 播放性能、导出流畅性尚未完成验收，不修改 App 时间戳或截掉尾部 IMU。
+
+文件级证据 `/tmp/gyrocine-user-C019-timing.json`、`/tmp/gyrocine-user-C019-frames.json`、`/tmp/gyrocine-user-C019-parsed.json`、`/tmp/gyrocine-user-C019-frames.md5`、`/tmp/gyrocine-user-C019-null-decode.log`。

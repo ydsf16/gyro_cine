@@ -193,12 +193,29 @@ enum MovieIMUFinalizer {
         guard end > 0, firstFrameHost.isFinite else {
             throw RecorderError.unavailable("视频与相机时间证据不足")
         }
+        let alignment = try CameraIntrinsicsRecorder.alignment(cameraFrames, video: video,
+            firstHost: firstFrameHost, interval: frameDuration)
+        let frameEvidence = alignment.frames
+        completed("alignCameraIntrinsics")
+        let retimed = frameEvidence.contains { $0.presentationTime != nil }
+        if retimed {
+            guard zip(frameEvidence, video.frames).allSatisfy({ evidence, frame in
+                evidence.presentationTime.map { abs($0 - (frame.pts - first)) < 0.00005 } ?? false
+            }), zip(frameEvidence, frameEvidence.dropFirst()).allSatisfy({ $0.hostTime < $1.hostTime }) else {
+                throw RecorderError.unavailable("RAW 采集时间与播放帧映射不完整；原始记录已保留")
+            }
+        }
+        let captureMap = VideoCaptureTimeMap(presentation: video.frames.map { $0.pts - first },
+            capture: retimed ? frameEvidence.map { $0.hostTime - firstFrameHost } : video.frames.map { $0.pts - first })
+        func captureTime(_ time: Double) -> Double { retimed ? captureMap.captureTime(at: time) : time }
+        func presentationTime(_ time: Double) -> Double { retimed ? captureMap.presentationTime(at: time) : time }
+        let captureEnd = captureTime(end)
         let lines = try String(contentsOf: rawIMU, encoding: .utf8).split(whereSeparator: \.isNewline)
         let events = try lines.map { try JSONDecoder().decode(MotionEvent.self, from: Data($0.utf8)) }
         func timeline(_ kind: MotionEvent.Kind) throws -> [MotionEvent] {
             let values = events.filter { $0.kind == kind }.sorted { $0.timestamp < $1.timestamp }
             let before = values.first.map { firstFrameHost - $0.timestamp } ?? -.infinity
-            let after = values.last.map { $0.timestamp - firstFrameHost - end } ?? -.infinity
+            let after = values.last.map { $0.timestamp - firstFrameHost - captureEnd } ?? -.infinity
             guard values.count >= 2, before >= 0, after >= 0 else {
                 throw RecorderError.unavailable("IMU \(kind.rawValue) 未覆盖实际视频：片头 \(before) s、片尾 \(after) s；原始 MOV 与 IMU 已保留")
             }
@@ -210,10 +227,10 @@ enum MovieIMUFinalizer {
             zip(values, values.dropFirst()).map { $1.timestamp - $0.timestamp }.max() ?? 0
         }
         let actualPreRoll = min(firstFrameHost - gyro[0].timestamp, firstFrameHost - accel[0].timestamp)
-        let actualPostRoll = min(gyro.last!.timestamp, accel.last!.timestamp) - firstFrameHost - end
+        let actualPostRoll = min(gyro.last!.timestamp, accel.last!.timestamp) - firstFrameHost - captureEnd
         completed("readIMU")
         func interpolate(_ values: [MotionEvent], _ seconds: Double) throws -> [Double] {
-            let target = firstFrameHost + seconds
+            let target = firstFrameHost + captureTime(seconds)
             var low = 0, high = values.count - 1
             while low + 1 < high {
                 let mid = (low + high) / 2
@@ -224,10 +241,6 @@ enum MovieIMUFinalizer {
             let f = (target - a.timestamp) / gap
             return [a.x + (b.x-a.x)*f, a.y + (b.y-a.y)*f, a.z + (b.z-a.z)*f]
         }
-        let alignment = try CameraIntrinsicsRecorder.alignment(cameraFrames, video: video,
-            firstHost: firstFrameHost, interval: frameDuration)
-        let frameEvidence = alignment.frames
-        completed("alignCameraIntrinsics")
         let matrix = (0..<9).map { element in
             frameEvidence.reduce(0.0) { $0 + $1.matrix[element] } / Double(frameEvidence.count)
         }
@@ -246,6 +259,9 @@ enum MovieIMUFinalizer {
         let note = try JSONSerialization.data(withJSONObject: ["source_camera": camera,
             "transport": mode, "timing": timingSource ?? "MOV first frame PTS mapped from MovieFileOutput startPTS; optical sync unverified",
             "exposure_timing_model": exposureTimingModel.rawValue,
+            "raw_presentation_regularized": retimed,
+            "capture_first_frame_host_seconds": firstFrameHost,
+            "capture_minus_presentation_seconds": retimed ? zip(captureMap.capture, captureMap.presentation).map { $0 - $1 } : [],
             "exposure_source": "AVCaptureDevice state sampled at camera callback; not frame-embedded exposure metadata",
             "exposure_timing_measured": false,
             "frame_readout_seconds": 0,
@@ -292,7 +308,7 @@ enum MovieIMUFinalizer {
             var samples = [EmbeddedTelemetryExporter.Sample(time: 0,
                 gyro: try interpolate(gyro, 0), accel: try interpolate(accel, 0))]
             for event in gyro {
-                let time = event.timestamp - firstFrameHost
+                let time = presentationTime(event.timestamp - firstFrameHost)
                 if time > 0 && time < end {
                     samples.append(.init(time: time, gyro: [event.x, event.y, event.z],
                         accel: try interpolate(accel, time)))

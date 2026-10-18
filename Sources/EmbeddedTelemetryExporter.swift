@@ -11,6 +11,28 @@ struct ActualVideoInfo {
     var rotationDegrees: Int = 0
 }
 
+/// Piecewise-linear correspondence between MOV presentation and real capture
+/// time. The final frame's duration extends at unit rate, with no invented frame.
+struct VideoCaptureTimeMap {
+    let presentation: [Double]
+    let capture: [Double]
+
+    func captureTime(at time: Double) -> Double { Self.map(time, from: presentation, to: capture) }
+    func presentationTime(at time: Double) -> Double { Self.map(time, from: capture, to: presentation) }
+
+    private static func map(_ time: Double, from: [Double], to: [Double]) -> Double {
+        guard let first = from.first, let last = from.last else { return time }
+        if time <= first { return to[0] + time - first }
+        if time >= last { return to[to.count - 1] + time - last }
+        var low = 0, high = from.count - 1
+        while low + 1 < high {
+            let mid = (low + high) / 2
+            if from[mid] <= time { low = mid } else { high = mid }
+        }
+        return to[low] + (time - from[low]) / (from[high] - from[low]) * (to[high] - to[low])
+    }
+}
+
 /// A declared export convention, not a hardware timestamp measurement.
 enum ExposureTimingModel: String, Codable {
     case presentationMidpoint

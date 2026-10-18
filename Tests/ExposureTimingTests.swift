@@ -1,7 +1,62 @@
 import XCTest
+import AVFoundation
 @testable import GyroCine
 
 final class ExposureTimingTests: XCTestCase {
+    func testRAWPresentationRemovesJitterWithoutClosingDroppedFrameGap() throws {
+        var timeline = RAWPresentationTimeline(interval: CMTime(value: 1, timescale: 60))
+        let times = [100.0, 100.0169, 100.0332, 100.0668, 100.0831]
+        let expected = [0.0, 1.0 / 60, 2.0 / 60, 4.0 / 60, 5.0 / 60]
+        for (capture, output) in zip(times, expected) {
+            let pts = try timeline.present(CMTime(seconds: capture, preferredTimescale: 1_000_000_000))
+            XCTAssertEqual(pts.seconds - 100, output, accuracy: 0.00000001)
+        }
+        XCTAssertThrowsError(try timeline.present(CMTime(seconds: times.last!, preferredTimescale: 1_000_000_000)))
+    }
+
+    func testCaptureMappingPreservesFrameIMUCorrespondenceAndGap() {
+        let mapping = VideoCaptureTimeMap(presentation: [0, 1.0 / 60, 2.0 / 60, 4.0 / 60],
+            capture: [0, 0.0169, 0.0332, 0.0668])
+        for (presentation, capture) in zip(mapping.presentation, mapping.capture) {
+            XCTAssertEqual(mapping.captureTime(at: presentation), capture, accuracy: 1e-12)
+            XCTAssertEqual(mapping.presentationTime(at: capture), presentation, accuracy: 1e-12)
+        }
+        XCTAssertEqual(mapping.captureTime(at: 0.05), 0.05, accuracy: 1e-12)
+        XCTAssertEqual(mapping.captureTime(at: 5.0 / 60), 0.0668 + 1.0 / 60, accuracy: 1e-12)
+    }
+
+    func testRAWPresentationHasNoLongRecordingDrift() throws {
+        var timeline = RAWPresentationTimeline(interval: CMTime(value: 1, timescale: 60))
+        for index in 0..<18_000 {
+            let capture = 100 + Double(index) / 60 + (index.isMultiple(of: 2) ? 0 : 0.0002)
+            let pts = try timeline.present(CMTime(seconds: capture, preferredTimescale: 1_000_000_000))
+            XCTAssertEqual(pts.seconds - 100, Double(index) / 60, accuracy: 0.00000001)
+        }
+    }
+
+    func testRAWFrameMetadataMatchesPresentationButKeepsOriginalCaptureAndK() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let sources = [100.0, 100.017, 100.034]
+        let frames = sources.enumerated().map { index, time in
+            CameraIntrinsicsRecorder.Frame(hostTime: time, width: 3840, height: 2160,
+                matrix: matrix, exposure: 1.0 / 120, iso: 80, presentationTime: Double(index) / 60)
+        }
+        var bytes = Data()
+        for frame in frames { bytes += try JSONEncoder().encode(frame); bytes.append(10) }
+        try bytes.write(to: url)
+        let video = ActualVideoInfo(frames: (0..<3).map { .init(pts: Double($0) / 60) },
+            width: 3840, height: 2160, duration: 0.05, codecFourCC: "aprn")
+        let alignment = try CameraIntrinsicsRecorder.alignment(url, video: video, firstHost: 100, interval: 1.0 / 60)
+        XCTAssertEqual(alignment.frames.map(\.hostTime), sources)
+        XCTAssertEqual(alignment.frames.map(\.matrix), frames.map(\.matrix))
+        XCTAssertEqual(alignment.frames.map(\.exposure), frames.map(\.exposure))
+        var old = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(frames[0])) as? [String: Any])
+        old.removeValue(forKey: "presentationTime")
+        XCTAssertNil(try JSONDecoder().decode(CameraIntrinsicsRecorder.Frame.self,
+            from: JSONSerialization.data(withJSONObject: old)).presentationTime)
+    }
+
     private let matrix: [Double] = [2000, 0, 1920, 0, 2000, 1080, 0, 0, 1]
 
     private func tags(_ packet: Data) -> [UInt64: Data] {

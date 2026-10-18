@@ -1,5 +1,44 @@
 import AVFoundation
 
+/// Quantize capture intervals, not delivered-frame numbers: a missing capture
+/// leaves an empty presentation slot. Capture PTS itself is never overwritten.
+struct RAWPresentationTimeline {
+    let interval: CMTime
+    private(set) var first: CMTime?
+    private var previous: CMTime?
+    private var slot: Int64 = 0
+    private(set) var missingSlots = 0
+    private(set) var maximumAdjustmentSeconds = 0.0
+
+    init(interval: CMTime) {
+        self.interval = CMTimeConvertScale(interval, timescale: 60_000, method: .roundHalfAwayFromZero)
+    }
+
+    mutating func present(_ capture: CMTime) throws -> CMTime {
+        guard capture.isNumeric, interval.isNumeric, interval.seconds > 0 else {
+            throw RecorderError.unavailable("RAW 视频时间戳无效")
+        }
+        guard let first, let previous else {
+            first = capture; previous = capture
+            return capture
+        }
+        let steps = CMTimeSubtract(capture, previous).seconds / interval.seconds
+        guard steps.isFinite, steps >= 0.5, steps < Double(Int32.max) else {
+            throw RecorderError.unavailable("RAW 采集时间戳不连续；原始素材已保留")
+        }
+        let advance = Int64(steps.rounded())
+        guard slot <= Int64(Int32.max) - advance else {
+            throw RecorderError.unavailable("RAW 视频时间轴超出范围")
+        }
+        slot += advance
+        missingSlots += Int(advance - 1)
+        self.previous = capture
+        let result = CMTimeAdd(first, CMTimeMultiply(interval, multiplier: Int32(slot)))
+        maximumAdjustmentSeconds = max(maximumAdjustmentSeconds, abs(CMTimeSubtract(result, capture).seconds))
+        return result
+    }
+}
+
 /// Counts all samples waiting for and inside the writer, not only its pending array.
 final class RAWFrameBudget {
     private let lock = NSLock()
@@ -41,7 +80,7 @@ struct RAWCadenceGuard {
 }
 
 private final class RAWBufferedSample {
-    let sample: CMSampleBuffer
+    var sample: CMSampleBuffer
     private let budget: RAWFrameBudget
     init(_ sample: CMSampleBuffer, budget: RAWFrameBudget) { self.sample = sample; self.budget = budget }
     deinit { budget.release() }
@@ -68,7 +107,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     private let started: (CMTime) -> Void
     private let orientation: RecordingOrientation
     private let imuReady: () -> Bool
-    private let metadata: (CMSampleBuffer) -> Void
+    private let metadata: (CMSampleBuffer, Double) -> Void
+    private var presentationTimeline: RAWPresentationTimeline
     private var audioInput: AVAssetWriterInput?
     private var audioFormat: CMFormatDescription?
     private var audioPending: [RAWBufferedSample] = []
@@ -110,10 +150,11 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
          preview: RAWWriterPreview, dedicatedStorage: Bool, slateMetadata: [AVMetadataItem] = [],
          prepareRecovery: @escaping () throws -> Void,
          orientation: RecordingOrientation, imuReady: @escaping () -> Bool,
-         metadata: @escaping (CMSampleBuffer) -> Void,
+         metadata: @escaping (CMSampleBuffer, Double) -> Void,
          log: @escaping (String, [String: Any]) -> Void, started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?) -> Void) {
         self.camera = camera; self.codec = codec; self.url = url
+        self.presentationTimeline = RAWPresentationTimeline(interval: camera.activeVideoMinFrameDuration)
         self.queue = DispatchQueue(label: "GyroCine.rawRecording", qos: .userInitiated)
         self.slateMetadata = slateMetadata
         self.dedicatedStorage = dedicatedStorage
@@ -264,9 +305,9 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
         if writer == nil {
             do {
                 let w = try AVAssetWriter(outputURL: url, fileType: .mov)
-                // Preserve source PTS at microsecond precision in both the movie
-                // timeline and video track. Audio keeps its native sample-rate scale.
-                w.movieTimeScale = 1_000_000
+                // 60,000 represents 60/120 and 59.94 exactly. High precision
+                // capture timestamps remain in the per-frame metadata sidecar.
+                w.movieTimeScale = 60_000
                 if dedicatedStorage {
                     guard w.isProVideoStorageSupported else { throw failure("Writer 不支持专用存储") }
                     w.usesProVideoStorage = true
@@ -279,7 +320,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 guard let settings, let hint = CMSampleBufferGetFormatDescription(sample) else { throw failure("缺少 RAW 编码配置") }
                 let i = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: hint)
                 i.expectsMediaDataInRealTime = true
-                i.mediaTimeScale = 1_000_000
+                i.mediaTimeScale = 60_000
                 let size = CMVideoFormatDescriptionGetDimensions(hint)
                 i.transform = orientation.movieTransform(width: Int(size.width), height: Int(size.height))
                 guard w.canAdd(i) else { throw failure("无法添加 RAW Writer 输入") }
@@ -327,7 +368,21 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
             finish(failure("检测到持续严重丢帧，已停止录制并保留原片。请检查存储持续写入速度，或降低编码质量、分辨率及帧率"))
             return
         }
-        metadata(sample)
+        do {
+            let sourcePTS = CMSampleBufferGetPresentationTimeStamp(sample)
+            let presentationPTS = try presentationTimeline.present(sourcePTS)
+            let relativePTS = CMTimeSubtract(presentationPTS, firstPTS!).seconds
+            // Snapshot original K/exposure and capture time before retiming.
+            metadata(sample, relativePTS)
+            var timing = CMSampleTimingInfo(duration: presentationTimeline.interval,
+                presentationTimeStamp: presentationPTS, decodeTimeStamp: .invalid)
+            var retimed: CMSampleBuffer?
+            let status = CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault,
+                sampleBuffer: sample, sampleTimingEntryCount: 1,
+                sampleTimingArray: &timing, sampleBufferOut: &retimed)
+            guard status == noErr, let retimed else { throw failure("RAW 播放时间轴写入失败：\(status)") }
+            buffered.sample = retimed // Shares image data; no pixel copy or re-encode pass.
+        } catch { finish(error); return }
         let metadataEnd = ProcessInfo.processInfo.systemUptime
         maxMetadataMS = max(maxMetadataMS, (metadataEnd - processingStart) * 1000)
         pending.append(buffered)
@@ -404,6 +459,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     }
     private func report(_ error: Error?) {
         log("raw_writer_finished", ["file": url.path, "frames": frames, "captureDrops": captureDrops,
+            "presentationMissingSlots": presentationTimeline.missingSlots,
+            "maxPresentationAdjustmentMS": presentationTimeline.maximumAdjustmentSeconds * 1000,
             "maxCallbackMS": maxCallbackMS, "maxMetadataMS": maxMetadataMS,
             "maxAppendMS": maxAppendMS, "slowCallbacks": slowCallbacks,
             "audioPackets": audioPackets, "receivedVideo": receivedVideo, "receivedAudio": receivedAudio, "rotation": orientation.degrees, "preparationDrops": preparationDrops, "peakBuffered": max(peakBuffered, videoBudget.peak), "peakAudioBuffered": audioBudget.peak, "maxGap": maxGap, "error": error.map { String(describing: $0) } ?? ""])

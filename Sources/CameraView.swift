@@ -429,8 +429,8 @@ struct CameraView: View {
                let seconds = camera.estimatedRecordingSeconds, seconds.isFinite {
                 Text(String(format: seconds < 60
                             ? t("剩余 %.1f GB · 约 %d 秒", "Free %.1f GB · ~%d sec")
-                            : t("剩余 %.1f GB · 约 %d 分钟", "Free %.1f GB · ~%d min"),
-                            Double(bytes) / 1_000_000_000, Int(seconds < 60 ? seconds : seconds / 60)))
+                            : t("剩余 %.1f GB · 约 %d 分 %02d 秒", "Free %.1f GB · ~%d min %02d sec"),
+                            Double(bytes) / 1_000_000_000, Int(seconds < 60 ? seconds : seconds / 60), Int(seconds) % 60))
                     .font(.system(size: 11)).foregroundStyle(seconds < 60 ? .red : .white.opacity(0.7))
                     .accessibilityIdentifier("storageRemaining")
             } else {

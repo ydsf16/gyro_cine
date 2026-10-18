@@ -9,6 +9,7 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
         let matrix: [Double]
         let exposure: Double
         let iso: Float
+        var presentationTime: Double? = nil // RAW MOV-relative PTS; hostTime remains the real capture time.
     }
     let queue = DispatchQueue(label: "GyroCine.cameraIntrinsics")
     private var handle: FileHandle?
@@ -125,7 +126,8 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
 
     /// Snapshot metadata synchronously, then write only value types off the RAW capture queue.
     /// No pixel/sample buffer is retained by the metadata writer.
-    func recordNativeMetadata(_ sample: CMSampleBuffer, clock: CMClock?, camera: AVCaptureDevice) {
+    func recordNativeMetadata(_ sample: CMSampleBuffer, clock: CMClock?, camera: AVCaptureDevice,
+                              presentationTime: Double? = nil) {
         let snapshot = Result { () throws -> Frame in
             guard let matrix = CaptureFrameEvidence.intrinsicMatrix(sample),
                   let format = CMSampleBufferGetFormatDescription(sample) else {
@@ -134,7 +136,7 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
             let size = CMVideoFormatDescriptionGetDimensions(format)
             return Frame(hostTime: try ClockAligner.hostTime(CMSampleBufferGetPresentationTimeStamp(sample), clock: clock),
                 width: Int(size.width), height: Int(size.height), matrix: matrix,
-                exposure: camera.exposureDuration.seconds, iso: camera.iso)
+                exposure: camera.exposureDuration.seconds, iso: camera.iso, presentationTime: presentationTime)
         }
         queue.async {
             guard let handle = self.handle else { return }
@@ -166,7 +168,8 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
                 frame.hostTime.isFinite && frame.exposure.isFinite && frame.exposure > 0 &&
                 frame.iso.isFinite && frame.iso > 0
         }
-        let samples = valid.sorted { $0.hostTime < $1.hostTime }
+        func matchingTime(_ frame: Frame) -> Double { frame.presentationTime.map { firstHost + $0 } ?? frame.hostTime }
+        let samples = valid.sorted { matchingTime($0) < matchingTime($1) }
         guard !samples.isEmpty else { throw RecorderError.unavailable("没有与 MOV 像素尺寸一致的有效 K 数据") }
         var cursor = 0
         var frames: [Frame] = []
@@ -175,9 +178,9 @@ final class CameraIntrinsicsRecorder: NSObject, AVCaptureVideoDataOutputSampleBu
         var maximumNearestError = 0.0
         for frame in video.frames {
             let target = firstHost + frame.pts - video.frames[0].pts
-            while cursor + 1 < samples.count && abs(samples[cursor + 1].hostTime - target) < abs(samples[cursor].hostTime - target) { cursor += 1 }
+            while cursor + 1 < samples.count && abs(matchingTime(samples[cursor + 1]) - target) < abs(matchingTime(samples[cursor]) - target) { cursor += 1 }
             let sample = samples[cursor]
-            let error = abs(sample.hostTime - target)
+            let error = abs(matchingTime(sample) - target)
             maximumNearestError = max(maximumNearestError, error)
             // MovieFileOutput and VideoDataOutput can stamp the same capture at
             // slightly different phases. Match the nearest K sample within

@@ -30,6 +30,7 @@
 		760BE7C762F37FA89377C0D8 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 0C7E9DBDACEA431F5BB172F4 /* InfoPlist.strings */; };
 		77048EAC6BBB06D63AC7772F /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7837A3B5E0845276712C02D9 /* Localizable.strings */; };
 		8082FD10ABEDAE1649CA9217 /* EmbeddedTelemetryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 608E15ABDD1FB53D5F561E79 /* EmbeddedTelemetryExporter.swift */; };
+		80C2E017C8D848C3409BCC00 /* RecordingRateEstimatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06CE1E8D1784D913C083A319 /* RecordingRateEstimatorTests.swift */; };
 		8A4D75C717C7D2C5DCCC78E9 /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2988EEEB7132649CE38D63 /* ClockAligner.swift */; };
 		8B7574C40EDE681D7840F8B1 /* MovingRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891AF4917D3C5FB2D5BC7704 /* MovingRuler.swift */; };
 		957990DD9BB5E5A46DB87F81 /* slay-05-portrait.cube in Resources */ = {isa = PBXBuildFile; fileRef = 987DE3E8C7C89F42C7E1D6BD /* slay-05-portrait.cube */; };
@@ -40,6 +41,7 @@
 		B07D5C4C4D09DD8B6C4A99B5 /* IMURecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034C3517079161B3003ECD09 /* IMURecordingUITests.swift */; };
 		B245DF897F1000DE9AA165E3 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85160F4187B712C627203368 /* DiagnosticLogger.swift */; };
 		B56801D5051C69FD22FB7791 /* ExposureTimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F3B97554DC86B5F601A321 /* ExposureTimingTests.swift */; };
+		BF9CB8F121E995A1F8219C7D /* RecordingRateEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC02D9C569C6C89D1CEF1C36 /* RecordingRateEstimator.swift */; };
 		C01B74C0926DD3A71AE8B5A1 /* CameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FAB22C1E5DFB0D1EBB98BC /* CameraManager.swift */; };
 		C81BA46DD49E9AACD9C99C1D /* PreviewColorTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD8DF5CEBF59A852F9A3BA /* PreviewColorTransform.swift */; };
 		DC9D5B3B8FE2CCFA89243FC8 /* CameraModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FADDFFE59721D646980D74 /* CameraModels.swift */; };
@@ -69,6 +71,7 @@
 /* Begin PBXFileReference section */
 		0109F90EE225951234B97E3A /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		034C3517079161B3003ECD09 /* IMURecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMURecordingUITests.swift; sourceTree = "<group>"; };
+		06CE1E8D1784D913C083A319 /* RecordingRateEstimatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingRateEstimatorTests.swift; sourceTree = "<group>"; };
 		06FAB22C1E5DFB0D1EBB98BC /* CameraManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
 		0DB1235157B0EA97B5C9F33B /* GyroCineApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GyroCineApp.swift; sourceTree = "<group>"; };
 		160B0A3208CA6FF8D6FE278F /* RAWFocusTest-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RAWFocusTest-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -105,6 +108,7 @@
 		C07DBE34683D824A79450C82 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		C2C8413D6AA7AAAC7D4B95B3 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		CD153062647BFB7ED4E8022F /* RecordingSlateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSlateTests.swift; sourceTree = "<group>"; };
+		DC02D9C569C6C89D1CEF1C36 /* RecordingRateEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingRateEstimator.swift; sourceTree = "<group>"; };
 		DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOrientation.swift; sourceTree = "<group>"; };
 		DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		E060E12B4BE73A0FAAA89CE5 /* SLAY-SOURCE.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "SLAY-SOURCE.json"; sourceTree = "<group>"; };
@@ -169,6 +173,7 @@
 				97B80C3565F20E93ED4FC875 /* RecordingExceptionCatcher.h */,
 				8A144ECA132A72D281F5BD8F /* RecordingExceptionCatcher.m */,
 				DD56F33BBE2D14A511A20ECC /* RecordingOrientation.swift */,
+				DC02D9C569C6C89D1CEF1C36 /* RecordingRateEstimator.swift */,
 				5E69E57621FCFFB1DD4CFFAD /* RecordingSlate.swift */,
 				DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */,
 				2817BCD3637009EF27D48531 /* SettingsView.swift */,
@@ -183,6 +188,7 @@
 				57387D9F647FF4429FC12F72 /* DefaultsAndOrientationTests.swift */,
 				E0F3B97554DC86B5F601A321 /* ExposureTimingTests.swift */,
 				44CCD09C1C4B879E79792AB1 /* PreviewColorTransformTests.swift */,
+				06CE1E8D1784D913C083A319 /* RecordingRateEstimatorTests.swift */,
 				CD153062647BFB7ED4E8022F /* RecordingSlateTests.swift */,
 			);
 			path = Tests;
@@ -367,6 +373,7 @@
 				0E286DED35A89FA3E11D2263 /* RAWInternalWriterExperiment.swift in Sources */,
 				993EEE7924B4A31BC31F0529 /* RecordingExceptionCatcher.m in Sources */,
 				F7F960DCE4C3CC3BE103771B /* RecordingOrientation.swift in Sources */,
+				BF9CB8F121E995A1F8219C7D /* RecordingRateEstimator.swift in Sources */,
 				065A5CB761B0F44A8CCA697F /* RecordingSlate.swift in Sources */,
 				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,
 				36FF3D630C1B353466E458B6 /* SSDSpeedTest.swift in Sources */,
@@ -389,6 +396,7 @@
 				EBF533A698B5EA02EABBDA2F /* DefaultsAndOrientationTests.swift in Sources */,
 				B56801D5051C69FD22FB7791 /* ExposureTimingTests.swift in Sources */,
 				AE5C369E8809C261C6EBABA3 /* PreviewColorTransformTests.swift in Sources */,
+				80C2E017C8D848C3409BCC00 /* RecordingRateEstimatorTests.swift in Sources */,
 				9C1E31916C93A238CAAB5A5C /* RecordingSlateTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -466,7 +474,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261017.3;
+				CURRENT_PROJECT_VERSION = 20261018.1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -542,7 +550,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 20261017.3;
+				CURRENT_PROJECT_VERSION = 20261018.1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = F2LVFHW3ZH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
