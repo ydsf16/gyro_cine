@@ -98,7 +98,7 @@
     "storeCopy": "Localized subtitles and promotional text emphasize professional camera, ProRes RAW capture, IMU motion data, and Gyroflow post stabilization.",
     "icon": "Recreated original camera/grape mark without baked inset card or outer white margin; 1024x1024 opaque AppIcon.",
     "privacyResponse": "No data collected; published in App Store Connect after user confirmation",
-    "releaseMode": "manual",
+    "releaseMode": "automatic after App Review approval, confirmed in App Store Connect on 2026-10-19",
     "appSubmitted": true
   }
 }
