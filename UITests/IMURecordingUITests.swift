@@ -1,6 +1,50 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    // Run after physical-device QA to leave the camera in its normal capture configuration.
+    func testRestoreQuickReleaseCameraDefaults() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        if !app.buttons["codecMenu"].label.contains("H.265") || app.buttons["codecMenu"].label.contains("HQ") {
+            app.buttons["codecMenu"].tap()
+            app.buttons["H.265"].tap()
+        }
+        let resolution = app.buttons["resolutionMenu"]
+        if !resolution.label.contains("3840×2160") {
+            resolution.tap()
+            app.buttons["4K · 3840×2160"].tap()
+        }
+        let fps = app.buttons["fpsMenu"]
+        if !fps.label.contains("60.0") {
+            fps.tap()
+            app.buttons["fpsOption.60.0 fps"].tap()
+        }
+        let exposure = app.buttons["exposureTypeMenu"]
+        if !exposure.label.contains("角度") {
+            exposure.tap()
+            app.buttons["exposureType.angle"].tap()
+        }
+        let storage = app.buttons["storageLocationMenu"]
+        if !storage.isHittable { app.swipeUp() }
+        if !storage.label.contains("专用视频存储") {
+            storage.tap()
+            app.buttons["专用视频存储"].tap()
+        }
+        app.buttons["captureSettingsClose"].tap()
+        app.buttons["parameter.ISO"].tap()
+        app.buttons["A"].tap()
+        app.buttons["parameter.Shutter"].tap()
+        app.buttons["A-Max"].tap()
+        app.buttons["parameter.WB"].tap()
+        app.buttons["wb.mode.Auto"].tap()
+        XCTAssertTrue(app.buttons["captureSetupOpen"].label.contains("H.265"))
+        XCTAssertTrue(app.buttons["captureSetupOpen"].label.contains("3840×2160"))
+        XCTAssertTrue(app.buttons["captureSetupOpen"].label.contains("60.0fps"))
+        controlScreenshot(app, "quick-release-defaults-restored")
+    }
     func testProPurchaseEntryAndBilingualDisclosure() {
         let app = XCUIApplication()
         for language in ["en", "zh-Hans"] {
@@ -341,7 +385,10 @@ final class IMURecordingUITests: XCTestCase {
         first.press(forDuration: 0.8)
         XCTAssertTrue(app.buttons["mediaShareSelected"].isEnabled)
         XCTAssertTrue(app.buttons["mediaDeleteSelected"].isEnabled)
-        app.buttons["mediaDeleteSelected"].tap()
+        // AssistiveTouch can cover the right side of this button on a physical phone.
+        app.buttons["mediaDeleteSelected"].coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5)).tap()
+        controlScreenshot(app, "media-delete-confirmation")
+        print("MEDIA_DELETE_UI \(app.debugDescription)")
         let confirmDelete = app.buttons["删除文件"].exists ? app.buttons["删除文件"] : app.buttons["Delete file"]
         XCTAssertTrue(confirmDelete.waitForExistence(timeout: 5))
         let cancelDelete = app.buttons["取消"].exists ? app.buttons["取消"] : app.buttons["Cancel"]
