@@ -198,6 +198,24 @@ struct SettingsView: View {
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
+            if camera.selectedEncoding == .hevc {
+                SettingsChoices(title: t("码率档位", "Bitrate")) {
+                    ForEach(HEVCBitratePreset.allCases) { preset in
+                        Button {
+                            camera.setHEVCBitratePreset(preset)
+                        } label: {
+                            if camera.hevcBitratePreset == preset {
+                                Label(bitrateLabel(preset), systemImage: "checkmark")
+                            } else {
+                                Text(bitrateLabel(preset))
+                            }
+                        }
+                        .accessibilityIdentifier("hevcBitrateOption.\(preset.rawValue)")
+                    }
+                } label: { row(t("码率档位", "Bitrate"), bitrateLabel(camera.hevcBitratePreset)) }
+                    .tint(.primary).disabled(locked || currentFormat == nil)
+                    .accessibilityIdentifier("hevcBitrateMenu")
+            }
             SettingsChoices(title: t("曝光类型", "Exposure type")) {
                 Button(t("速度", "Speed")) { chooseExposureType("speed") }
                     .accessibilityIdentifier("exposureType.speed")
@@ -213,6 +231,15 @@ struct SettingsView: View {
                 Text(intrinsicFormatNotice).font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func bitrateLabel(_ preset: HEVCBitratePreset) -> String {
+        let name = preset.title(locale: locale)
+        guard let format = currentFormat,
+              let bits = preset.targetBitsPerSecond(width: format.width, height: format.height, fps: camera.fps) else {
+            return name
+        }
+        return "\(name) · ≈\(Int((Double(bits) / 1_000_000).rounded())) Mb/s"
     }
     private func chooseExposureType(_ type: String) {
         guard exposureType != type else { return }

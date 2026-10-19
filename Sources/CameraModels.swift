@@ -20,6 +20,40 @@ enum VideoEncoding: String, CaseIterable, Identifiable {
     }
 }
 
+/// Requested H.265 encoder rate. H.265 HQ keeps its existing encoder settings.
+enum HEVCBitratePreset: String, CaseIterable, Identifiable {
+    case compact, balanced, quality, maximum
+    var id: Self { self }
+
+    // Preserve the first three stored values from the previous UI. Its old
+    // "automatic" value and fresh installs now use the middle tier.
+    static func stored(_ value: String?) -> Self {
+        Self(rawValue: value ?? "") ?? .balanced
+    }
+
+    func title(locale: Locale) -> String {
+        switch self {
+        case .compact: AppText.value("低", "Low", locale: locale)
+        case .balanced: AppText.value("中", "Medium", locale: locale)
+        case .quality: AppText.value("高", "High", locale: locale)
+        case .maximum: AppText.value("最高", "Max", locale: locale)
+        }
+    }
+
+    func targetBitsPerSecond(width: Int32, height: Int32, fps: Double) -> Int? {
+        let bitsPerPixelPerFrame: Double
+        switch self {
+        case .compact: bitsPerPixelPerFrame = 0.06
+        case .balanced: bitsPerPixelPerFrame = 0.10
+        case .quality: bitsPerPixelPerFrame = 0.18
+        case .maximum: bitsPerPixelPerFrame = 0.24
+        }
+        guard width > 0, height > 0, fps.isFinite, fps > 0 else { return nil }
+        return Int(min(200_000_000, max(2_000_000,
+            Double(width) * Double(height) * fps * bitsPerPixelPerFrame)).rounded())
+    }
+}
+
 enum ShutterMode { case auto, autoMax, manual, angle }
 
 enum FocusChoice: String, CaseIterable, Identifiable {

@@ -45,10 +45,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 guard let format = formats.first else { continue }
                 let rates = Set(formats.flatMap { availableFPS(for: $0) }).sorted()
                 for rate in rates {
-                    let key = "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(encoding.rawValue).\(format.width)x\(format.height).\(rate)"
+                    let key = "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(encoding.rawValue).\(format.width)x\(format.height).\(rate)" +
+                        (encoding == .hevc ? ".\(chosenHEVCBitratePreset.rawValue)" : "")
                     let learned = UserDefaults.standard.double(forKey: key)
                     let bits = encoding == .proResRAWHQ ? 8.0 : encoding == .proResRAW ? 6.0 : 0.5
-                    let fallback = max(1_000_000, Double(format.width) * Double(format.height) * rate * bits / 8 + 100_000)
+                    let fallback = (encoding == .hevc ? chosenHEVCBitratePreset.targetBitsPerSecond(
+                        width: format.width, height: format.height, fps: rate) : nil)
+                        .map { Double($0) / 8 * 1.25 + 100_000 }
+                        ?? max(1_000_000, Double(format.width) * Double(format.height) * rate * bits / 8 + 100_000)
                     let validLearned = learned.isFinite && learned > 0
                     let assessmentRate = max(validLearned ? learned : fallback, fallback * 0.25)
                     result.append(SSDSpeedSpecification(encoding: encoding, width: format.width, height: format.height,
@@ -124,6 +128,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var codecs: [AVVideoCodecType] = []
     @Published private(set) var selectedCodec: AVVideoCodecType?
     @Published private(set) var selectedEncoding: VideoEncoding = .hevc
+    @Published private(set) var hevcBitratePreset = HEVCBitratePreset.stored(
+        UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     @Published private(set) var selectedFormatIndex: Int?
     @Published private(set) var fps: Double = 60
     @Published private(set) var focusChoice: FocusChoice = .continuous
@@ -228,6 +234,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var supportedCodecs: [AVVideoCodecType] = []
     private var chosenCodec: AVVideoCodecType?
     private var chosenEncoding: VideoEncoding = .hevc
+    private var chosenHEVCBitratePreset = HEVCBitratePreset.stored(
+        UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     private var chosenIndex: Int?
     private var chosenFPS: Double = 60
     private var shutterMaxCustomized = false
@@ -469,6 +477,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var conservativeBytesPerSecond: Double {
         let size = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         let pixels = Double(size?.width ?? 3840) * Double(size?.height ?? 2160)
+        if chosenEncoding == .hevc,
+           let target = chosenHEVCBitratePreset.targetBitsPerSecond(
+                width: size?.width ?? 3840, height: size?.height ?? 2160, fps: chosenFPS) {
+            return Double(target) / 8 * 1.25 + 100_000
+        }
         let bitsPerPixel: Double = chosenCodec?.rawValue == "aprh" ? 8 :
             (chosenCodec?.rawValue == "aprn" ? 6 : 0.5)
         return max(1_000_000, pixels * max(chosenFPS, 1) * bitsPerPixel / 8 + 100_000)
@@ -483,7 +496,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var liveBytesPerSecond: Double? { bitrateEstimator.bytesPerSecond ?? capacityBitrateEstimator.bytesPerSecond }
     private var bitrateStatisticsKey: String {
         let size = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
-        return "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(chosenEncoding.rawValue).\(size?.width ?? 0)x\(size?.height ?? 0).\(chosenFPS)"
+        let base = "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(chosenEncoding.rawValue).\(size?.width ?? 0)x\(size?.height ?? 0).\(chosenFPS)"
+        return chosenEncoding == .hevc ? base + ".\(chosenHEVCBitratePreset.rawValue)" : base
     }
     private var estimatedRecordingBytesPerSecond: Double {
         RecordingRateEstimator.displayRate(live: liveBytesPerSecond,
@@ -1675,6 +1689,47 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    func setHEVCBitratePreset(_ preset: HEVCBitratePreset) {
+        queue.async {
+            guard !self.output.isRecording, !self.recordingStarting, !self.captureFinishing,
+                  self.rawWriterExperiment == nil else {
+                self.fail("Bitrate cannot change during recording"); return
+            }
+            guard self.chosenEncoding == .hevc, let index = self.chosenIndex,
+                  self.formatObjects.indices.contains(index),
+                  let connection = self.output.connection(with: .video) else {
+                self.fail("H.265 bitrate is unavailable for this configuration"); return
+            }
+            let previous = self.chosenHEVCBitratePreset
+            self.chosenHEVCBitratePreset = preset
+            do {
+                let settings = try self.encodingSettings(for: self.formatObjects[index],
+                                                         fps: self.chosenFPS, connection: connection)
+                if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
+                    self.output.setOutputSettings(settings, for: connection)
+                }) { throw CameraError.unsupportedFocus("Bitrate settings: \(exception)") }
+                UserDefaults.standard.set(preset.rawValue, forKey: "hevcBitratePreset")
+                self.logger.event("hevc_bitrate_preset", ["preset": preset.rawValue,
+                    "targetBitsPerSecond": preset.targetBitsPerSecond(
+                        width: self.formatObjects[index].width,
+                        height: self.formatObjects[index].height, fps: self.chosenFPS) as Any? ?? NSNull()])
+                self.publish { self.hevcBitratePreset = preset; self.errorText = nil }
+                self.resetBitrateProbe()
+                self.refreshStorageBudget()
+                self.refreshSSDSpeedAssessment()
+            } catch {
+                self.chosenHEVCBitratePreset = previous
+                if let old = try? self.encodingSettings(for: self.formatObjects[index],
+                                                        fps: self.chosenFPS, connection: connection) {
+                    _ = RecordingExceptionCatcher.exceptionMessage(for: {
+                        self.output.setOutputSettings(old, for: connection)
+                    })
+                }
+                self.fail("H.265 bitrate: \(error)")
+            }
+        }
+    }
+
     func chooseFormat(_ index: Int) {
         queue.async {
             guard let codec = self.chosenCodec else { return }
@@ -1961,12 +2016,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private func encodingSettings(for info: FormatInfo, fps: Double, connection: AVCaptureConnection) throws -> [String: Any] {
         guard let codec = chosenCodec else { throw CameraError.unsupportedFocus("Video codec") }
         var settings: [String: Any] = [AVVideoCodecKey: codec.rawValue]
-        if chosenEncoding == .hevcHQ {
+        if chosenEncoding == .hevcHQ || chosenEncoding == .hevc {
             guard output.supportedOutputSettingsKeys(for: connection).contains(AVVideoCompressionPropertiesKey) else {
-                throw CameraError.unsupportedFocus("HEVC HQ bitrate control")
+                throw CameraError.unsupportedFocus("H.265 bitrate control")
             }
-            let bitrate = Int(min(200_000_000, max(10_000_000,
-                Double(info.width) * Double(info.height) * fps * 0.35)))
+            let bitrate: Int
+            if chosenEncoding == .hevcHQ {
+                bitrate = Int(min(200_000_000, max(10_000_000,
+                    Double(info.width) * Double(info.height) * fps * 0.35)))
+            } else if let requested = chosenHEVCBitratePreset.targetBitsPerSecond(
+                width: info.width, height: info.height, fps: fps) {
+                bitrate = requested
+            } else {
+                throw CameraError.unsupportedFocus("Invalid H.265 bitrate target")
+            }
             settings[AVVideoCompressionPropertiesKey] = [kVTCompressionPropertyKey_AverageBitRate as String: bitrate]
         }
         return settings

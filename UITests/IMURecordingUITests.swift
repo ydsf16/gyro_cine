@@ -1,6 +1,93 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testHEVCBitratePresetPersistsAcrossLaunch() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        let originalPreset = selectedHEVCBitratePreset(app)
+        chooseHEVCBitratePreset("maximum", title: "最高", app: app)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        XCTAssertEqual(selectedHEVCBitratePreset(app), "maximum")
+        chooseHEVCBitratePreset(originalPreset, title: bitrateTitle(originalPreset), app: app)
+        app.buttons["captureSettingsClose"].tap()
+    }
+
+    func testHEVCBitratePresetsAndShortRecordings() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件",
+                               "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        let originalCodec = app.buttons["codecMenu"].label
+        if !originalCodec.contains("H.265") || originalCodec.contains("HQ") {
+            app.buttons["codecMenu"].tap()
+            app.buttons["H.265"].tap()
+        }
+        let originalPreset = selectedHEVCBitratePreset(app)
+        for preset in ["compact", "quality", "maximum"] {
+            chooseHEVCBitratePreset(preset, title: bitrateTitle(preset), app: app)
+            controlScreenshot(app, "hevc-bitrate-\(preset)")
+            app.buttons["captureSettingsClose"].tap()
+            let record = app.buttons["recordToggle"]
+            XCTAssertTrue(record.waitForExistence(timeout: 20))
+            record.tap()
+            XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label CONTAINS %@", "停止录制"), object: record)],
+                timeout: 30) == .completed)
+            Thread.sleep(forTimeInterval: 6)
+            record.tap()
+            XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "enabled == true AND label CONTAINS %@", "开始录制"), object: record)],
+                timeout: 90) == .completed)
+            XCTAssertFalse(app.alerts.firstMatch.exists, app.debugDescription)
+            print("HEVC_BITRATE_RECORDED \(preset)")
+            app.buttons["settingsOpen"].tap()
+        }
+        chooseHEVCBitratePreset(originalPreset, title: bitrateTitle(originalPreset), app: app)
+        if originalCodec.contains("HQ") || !originalCodec.contains("H.265") {
+            app.buttons["codecMenu"].tap()
+            let codec = originalCodec.contains("ProRes RAW HQ") ? "ProRes RAW HQ" :
+                originalCodec.contains("ProRes RAW") ? "ProRes RAW" : "H.265 HQ"
+            app.buttons[codec].tap()
+        }
+        app.buttons["captureSettingsClose"].tap()
+    }
+
+    private func bitrateTitle(_ preset: String) -> String {
+        switch preset {
+        case "compact": return "低"
+        case "balanced": return "中"
+        case "quality": return "高"
+        default: return "最高"
+        }
+    }
+
+    private func selectedHEVCBitratePreset(_ app: XCUIApplication) -> String {
+        let label = app.buttons["hevcBitrateMenu"].label
+        if label.contains("最高") { return "maximum" }
+        if label.contains("高") { return "quality" }
+        if label.contains("低") { return "compact" }
+        return "balanced"
+    }
+
+    private func chooseHEVCBitratePreset(_ preset: String, title: String, app: XCUIApplication) {
+        let menu = app.buttons["hevcBitrateMenu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15))
+        menu.tap()
+        let option = app.buttons["hevcBitrateOption.\(preset)"]
+        XCTAssertTrue(option.waitForExistence(timeout: 10))
+        option.tap()
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", title), object: menu)], timeout: 15) == .completed)
+    }
+
     func testMediaPlaybackVisualProbe() {
         let app = XCUIApplication()
         app.launch()

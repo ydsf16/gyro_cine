@@ -3,6 +3,22 @@ import AVFoundation
 @testable import GyroCine
 
 final class DefaultsAndOrientationTests: XCTestCase {
+    func testHEVCBitratePresetsScaleWithRasterAndFrameRate() {
+        XCTAssertEqual(HEVCBitratePreset.allCases.count, 4)
+        XCTAssertEqual(HEVCBitratePreset.stored(nil), .balanced)
+        XCTAssertEqual(HEVCBitratePreset.stored("automatic"), .balanced)
+        XCTAssertEqual(HEVCBitratePreset.stored("compact"), .compact)
+        XCTAssertEqual(HEVCBitratePreset.stored("quality"), .quality)
+        XCTAssertEqual(HEVCBitratePreset.compact.targetBitsPerSecond(width: 3840, height: 2160, fps: 60), 29_859_840)
+        XCTAssertEqual(HEVCBitratePreset.balanced.targetBitsPerSecond(width: 3840, height: 2160, fps: 60), 49_766_400)
+        XCTAssertEqual(HEVCBitratePreset.quality.targetBitsPerSecond(width: 3840, height: 2160, fps: 60), 89_579_520)
+        XCTAssertEqual(HEVCBitratePreset.maximum.targetBitsPerSecond(width: 3840, height: 2160, fps: 60), 119_439_360)
+        XCTAssertEqual(HEVCBitratePreset.balanced.targetBitsPerSecond(width: 3840, height: 2160, fps: 30), 24_883_200)
+        XCTAssertEqual(HEVCBitratePreset.balanced.targetBitsPerSecond(width: 1920, height: 1080, fps: 60), 12_441_600)
+        XCTAssertNil(HEVCBitratePreset.quality.targetBitsPerSecond(width: 0, height: 2160, fps: 60))
+        XCTAssertNil(HEVCBitratePreset.quality.targetBitsPerSecond(width: 3840, height: 2160, fps: .nan))
+    }
+
     func testDisabled240FrameRateFallsBackTo120() {
         XCTAssertEqual(CaptureFrameRatePolicy.maximum, 120)
         XCTAssertEqual(CaptureFrameRatePolicy.normalized(240), 120)
