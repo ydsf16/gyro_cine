@@ -1,6 +1,40 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testMediaPlaybackVisualProbe() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["mediaOpen"].waitForExistence(timeout: 25))
+        app.buttons["mediaOpen"].tap()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaRow.")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        XCTAssertTrue(app.otherElements["mediaPlayer"].waitForExistence(timeout: 10))
+        controlScreenshot(app, "player-open")
+        let video = app.otherElements["mediaPlayer"]
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        controlScreenshot(app, "player-after-first-tap")
+        Thread.sleep(forTimeInterval: 2)
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        controlScreenshot(app, "player-after-second-tap")
+        let elapsed = app.staticTexts["Elapsed Time"]
+        XCTAssertTrue(elapsed.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(Int(elapsed.label.split(separator: ":").last ?? "0") ?? 0, 0,
+                             "The in-app player must advance after tapping the video")
+    }
+
+    func testLiveMenuQuiescenceProbe() {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+        app.buttons["settingsOpen"].tap()
+        XCTAssertTrue(app.buttons["codecMenu"].waitForExistence(timeout: 10))
+        controlScreenshot(app, "menu-before-open")
+        app.buttons["codecMenu"].tap()
+        controlScreenshot(app, "menu-after-open")
+        XCTAssertTrue(app.buttons["H.265"].waitForExistence(timeout: 5))
+    }
+
     // Run after physical-device QA to leave the camera in its normal capture configuration.
     func testRestoreQuickReleaseCameraDefaults() {
         let app = XCUIApplication()
@@ -445,14 +479,14 @@ final class IMURecordingUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         print("PLAYER_UI \(app.debugDescription)")
         controlScreenshot(app, "stable-playback-open")
-        let play = app.buttons.matching(NSPredicate(format: "label IN %@", ["Play", "播放"])).firstMatch
-        if !play.exists { app.otherElements["mediaPlayer"].tap() }
-        XCTAssertTrue(play.waitForExistence(timeout: 5)); play.tap()
-        Thread.sleep(forTimeInterval: 4)
+        let video = app.otherElements["mediaPlayer"]
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        Thread.sleep(forTimeInterval: 2)
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         controlScreenshot(app, "stable-playback-running")
         print("PLAYER_AFTER \(app.debugDescription)")
         let elapsed = app.staticTexts["Elapsed Time"]
-        XCTAssertTrue(elapsed.exists)
+        XCTAssertTrue(elapsed.waitForExistence(timeout: 5))
         XCTAssertGreaterThan(Int(elapsed.label.split(separator: ":").last ?? "0") ?? 0, 0,
                              "Playback must advance despite live camera parameter updates")
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaSave.")).firstMatch.exists)
