@@ -23,6 +23,7 @@ struct GyroCineApp: App {
                 .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
                 .onChange(of: scenePhase) { _, phase in
                     UIApplication.shared.isIdleTimerDisabled = phase == .active
+                    if phase == .active { Task { await ProStore.shared.prepare() } }
                 }
         }
     }

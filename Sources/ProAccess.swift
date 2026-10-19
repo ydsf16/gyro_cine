@@ -1,5 +1,6 @@
 import StoreKit
 import SwiftUI
+import OSLog
 
 /// Camera queues read only this small locked snapshot, never StoreKit or UI state.
 final class ProRecordingAccess {
@@ -22,6 +23,7 @@ final class ProRecordingAccess {
 final class ProStore: ObservableObject {
     static let shared = ProStore()
     static let productID = "com.tinygrape.gyrocine.pro"
+    private let logger = Logger(subsystem: "com.tinygrape.RawMotionRecorder", category: "ProAccess")
     @Published private(set) var product: Product?
     @Published private(set) var purchased = false
     @Published private(set) var testFlightBypass = false
@@ -31,7 +33,10 @@ final class ProStore: ObservableObject {
     private var prepared = false
 
     func prepare() async {
-        guard !prepared else { return }
+        guard !prepared else {
+            await refreshTestFlightBypass()
+            return
+        }
         prepared = true
         updates = Task { [weak self] in
             for await result in Transaction.updates {
@@ -48,24 +53,30 @@ final class ProStore: ObservableObject {
             }
         }
         await refreshEntitlements()
-        // Fail closed: a build flag alone can never unlock a production install.
-        // Only a verified AppTransaction from Apple's sandbox enables bypass.
+        await refreshTestFlightBypass()
+        await loadProduct()
+    }
+
+    private func refreshTestFlightBypass() async {
+        // The signed app transaction is the authority. The legacy receipt file
+        // may be absent even for a valid TestFlight installation.
         let configuredBypass = Bundle.main.object(forInfoDictionaryKey: "GyroCineTestFlightProBypass")
         let bypassEnabled = (configuredBypass as? Bool == true) ||
             (configuredBypass as? String).map { ["YES", "TRUE", "1"].contains($0.uppercased()) } == true
-        // Fetching AppTransaction without a receipt can prompt for Apple sign-in.
-        // Only inspect an existing TestFlight receipt; its name is a hint, never proof.
-        let receipt = Bundle.main.appStoreReceiptURL
-        let hasSandboxReceipt = receipt?.lastPathComponent == "sandboxReceipt" &&
-            receipt.map { FileManager.default.fileExists(atPath: $0.path) } == true
-        if bypassEnabled, hasSandboxReceipt,
-           let result = try? await AppTransaction.shared,
-           case .verified(let transaction) = result {
-            testFlightBypass = ProRecordingAccess.permitsBypass(enabled: true,
-                verifiedEnvironment: transaction.environment == .sandbox ? "Sandbox" : "Production")
-            publishAccess()
+        guard bypassEnabled else { return }
+        do {
+            switch try await AppTransaction.shared {
+            case .verified(let transaction):
+                testFlightBypass = ProRecordingAccess.permitsBypass(enabled: true,
+                    verifiedEnvironment: transaction.environment == .sandbox ? "Sandbox" : "Production")
+                publishAccess()
+                logger.info("App transaction verified; sandbox bypass active: \(self.testFlightBypass)")
+            case .unverified:
+                logger.error("App transaction unverified; RAW free limit remains active")
+            }
+        } catch {
+            logger.error("App transaction unavailable; RAW free limit remains active: \(error.localizedDescription, privacy: .public)")
         }
-        await loadProduct()
     }
 
     func loadProduct() async {
