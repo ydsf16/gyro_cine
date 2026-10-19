@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     var quickCapture = false
     @EnvironmentObject private var camera: CameraManager
+    @ObservedObject private var proStore = ProStore.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
@@ -108,8 +109,12 @@ struct SettingsView: View {
                                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                             }
                         }.tint(.primary).accessibilityIdentifier("proSettings")
-                        Text(t("RAW 每段免费录制 2 分钟；Pro 一次性解锁长录制。其他功能免费。",
-                               "RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
+                        Text(proStore.testFlightBypass
+                             ? t("TestFlight 测试版：RAW 长录制已开放。", "TestFlight: longer RAW recordings enabled.")
+                             : proStore.purchased
+                             ? t("Pro 已解锁：RAW 长录制已开放。", "Pro unlocked: longer RAW recordings enabled.")
+                             : t("RAW 每段免费录制 2 分钟；Pro 一次性解锁长录制。其他功能免费。",
+                                 "RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     storageSection

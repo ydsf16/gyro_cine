@@ -153,11 +153,13 @@ struct ProAccessView: View {
                         Text(t("已达到本段 RAW 的 2 分钟免费时长，录制已停止并按正常流程保存。",
                                "This RAW clip reached the free 2-minute limit. Recording stopped and is being saved normally."))
                     }
-                    Text(t("一次性购买，解锁 ProRes RAW 与 ProRes RAW HQ 长时间录制。",
-                           "A one-time purchase unlocks longer ProRes RAW and ProRes RAW HQ recordings."))
-                    Text(t("免费版：每段 RAW 最长 2 分钟。H.265 及其他功能免费。",
-                           "Free: up to 2 minutes per RAW clip. H.265 and all other features remain free."))
-                        .font(.footnote).foregroundStyle(.secondary)
+                    if !store.purchased && !store.testFlightBypass {
+                        Text(t("一次性购买，解锁 ProRes RAW 与 ProRes RAW HQ 长时间录制。",
+                               "A one-time purchase unlocks longer ProRes RAW and ProRes RAW HQ recordings."))
+                        Text(t("免费版：每段 RAW 最长 2 分钟。H.265 及其他功能免费。",
+                               "Free: up to 2 minutes per RAW clip. H.265 and all other features remain free."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 Section {
                     if store.purchased {
@@ -169,13 +171,15 @@ struct ProAccessView: View {
                                    "This test build bypasses the free limit. Sandbox purchase and restore remain available."))
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
-                        if let product = store.product {
-                            Button(t("一次性解锁 · \(product.displayPrice)", "Unlock once · \(product.displayPrice)")) {
-                                Task { await store.purchase() }
-                            }.accessibilityIdentifier("purchasePro")
-                        } else {
-                            Text(t("购买项目暂不可用，请稍后重试。", "Purchase is temporarily unavailable. Please try again later."))
-                            Button(t("重新加载", "Reload")) { Task { await store.loadProduct() } }
+                        if !store.testFlightBypass {
+                            if let product = store.product {
+                                Button(t("一次性解锁 · \(product.displayPrice)", "Unlock once · \(product.displayPrice)")) {
+                                    Task { await store.purchase() }
+                                }.accessibilityIdentifier("purchasePro")
+                            } else {
+                                Text(t("购买项目暂不可用，请稍后重试。", "Purchase is temporarily unavailable. Please try again later."))
+                                Button(t("重新加载", "Reload")) { Task { await store.loadProduct() } }
+                            }
                         }
                     }
                     Button(t("恢复购买", "Restore Purchases")) { Task { await store.restore() } }
