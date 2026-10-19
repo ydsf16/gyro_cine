@@ -4,6 +4,8 @@
 <dict>
     <key>GyroCineTestFlightProBypass</key>
     <string>$(GYROCINE_TESTFLIGHT_PRO_BYPASS)</string>
+    <key>GyroCineTestFlightFreeBuild</key>
+    <string>$(GYROCINE_TESTFLIGHT_FREE_BUILD)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>

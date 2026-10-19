@@ -1,4 +1,5 @@
 import StoreKit
+import MarketplaceKit
 import SwiftUI
 import OSLog
 
@@ -6,16 +7,30 @@ import OSLog
 final class ProRecordingAccess {
     static let shared = ProRecordingAccess()
     private let lock = NSLock()
+    #if TESTFLIGHT_FREE
+    private var value = true
+    #else
     private var value = false
+    #endif
     var unlimited: Bool { lock.lock(); defer { lock.unlock() }; return value }
-    func update(unlimited: Bool) { lock.lock(); value = unlimited; lock.unlock() }
+    func update(unlimited: Bool) {
+        lock.lock()
+        #if TESTFLIGHT_FREE
+        value = true
+        #else
+        value = unlimited
+        #endif
+        lock.unlock()
+    }
 
     static func freeLimit(codec: String, purchased: Bool, bypass: Bool) -> TimeInterval? {
         ["aprn", "aprh"].contains(codec) && !purchased && !bypass ? 120 : nil
     }
 
-    static func permitsBypass(enabled: Bool, verifiedEnvironment: String) -> Bool {
-        enabled && verifiedEnvironment == "Sandbox"
+    static func permitsBypass(enabled: Bool, distributor: AppDistributor) -> Bool {
+        guard enabled else { return false }
+        if case .testFlight = distributor { return true }
+        return false
     }
 }
 
@@ -33,6 +48,11 @@ final class ProStore: ObservableObject {
     private var prepared = false
 
     func prepare() async {
+        #if TESTFLIGHT_FREE
+        testFlightBypass = true
+        publishAccess()
+        return
+        #else
         guard !prepared else {
             await refreshTestFlightBypass()
             return
@@ -55,28 +75,41 @@ final class ProStore: ObservableObject {
         await refreshEntitlements()
         await refreshTestFlightBypass()
         await loadProduct()
+        #endif
     }
 
+    #if !TESTFLIGHT_FREE
     private func refreshTestFlightBypass() async {
-        // The signed app transaction is the authority. The legacy receipt file
-        // may be absent even for a valid TestFlight installation.
+        // StoreKit's purchase environment isn't an installation-source signal.
+        // MarketplaceKit identifies TestFlight directly and keeps App Store
+        // installs subject to the normal RAW limit.
         let configuredBypass = Bundle.main.object(forInfoDictionaryKey: "GyroCineTestFlightProBypass")
         let bypassEnabled = (configuredBypass as? Bool == true) ||
             (configuredBypass as? String).map { ["YES", "TRUE", "1"].contains($0.uppercased()) } == true
         guard bypassEnabled else { return }
         do {
-            switch try await AppTransaction.shared {
-            case .verified(let transaction):
-                testFlightBypass = ProRecordingAccess.permitsBypass(enabled: true,
-                    verifiedEnvironment: transaction.environment == .sandbox ? "Sandbox" : "Production")
-                publishAccess()
-                logger.info("App transaction verified; sandbox bypass active: \(self.testFlightBypass)")
-            case .unverified:
-                logger.error("App transaction unverified; RAW free limit remains active")
-            }
+            let distributor = try await AppDistributor.current
+            testFlightBypass = ProRecordingAccess.permitsBypass(enabled: true, distributor: distributor)
+            publishAccess()
+            recordDistributorDiagnostic(source: String(describing: distributor))
+            logger.info("App distributor: \(String(describing: distributor), privacy: .public); TestFlight RAW bypass active: \(self.testFlightBypass)")
         } catch {
-            logger.error("App transaction unavailable; RAW free limit remains active: \(error.localizedDescription, privacy: .public)")
+            recordDistributorDiagnostic(source: "error: \(error.localizedDescription)")
+            logger.error("App distributor unavailable; RAW free limit remains active: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func recordDistributorDiagnostic(source: String) {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let payload: [String: Any] = [
+            "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
+            "source": source,
+            "testFlightBypass": testFlightBypass,
+            "checkedAt": ISO8601DateFormatter().string(from: Date())
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: directory.appendingPathComponent("pro_access.json"), options: .atomic)
     }
 
     func loadProduct() async {
@@ -95,11 +128,13 @@ final class ProStore: ObservableObject {
         purchased = active
         publishAccess()
     }
+    #endif
 
     private func publishAccess() {
         ProRecordingAccess.shared.update(unlimited: purchased || testFlightBypass)
     }
 
+    #if !TESTFLIGHT_FREE
     func purchase() async {
         guard !busy, let product else { return }
         busy = true; message = nil
@@ -134,8 +169,26 @@ final class ProStore: ObservableObject {
                 : AppText.value("此 Apple 账户暂无 Pro 购买记录。", "No Pro purchase was found for this Apple Account.", locale: .current)
         } catch { message = error.localizedDescription }
     }
+    #endif
 }
 
+#if TESTFLIGHT_FREE
+struct ProAccessView: View {
+    @Environment(\.dismiss) private var dismiss
+    var limitReached = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Label("TestFlight · RAW 长录制已开放", systemImage: "testtube.2")
+                    .foregroundStyle(.green)
+            }
+            .navigationTitle("GyroCine")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+        }
+    }
+}
+#else
 struct ProAccessView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
@@ -201,3 +254,4 @@ struct ProAccessView: View {
         }
     }
 }
+#endif

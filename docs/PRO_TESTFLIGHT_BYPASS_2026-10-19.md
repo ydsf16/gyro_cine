@@ -6,3 +6,13 @@
 - App 回到前台时重新检查签名交易。验证失败时保留 2 分钟限制并写入 `ProAccess` 系统日志，便于定位。
 - `ProAccessTests` 模拟器回归：2 通过、1 跳过（需要 CommerceQA 的本地购买测试）。Release 归档编译通过，构建号 20261019.7。
 - 20261019.7 已加入内部测试和熟人测试群组。实际 TestFlight 安装并录制超过 2 分钟仍需验证；本地安装的开发包不能证明 Apple 签名的 TestFlight 环境行为。
+- 用户确认 20261019.8 已通过 TestFlight 安装，仍显示 2 分钟付费提示；设备构建号也核对为 20261019.8。因此 `AppTransaction.environment` 未在该设备上触发豁免，前两版修复不能视为通过。
+- 20261020.1 改用 Apple 的 `MarketplaceKit.AppDistributor.current` 直接判断安装来源。仅 `.testFlight` 且构建开关开启时豁免；`.appStore` 等来源继续执行 120 秒限制。识别结果写入 App 私有 Application Support 的 `pro_access.json`，便于从真机拉取证据。
+- 20261020.1 的真实 TestFlight 安装、权限显示及超过 2 分钟 RAW 录制仍需回归。
+
+## 独立免费测试构建（20261020.2）
+
+- 用户要求 TestFlight 版本不显示、也不执行付费功能。`TESTFLIGHT_FREE` 编译条件使 RAW 录制权限始终开放，即使 StoreKit、安装来源检测或网络不可用，也不会启动 120 秒停止计时器。
+- 测试构建隐藏设置中的 Pro 购买入口，并从编译结果中移除购买、恢复购买方法和付费页面。设置页底部显示测试版标识。
+- 标准 Release 构建不开启此条件，继续执行付费规则。项目默认的 TestFlight 豁免开关为 `NO`；免费测试构建使用 `scripts/upload_testflight_free.sh` 单独归档和上传。
+- 该免费构建仅分发到 TestFlight 群组，不得选作 App Store 正式版审核构建。`20261020.1` 已上传但不分发；`20261020.2` 为待验证的免费构建。

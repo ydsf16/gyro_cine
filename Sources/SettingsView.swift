@@ -101,6 +101,7 @@ struct SettingsView: View {
                 }
                 videoSection
                 if !quickCapture {
+                    #if !TESTFLIGHT_FREE
                     Section {
                         Button { showingPro = true } label: {
                             HStack {
@@ -117,6 +118,7 @@ struct SettingsView: View {
                                  "RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
+                    #endif
                     storageSection
                     recordingSection
                     viewfinderSection
@@ -129,6 +131,10 @@ struct SettingsView: View {
                         VStack(spacing: 4) {
                             Text("GyroCine").font(.footnote.weight(.semibold))
                             Text(appVersion).font(.caption)
+                            #if TESTFLIGHT_FREE
+                            Text(t("TestFlight 测试版 · RAW 长录制开放", "TestFlight build · longer RAW recordings enabled"))
+                                .font(.caption2)
+                            #endif
                         }
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)

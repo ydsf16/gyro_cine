@@ -1,5 +1,6 @@
 import XCTest
 import StoreKitTest
+import MarketplaceKit
 import UIKit
 @testable import GyroCine
 
@@ -15,14 +16,21 @@ final class ProAccessTests: XCTestCase {
         }
     }
 
-    func testBuildFlagNeverUnlocksProductionOrUnknownEnvironment() {
-        for environment in ["Production", "Xcode", "", "unknown"] {
-            XCTAssertFalse(ProRecordingAccess.permitsBypass(enabled: true, verifiedEnvironment: environment))
+    func testOnlyTestFlightDistributorUnlocksWithBuildFlag() {
+        for distributor in [AppDistributor.appStore, .other, .web, .marketplace("example.marketplace")] {
+            XCTAssertFalse(ProRecordingAccess.permitsBypass(enabled: true, distributor: distributor))
         }
-        XCTAssertFalse(ProRecordingAccess.permitsBypass(enabled: false, verifiedEnvironment: "Sandbox"))
-        XCTAssertTrue(ProRecordingAccess.permitsBypass(enabled: true, verifiedEnvironment: "Sandbox"))
+        XCTAssertFalse(ProRecordingAccess.permitsBypass(enabled: false, distributor: .testFlight))
+        XCTAssertTrue(ProRecordingAccess.permitsBypass(enabled: true, distributor: .testFlight))
     }
 
+    #if TESTFLIGHT_FREE
+    func testFreeTestFlightBuildCannotReenableRAWLimit() {
+        XCTAssertTrue(ProRecordingAccess.shared.unlimited)
+        ProRecordingAccess.shared.update(unlimited: false)
+        XCTAssertTrue(ProRecordingAccess.shared.unlimited)
+    }
+    #else
     @MainActor
     func testLocalStoreKitPurchaseRestoreAndRefund() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.arguments.contains("--commerce-tests"),
@@ -67,4 +75,5 @@ final class ProAccessTests: XCTestCase {
         XCTAssertFalse(restored.purchased)
         XCTAssertFalse(ProRecordingAccess.shared.unlimited)
     }
+    #endif
 }
