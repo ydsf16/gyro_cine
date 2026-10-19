@@ -16,4 +16,4 @@
 - 测试构建隐藏设置中的 Pro 购买入口，并从编译结果中移除购买、恢复购买方法和付费页面。设置页底部显示测试版标识。
 - 标准 Release 构建不开启此条件，继续执行付费规则。项目默认的 TestFlight 豁免开关为 `NO`；免费测试构建使用 `scripts/upload_testflight_free.sh` 单独归档和上传。
 - 该免费构建仅分发到 TestFlight 群组，不得选作 App Store 正式版审核构建。`20261020.1` 已上传但不分发；`20261020.2` 已上传并加入“熟人测试”群组，App Store Connect 显示“正在测试”。
-- `TESTFLIGHT_FREE` 下 `ProAccessTests`：3 通过、0 跳过；标准 Release 构建通过。归档内 `GyroCineTestFlightFreeBuild=YES`。真实 TestFlight 安装与超过 2 分钟 RAW 录制仍待设备验证。
+- `TESTFLIGHT_FREE` 下 `ProAccessTests`：3 通过、0 跳过；标准 Release 构建通过。归档内 `GyroCineTestFlightFreeBuild=YES`。真机已核对安装版本为 `20261020.2`；用户反馈 TestFlight 版无付费提示，ProRes RAW 录制超过 2 分钟。此次反馈未单独确认最终 MOV 文件的保存与解码。
