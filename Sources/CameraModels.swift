@@ -2,6 +2,7 @@ import AVFoundation
 
 enum VideoEncoding: String, CaseIterable, Identifiable {
     case hevc, hevcHQ, proResRAW, proResRAWHQ
+    case proRes422HQ, proRes422, proRes422LT, proRes422Proxy
     var id: Self { self }
     var title: String {
         switch self {
@@ -9,6 +10,10 @@ enum VideoEncoding: String, CaseIterable, Identifiable {
         case .hevcHQ: "H.265 HQ"
         case .proResRAW: "ProRes RAW"
         case .proResRAWHQ: "ProRes RAW HQ"
+        case .proRes422HQ: "ProRes 422 HQ"
+        case .proRes422: "ProRes 422"
+        case .proRes422LT: "ProRes 422 LT"
+        case .proRes422Proxy: "ProRes 422 Proxy"
         }
     }
     var codec: AVVideoCodecType {
@@ -16,7 +21,66 @@ enum VideoEncoding: String, CaseIterable, Identifiable {
         case .hevc, .hevcHQ: .hevc
         case .proResRAW: AVVideoCodecType(rawValue: "aprn")
         case .proResRAWHQ: AVVideoCodecType(rawValue: "aprh")
+        case .proRes422HQ: .proRes422HQ
+        case .proRes422: .proRes422
+        case .proRes422LT: .proRes422LT
+        case .proRes422Proxy: .proRes422Proxy
         }
+    }
+
+    var isRAW: Bool { self == .proResRAW || self == .proResRAWHQ }
+    var isProRes422: Bool {
+        switch self {
+        case .proRes422HQ, .proRes422, .proRes422LT, .proRes422Proxy: true
+        default: false
+        }
+    }
+
+    // Conservative estimates until the existing per-device bitrate learner has samples.
+    var estimatedBitsPerPixelPerFrame: Double {
+        switch self {
+        case .proResRAWHQ: 8
+        case .proResRAW: 6
+        case .proRes422HQ: 4
+        case .proRes422: 3
+        case .proRes422LT: 2
+        case .proRes422Proxy: 1.2
+        case .hevc, .hevcHQ: 0.5
+        }
+    }
+}
+
+enum RecordingColorSpace: String, CaseIterable, Identifiable {
+    case systemDefault, rec709, rec2020HDR, p3D65, appleLog, appleLog2
+    var id: Self { self }
+
+    func title(locale: Locale) -> String {
+        switch self {
+        case .systemDefault: AppText.value("系统默认", "System Default", locale: locale)
+        case .rec709: "Rec.709"
+        case .rec2020HDR: "Rec.2020 · HDR"
+        case .p3D65: "P3 D65"
+        case .appleLog: "Apple Log"
+        case .appleLog2: "Apple Log 2"
+        }
+    }
+
+    var captureColorSpace: AVCaptureColorSpace? {
+        switch self {
+        case .systemDefault: nil
+        case .rec709: .sRGB
+        case .rec2020HDR: .HLG_BT2020
+        case .p3D65: .P3_D65
+        case .appleLog: .appleLog
+        case .appleLog2:
+            if #available(iOS 27.0, *) { .appleLog2 } else { nil }
+        }
+    }
+
+    func isAvailable(for format: AVCaptureDevice.Format, encoding: VideoEncoding) -> Bool {
+        if self == .systemDefault { return true }
+        guard !encoding.isRAW, let captureColorSpace else { return false }
+        return format.supportedColorSpaces.contains(captureColorSpace)
     }
 }
 
@@ -105,6 +169,9 @@ struct FormatInfo: Identifiable {
     var dictionary: [String: Any] {
         ["index": index, "width": width, "height": height, "pixelFormat": fourCC,
          "fpsRanges": format.videoSupportedFrameRateRanges.map { ["min": $0.minFrameRate, "max": $0.maxFrameRate] },
+         "colorSpaces": RecordingColorSpace.allCases.filter {
+             $0 != .systemDefault && $0.captureColorSpace.map(format.supportedColorSpaces.contains) == true
+         }.map(\.rawValue),
          "autoFocusSystem": autofocus, "fieldOfViewDegrees": format.videoFieldOfView,
          "supportsIntrinsics": supportsIntrinsics, "compatibleCodecs": compatibleCodecs.sorted()]
     }

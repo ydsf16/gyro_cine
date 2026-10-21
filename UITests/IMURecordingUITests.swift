@@ -1,6 +1,140 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testBuiltinLUTManagementChineseAndEnglish() {
+        for (language, title, amber, group) in [
+            ("zh-Hans", "LUT 管理", "暖阳 · Amber", "内置 LUT"),
+            ("en", "LUT Management", "Amber", "Built-in LUTs")
+        ] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-testing", "-AppleLanguages", "(\(language))"]
+            app.launch()
+            XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+            func openManagement() {
+                app.buttons["settingsOpen"].tap()
+                let manage = app.buttons["settings.lutManagement"]
+                for _ in 0..<6 where !manage.isHittable { app.swipeUp() }
+                XCTAssertEqual(manage.label, title)
+                manage.tap()
+            }
+            func setToggle(_ toggle: XCUIElement, _ on: Bool) {
+                XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+                if (toggle.value as? String == "1") != on {
+                    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                }
+                XCTAssertEqual(toggle.value as? String, on ? "1" : "0")
+            }
+            openManagement()
+            XCTAssertTrue(app.staticTexts[group].exists)
+            XCTAssertEqual(app.switches["lut.visible.builtin.amber"].label, amber)
+            let builtin = app.switches["lut.visible.builtin.rec709"]
+            setToggle(builtin, true)
+            app.buttons["lut.managementDone"].tap(); app.buttons["captureSettingsClose"].tap()
+            app.buttons["parameter.LUT"].tap(); app.buttons["lut.rec709"].tap()
+            app.buttons["parameter.LUT"].tap()
+            openManagement()
+            setToggle(builtin, false)
+            controlScreenshot(app, "builtin-lut-disabled-\(language)")
+            app.buttons["lut.managementDone"].tap()
+            XCTAssertEqual(app.switches["settings.lutBurn"].value as? String, "0")
+            app.buttons["captureSettingsClose"].tap()
+            app.buttons["parameter.LUT"].tap()
+            XCTAssertFalse(app.buttons["lut.rec709"].exists)
+            XCTAssertEqual(app.switches["lut.burn"].value as? String, "0")
+            app.terminate(); app.launch()
+            XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 25))
+            openManagement(); setToggle(builtin, false); setToggle(builtin, true)
+            app.buttons["lut.managementDone"].tap(); app.buttons["captureSettingsClose"].tap()
+            app.buttons["parameter.LUT"].tap()
+            XCTAssertTrue(app.buttons["lut.rec709"].exists)
+            controlScreenshot(app, "builtin-lut-restored-\(language)")
+            app.terminate()
+        }
+    }
+
+    func testRealtimeLUTOnOffOnRecording() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launch()
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.waitForExistence(timeout: 25))
+        for enabled in [true, false, true] {
+            app.buttons["parameter.LUT"].tap()
+            let burn = app.switches["lut.burn"]
+            XCTAssertTrue(burn.waitForExistence(timeout: 5))
+            if (burn.value as? String == "1") != enabled {
+                burn.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            }
+            XCTAssertEqual(burn.value as? String, enabled ? "1" : "0")
+            app.buttons["parameter.LUT"].tap()
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label == 'Stop recording'"), object: record)], timeout: 15), .completed)
+            Thread.sleep(forTimeInterval: 4)
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "enabled == true AND label == 'Record'"), object: record)], timeout: 15), .completed)
+            XCTAssertFalse(app.alerts.firstMatch.exists)
+        }
+    }
+
+    func testLUTManagementAndBurnControls() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["parameter.LUT"].tap()
+        XCTAssertTrue(app.switches["lut.burn"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["lut.import"].exists)
+        controlScreenshot(app, "lut-compact-realtime-controls")
+        let burn = app.switches["lut.burn"]
+        let before = burn.value as? String
+        burn.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertNotEqual(burn.value as? String, before)
+        burn.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertEqual(burn.value as? String, before)
+        app.buttons["settingsOpen"].tap()
+        let manage = app.buttons["settings.lutManagement"]
+        for _ in 0..<5 where !manage.isHittable { app.swipeUp() }
+        XCTAssertTrue(manage.isHittable); manage.tap()
+        XCTAssertTrue(app.buttons["lut.import"].waitForExistence(timeout: 5))
+        let item = app.switches["lut.visible.UITEST_PreviewRed"].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        if item.value as? String == "1" { item.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+        XCTAssertEqual(item.value as? String, "0")
+        controlScreenshot(app, "lut-management-hidden")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        for _ in 0..<5 where !manage.isHittable { app.swipeUp() }
+        manage.tap()
+        XCTAssertTrue(item.waitForExistence(timeout: 5))
+        XCTAssertEqual(item.value as? String, "0")
+        item.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap(); XCTAssertEqual(item.value as? String, "1")
+        app.buttons["lut.import"].tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].tap()
+        controlScreenshot(app, "lut-management-enabled")
+    }
+
+    func testPointFocusHoldAndRelease() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]
+        app.launch()
+        let focus = app.buttons["parameter.Focus"]
+        XCTAssertTrue(focus.waitForExistence(timeout: 30))
+        // Deliberately use two off-center locations to catch discarded points.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.42)).press(forDuration: 0.8)
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "锁定"), object: focus)], timeout: 10) == .completed)
+        controlScreenshot(app, "point-focus-held")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.72, dy: 0.58)).tap()
+        XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "AF-C"), object: focus)], timeout: 10) == .completed)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        controlScreenshot(app, "point-focus-released")
+    }
+
     func testHEVCBitratePresetPersistsAcrossLaunch() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "-AppleLanguages", "(zh-Hans)"]

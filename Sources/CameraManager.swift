@@ -48,7 +48,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     let key = "recordingBitrate.v1.\(Self.hardwareModel()).\(device?.uniqueID ?? "unknown").\(encoding.rawValue).\(format.width)x\(format.height).\(rate)" +
                         (encoding == .hevc ? ".\(chosenHEVCBitratePreset.rawValue)" : "")
                     let learned = UserDefaults.standard.double(forKey: key)
-                    let bits = encoding == .proResRAWHQ ? 8.0 : encoding == .proResRAW ? 6.0 : 0.5
+                    let bits = encoding.estimatedBitsPerPixelPerFrame
                     let fallback = (encoding == .hevc ? chosenHEVCBitratePreset.targetBitsPerSecond(
                         width: format.width, height: format.height, fps: rate) : nil)
                         .map { Double($0) / 8 * 1.25 + 100_000 }
@@ -128,6 +128,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var codecs: [AVVideoCodecType] = []
     @Published private(set) var selectedCodec: AVVideoCodecType?
     @Published private(set) var selectedEncoding: VideoEncoding = .hevc
+    @Published private(set) var selectedRecordingColorSpace: RecordingColorSpace = .systemDefault
     @Published private(set) var hevcBitratePreset = HEVCBitratePreset.stored(
         UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     @Published private(set) var selectedFormatIndex: Int?
@@ -163,7 +164,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var shutterMaxSeconds: Double = 1.0 / 60.0
     @Published private(set) var shutterAngle: Double = 180
     @Published private(set) var whiteBalanceAuto = true
-    @Published private(set) var whiteBalanceChoice: WhiteBalanceChoice = .auto
+    @Published private(set) var whiteBalanceChoice: WhiteBalanceChoice = .autoLock
     @Published private(set) var exposureBias: Double = 0
     @Published private(set) var exposureBiasRange: ClosedRange<Double> = -6...6
     private var chosenWhiteBalance: WhiteBalanceChoice = .auto
@@ -177,16 +178,56 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var lutLook = PreviewLook(rawValue: UserDefaults.standard.string(forKey: "previewLUTLook") ?? "") ?? .rec709
     @Published private(set) var lutSupported = false
     @Published private(set) var lutStatus = "off"
+    @Published private(set) var importedLUTs = PreviewLUTLibrary.load()
+    @Published private(set) var importedLUTID = UserDefaults.standard.string(forKey: "previewImportedLUTID")
+    @Published private(set) var importingLUT = false
+    private let lutImportQueue = DispatchQueue(label: "GyroCine.LUTImport", qos: .userInitiated)
+    var selectedImportedLUT: ImportedPreviewLUT? { importedLUTs.first { $0.selectionID == importedLUTID } }
+    var selectedLUTID: String { selectedImportedLUT?.selectionID ?? lutLook.rawValue }
+    var selectedLUTTitle: String { selectedImportedLUT?.name ?? lutLook.title }
+    @Published private(set) var lutBurnEnabled = UserDefaults.standard.bool(forKey: "lutBurnEnabled")
+    @Published private(set) var disabledLUTIDs = Set(UserDefaults.standard.stringArray(forKey: "disabledLUTIDs") ?? [])
+    var visibleBuiltinLUTs: [PreviewLook] { PreviewLook.allCases.filter { !disabledLUTIDs.contains($0.rawValue) } }
+    var visibleImportedLUTs: [ImportedPreviewLUT] { importedLUTs.filter { !disabledLUTIDs.contains($0.selectionID) } }
+    var lutControlsLocked: Bool { recording || preparingRecording || finalizing }
+    func setLUTBurnEnabled(_ value: Bool) {
+        guard !lutControlsLocked else { return }
+        if value, disabledLUTIDs.contains(selectedLUTID) {
+            if let look = visibleBuiltinLUTs.first { setLUTLook(look) }
+            else if let item = visibleImportedLUTs.first { selectImportedLUT(item) }
+            else { return }
+        }
+        lutBurnEnabled = value && !selectedEncoding.isRAW
+        UserDefaults.standard.set(lutBurnEnabled, forKey: "lutBurnEnabled")
+        if lutBurnEnabled { setLUTEnabled(true) }
+    }
+    func setLUTVisible(_ item: ImportedPreviewLUT, enabled: Bool) {
+        setLUTVisible(id: item.selectionID, enabled: enabled)
+    }
+    func setLUTVisible(_ look: PreviewLook, enabled: Bool) {
+        setLUTVisible(id: look.rawValue, enabled: enabled)
+    }
+    private func setLUTVisible(id: String, enabled: Bool) {
+        guard !lutControlsLocked else { return }
+        if enabled { disabledLUTIDs.remove(id) } else { disabledLUTIDs.insert(id) }
+        UserDefaults.standard.set(Array(disabledLUTIDs), forKey: "disabledLUTIDs")
+        if !enabled, selectedLUTID == id { setLUTEnabled(false) }
+    }
     let lutPreview = LUTPreview()
     func setLUTEnabled(_ enabled: Bool) {
+        guard !enabled || !disabledLUTIDs.contains(selectedLUTID) else { return }
         guard lutEnabled != enabled else { return }
         lutEnabled = enabled
+        if !enabled { lutBurnEnabled = false; UserDefaults.standard.set(false, forKey: "lutBurnEnabled") }
         UserDefaults.standard.set(enabled, forKey: "previewLUTEnabled")
         lutPreview.setEnabled(enabled)
         logger.event("lut_preview_toggle", ["enabled": enabled, "previewOnly": true])
     }
     func setLUTLook(_ look: PreviewLook) {
-        if lutLook != look {
+        guard !disabledLUTIDs.contains(look.rawValue) else { return }
+        if lutLook != look || importedLUTID != nil {
+            importedLUTID = nil
+            UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
             lutLook = look
             UserDefaults.standard.set(look.rawValue, forKey: "previewLUTLook")
             lutPreview.setLook(look)
@@ -194,17 +235,58 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
         setLUTEnabled(true)
     }
+    func selectImportedLUT(_ item: ImportedPreviewLUT) {
+        guard !disabledLUTIDs.contains(item.selectionID) else { return }
+        importedLUTID = item.selectionID
+        UserDefaults.standard.set(item.selectionID, forKey: "previewImportedLUTID")
+        lutPreview.setImportedLook(item)
+        setLUTEnabled(true)
+    }
+    func importPreviewLUT(_ url: URL) {
+        importingLUT = true
+        lutImportQueue.async {
+            do {
+                let item = try PreviewLUTLibrary.importFile(url)
+                let items = PreviewLUTLibrary.load()
+                self.publish {
+                    self.importedLUTs = items; self.importingLUT = false
+                    self.selectImportedLUT(item)
+                }
+            } catch {
+                self.publish { self.importingLUT = false; self.errorText = error.localizedDescription }
+            }
+        }
+    }
+    func reportLUTImportError(_ error: Error) { errorText = error.localizedDescription }
+    func deleteImportedLUT(_ item: ImportedPreviewLUT) {
+        lutImportQueue.async {
+            do {
+                try PreviewLUTLibrary.remove(item)
+                let items = PreviewLUTLibrary.load()
+                self.publish {
+                    self.importedLUTs = items
+                    if self.importedLUTID == item.selectionID { self.setLUTLook(.rec709) }
+                }
+            } catch { self.publish { self.errorText = error.localizedDescription } }
+        }
+    }
     // Camera queue only. Add the small ISP proxy before recording, so UI toggles never reconfigure capture.
     private func configureLUTPreview() {
-        guard !session.outputs.contains(lutPreview.output) else { return }
         lutPreview.log = { [weak self] name, details in self?.logger.event(name, details) }
         lutPreview.statusChanged = { [weak self] status in self?.lutStatus = status }
-        guard lutPreview.metalDevice != nil, session.canAddOutput(lutPreview.output) else {
+        let shared = !chosenEncoding.isRAW && session.outputs.contains(intrinsicOutput)
+        if shared, session.outputs.contains(lutPreview.output) { session.removeOutput(lutPreview.output) }
+        lutPreview.setSharedSource(shared)
+        guard lutPreview.metalDevice != nil,
+              shared || session.outputs.contains(lutPreview.output) || session.canAddOutput(lutPreview.output) else {
             publish { self.lutSupported = false; self.lutStatus = "unavailable" }; return
         }
-        session.addOutput(lutPreview.output)
+        if !shared, !session.outputs.contains(lutPreview.output) { session.addOutput(lutPreview.output) }
         lutPreview.configure(fps: chosenFPS)
         lutPreview.setLook(PreviewLook(rawValue: UserDefaults.standard.string(forKey: "previewLUTLook") ?? "") ?? .rec709)
+        if let selected = PreviewLUTLibrary.load().first(where: {
+            $0.selectionID == UserDefaults.standard.string(forKey: "previewImportedLUTID")
+        }) { lutPreview.setImportedLook(selected) }
         lutPreview.setEnabled(UserDefaults.standard.bool(forKey: "previewLUTEnabled"))
         publish { self.lutSupported = true }
     }
@@ -224,6 +306,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private let output = AVCaptureMovieFileOutput()
     private let intrinsicOutput = AVCaptureVideoDataOutput()
     private let intrinsicRecorder = CameraIntrinsicsRecorder()
+    private lazy var previewFanout = IntrinsicsPreviewFanout(recorder: intrinsicRecorder, preview: lutPreview)
     #if DEBUG
     private let captureStartProbe = CaptureStartTimestampProbe()
     #endif
@@ -234,6 +317,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var supportedCodecs: [AVVideoCodecType] = []
     private var chosenCodec: AVVideoCodecType?
     private var chosenEncoding: VideoEncoding = .hevc
+    private var chosenRecordingColorSpace: RecordingColorSpace = .systemDefault
     private var chosenHEVCBitratePreset = HEVCBitratePreset.stored(
         UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     private var chosenIndex: Int?
@@ -307,6 +391,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private var isRAWWriterActive: Bool { rawWriterExperiment != nil }
     private var recordingLens = ""
+    private var realtimeLUTVideoSettings: [String: Any]?
+    private var realtimeLUTWriter: RealtimeLUTWriter?
+    private var recordingLUTBurn: LUTBurnRecipe?
     private var audioReady = false
     private var telemetryReadoutTick = 0
     #if DEBUG
@@ -323,7 +410,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         super.init()
         CaptureDefaults.restoreIfNeeded()
         savedControls = SavedCameraControls.load()
-        chosenWhiteBalance = WhiteBalanceChoice(rawValue: savedControls.whiteBalance) ?? .auto
+        chosenWhiteBalance = WhiteBalanceChoice(rawValue: savedControls.whiteBalance) ?? .autoLock
         manualWhiteBalanceKelvin = savedControls.kelvin
         exposureBiasIntent = savedControls.ev
         if savedControls.shutter == "manual" || savedControls.shutter == "angle" {
@@ -390,6 +477,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         "selectedID": selectedID ?? "none",
                         "detected": available.map { $0.displayName ?? "SSD" }])
                     self.publish { self.externalStorageConnected = connected }
+                    if !connected, self.activeExternalMovieURL != nil, let writer = self.realtimeLUTWriter {
+                        writer.abort("外部 SSD 已断开连接")
+                    }
                     if !connected, self.activeExternalMovieURL != nil,
                        #available(iOS 27.0, *), let writer = self.rawWriterExperiment as? RAWInternalWriterExperiment {
                         self.logger.event("raw_writer_ssd_disconnected")
@@ -482,8 +572,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 width: size?.width ?? 3840, height: size?.height ?? 2160, fps: chosenFPS) {
             return Double(target) / 8 * 1.25 + 100_000
         }
-        let bitsPerPixel: Double = chosenCodec?.rawValue == "aprh" ? 8 :
-            (chosenCodec?.rawValue == "aprn" ? 6 : 0.5)
+        let bitsPerPixel = chosenEncoding.estimatedBitsPerPixelPerFrame
         return max(1_000_000, pixels * max(chosenFPS, 1) * bitsPerPixel / 8 + 100_000)
     }
     // Learned locally per hardware/lens/codec/format/rate, never from a single lab clip.
@@ -510,7 +599,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         max(estimatedRecordingBytesPerSecond, conservativeBytesPerSecond * 0.25)
     }
     private func updateRecordingBitrateEstimate(freeBytes: Int64?) {
-        guard output.isRecording || rawWriterExperiment != nil, let file = currentFile else {
+        guard output.isRecording || rawWriterExperiment != nil || realtimeLUTWriter != nil, let file = currentFile else {
             bitrateProbeFile = nil; resetBitrateProbe()
             return
         }
@@ -653,7 +742,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self.checkedStorageLocation = location
         }
         var active = output.isRecording
-        active = active || rawWriterExperiment != nil
+        active = active || rawWriterExperiment != nil || realtimeLUTWriter != nil
         if active {
             logger.event("recording_storage_health", ["availableBytes": free ?? -1,
                 "reserveBytes": storageReserveBytes, "localFreeBytes": localFreeBytes() ?? -1,
@@ -980,7 +1069,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let stopDelay: Double = longHQ ? 244 :
             (ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") ? 45 : 11)
         queue.asyncAfter(deadline: .now() + stopDelay) {
-            if self.output.isRecording { self.toggleRecording() }
+            if self.output.isRecording || self.realtimeLUTWriter != nil { self.toggleRecording() }
             else { self.logger.event("raw_smoke_failed", ["reason": "MovieFileOutput never entered recording state"]) }
         }
     }
@@ -1012,7 +1101,117 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish { self.cameraReady = false; self.status = "Storage probe complete; relaunch app" }
     }
 
+    private func runProRes422Smoke() {
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--prores422-smoke=") }),
+              let encoding = VideoEncoding(rawValue: String(argument.dropFirst("--prores422-smoke=".count))),
+              encoding.isProRes422 else { return }
+        let requestedColor = ProcessInfo.processInfo.arguments.first(where: {
+            $0.hasPrefix("--prores422-color=")
+        }).flatMap { RecordingColorSpace(rawValue: String($0.dropFirst("--prores422-color=".count))) }
+            ?? (ProcessInfo.processInfo.arguments.contains("--prores422-log-smoke") ? .appleLog : .systemDefault)
+        chosenEncoding = encoding
+        chosenCodec = encoding.codec
+        chosenFPS = 30
+        chosenRecordingColorSpace = .systemDefault
+        guard let target = closestFormatIndex(in: formatObjects, codec: encoding.codec,
+            preference: CapturePreference(encoding: encoding, width: 3840, height: 2160, fps: 30)),
+            applyFormat(target, reason: requestedColor == .systemDefault ? "color_space_change" : "prores422_smoke") else {
+            logger.event("prores422_smoke_failed", ["codec": encoding.title, "reason": "configuration"])
+            return
+        }
+        if requestedColor != .systemDefault {
+            guard requestedColor.isAvailable(for: formatObjects[target].format, encoding: encoding) else {
+                logger.event("prores422_smoke_failed", ["codec": encoding.title,
+                    "reason": "Color space unavailable", "color": requestedColor.rawValue])
+                return
+            }
+            session.stopRunning()
+            chosenRecordingColorSpace = requestedColor
+            guard applyFormat(target, reason: "prores422_color_smoke") else {
+                session.startRunning()
+                return
+            }
+            session.startRunning()
+            publish { self.setLUTEnabled(true) }
+        }
+        logger.event("prores422_smoke_ready", ["codec": encoding.title, "color": chosenRecordingColorSpace.rawValue,
+                                                 "state": configurationSnapshot()])
+        startSmokeRecordingWhenReady(deadline: ProcessInfo.processInfo.systemUptime + 30)
+    }
+
+    private func runPointFocusSmoke(attempt: Int = 0) {
+        guard let wide = lensDevices.values.first(where: { $0.deviceType == .builtInWideAngleCamera }) else { return }
+        if device !== wide {
+            guard attempt == 0 else { logger.event("point_focus_smoke_failed", ["reason": "wide lens unavailable"]); return }
+            chooseLens(wide.uniqueID)
+            queue.async { self.runPointFocusSmoke(attempt: attempt + 1) }
+            return
+        }
+        let tap = CGPoint(x: 0.23, y: 0.37), hold = CGPoint(x: 0.71, y: 0.62)
+        tapFocus(tap)
+        queue.async {
+            let tapOK = wide.focusMode == .continuousAutoFocus && wide.focusPointOfInterest == tap
+            self.lockFocus(at: hold)
+            self.queue.asyncAfter(deadline: .now() + 1) {
+                self.verifyPointFocusSmoke(tapOK: tapOK, point: hold,
+                    deadline: ProcessInfo.processInfo.systemUptime + 8)
+            }
+        }
+    }
+
+    private func verifyPointFocusSmoke(tapOK: Bool, point: CGPoint, deadline: Double) {
+        guard let camera = device else { return }
+        if camera.isAdjustingFocus && ProcessInfo.processInfo.systemUptime < deadline {
+            queue.asyncAfter(deadline: .now() + 0.1) {
+                self.verifyPointFocusSmoke(tapOK: tapOK, point: point, deadline: deadline)
+            }
+            return
+        }
+        let snapshot = configurationSnapshot()
+        let holdOK = chosenFocus == .locked && camera.focusPointOfInterest == point &&
+            (camera.focusMode == .autoFocus || camera.focusMode == .locked) && !camera.isAdjustingFocus
+        let position = camera.lensPosition
+        queue.asyncAfter(deadline: .now() + 0.7) {
+            let stable = abs(camera.lensPosition - position) < 0.005 && !camera.isAdjustingFocus
+            self.tapFocus(CGPoint(x: 0.5, y: 0.5))
+            self.queue.async {
+                let released = self.chosenFocus == .continuous && camera.focusMode == .continuousAutoFocus
+                let report: [String: Any] = ["pass": tapOK && holdOK && stable && released,
+                    "tapPointApplied": tapOK, "heldPointApplied": holdOK,
+                    "heldPositionStable": stable, "tapReleasesLock": released, "heldState": snapshot]
+                self.logger.event("point_focus_smoke_result", report)
+                if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? data.write(to: RecordingStoragePaths.diagnosticDirectory.appendingPathComponent("focus-point-smoke-result.json"), options: .atomic)
+                }
+            }
+        }
+    }
+
     private func runHEVCCadenceSmoke() {
+        if ProcessInfo.processInfo.arguments.contains("--lut-realtime-smoke") {
+            UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
+            UserDefaults.standard.set(true, forKey: "previewLUTEnabled")
+            publish { self.setLUTLook(.rec709); self.setLUTBurnEnabled(true) }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--lut-import-smoke") {
+            do {
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("UITEST_PreviewRed.cube")
+                try ("LUT_3D_SIZE 2\n" + Array(repeating: "1 0 0", count: 8).joined(separator: "\n"))
+                    .write(to: url, atomically: true, encoding: .utf8)
+                let item = try PreviewLUTLibrary.importFile(url)
+                try? FileManager.default.removeItem(at: url)
+                UserDefaults.standard.set(item.selectionID, forKey: "previewImportedLUTID")
+                UserDefaults.standard.set(true, forKey: "previewLUTEnabled")
+                let items = PreviewLUTLibrary.load()
+                publish { self.importedLUTs = items; self.selectImportedLUT(item); self.lutEnabled = true }
+                logger.event("lut_import_smoke", ["id": item.selectionID, "name": item.name])
+            } catch { logger.event("lut_import_smoke_failed", ["error": error.localizedDescription]); return }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--whitebalance-autol-smoke") {
+            chosenWhiteBalance = .autoLock
+            savedControls.whiteBalance = WhiteBalanceChoice.autoLock.rawValue
+            savedControls.save()
+        }
         let at120 = ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")
         let width: Int32 = at120 ? 1920 : 3840
         let height: Int32 = at120 ? 1080 : 2160
@@ -1327,6 +1526,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let info = formatObjects[index]
         SavedCaptureConfiguration(lensID: camera.uniqueID, encoding: chosenEncoding.rawValue,
             width: info.width, height: info.height, fps: chosenFPS).save()
+        UserDefaults.standard.set(chosenRecordingColorSpace.rawValue,
+                                  forKey: "capture.colorSpace.\(camera.uniqueID)")
     }
 
     private func configureSession(audioAllowed: Bool) {
@@ -1370,7 +1571,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             intrinsicOutput.alwaysDiscardsLateVideoFrames = true
             intrinsicOutput.automaticallyConfiguresOutputBufferDimensions = false
             intrinsicOutput.deliversPreviewSizedOutputBuffers = false
-            intrinsicOutput.setSampleBufferDelegate(intrinsicRecorder, queue: intrinsicRecorder.queue)
+            intrinsicOutput.setSampleBufferDelegate(previewFanout, queue: intrinsicRecorder.queue)
             guard session.canAddOutput(intrinsicOutput) else {
                 session.commitConfiguration(); fail("Cannot add camera intrinsics output"); return
             }
@@ -1420,6 +1621,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 guard let encoding = VideoEncoding(rawValue: value.encoding) else { return nil }
                 return CapturePreference(encoding: encoding, width: value.width, height: value.height, fps: value.fps)
             }
+            self.chosenRecordingColorSpace = RecordingColorSpace(rawValue:
+                UserDefaults.standard.string(forKey: "capture.colorSpace.\(camera.uniqueID)") ?? "") ?? .systemDefault
             guard discoverCapabilities(camera, preference: longRAWTest ? nil : preference, manualExposure: manualExposureIntent) else { return }
             startSampling(camera)
             session.startRunning()
@@ -1453,6 +1656,45 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
             }
             if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") { runRAWWriterIntegratedSmoke() }
+            if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") }) {
+                runProRes422Smoke()
+            }
+            if ProcessInfo.processInfo.arguments.contains("--lut-prores-file-smoke") {
+                finalizationQueue.async {
+                    let source = RecordingStoragePaths.movieDirectory.appendingPathComponent("UITEST_LUT_PRORES.mov")
+                    for codec in ["apco", "apcs", "apcn", "apch"] {
+                        let movie = RecordingStoragePaths.movieDirectory.appendingPathComponent("UITEST_LUT_PRORES_\(codec).mov")
+                        do {
+                            try? FileManager.default.removeItem(at: movie)
+                            try FileManager.default.copyItem(at: source, to: movie)
+                            let cube = try CubeLook(text: "LUT_3D_SIZE 2\n" + Array(repeating: "1 0 0", count: 8).joined(separator: "\n"))
+                                .compose(technical: PreviewColorTransform.cube(.rec709))
+                            let recipe = LUTBurnRecipe(id: "UITEST_PRORES_\(codec)", cube: cube, codec: codec, highBitDepth: true)
+                            try LUTMovieBurner.apply(recipe, movie: movie, progress: nil)
+                            // Repeating the durable job must preserve the completed file byte-for-byte.
+                            let completed = try Data(contentsOf: movie)
+                            try LUTMovieBurner.apply(recipe, movie: movie, progress: nil)
+                            guard try Data(contentsOf: movie) == completed else { throw RecorderError.unavailable("LUT retry was not idempotent") }
+                            self.logger.event("lut_prores_file_result", ["pass": true, "codec": codec])
+                        } catch { self.logger.event("lut_prores_file_result", ["pass": false, "codec": codec, "error": String(describing: error)]) }
+                    }
+                }
+            }
+            if ProcessInfo.processInfo.arguments.contains("--cleanup-lut-smoke") {
+                lutImportQueue.async {
+                    do {
+                        for item in PreviewLUTLibrary.load() where item.name == "UITEST_PreviewRed" {
+                            try PreviewLUTLibrary.remove(item)
+                        }
+                        let items = PreviewLUTLibrary.load()
+                        self.publish {
+                            self.importedLUTs = items
+                            if self.selectedImportedLUT == nil { self.setLUTLook(.rec709); self.setLUTEnabled(false) }
+                        }
+                    } catch { self.logger.event("lut_smoke_cleanup_failed", ["error": error.localizedDescription]) }
+                }
+            }
+            if ProcessInfo.processInfo.arguments.contains("--focus-point-smoke") { runPointFocusSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--pro-storage-support-probe") { runProStorageSupportProbe() }
             if ProcessInfo.processInfo.arguments.contains("--raw-ssd-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--raw-hq-ssd-smoke") ||
@@ -1607,6 +1849,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         case .hevcHQ: [.hevcHQ, .hevc, .proResRAW, .proResRAWHQ]
         case .proResRAW: [.proResRAW, .proResRAWHQ, .hevcHQ, .hevc]
         case .proResRAWHQ: [.proResRAWHQ, .proResRAW, .hevcHQ, .hevc]
+        case .proRes422HQ: [.proRes422HQ, .proRes422, .proRes422LT, .hevcHQ, .hevc]
+        case .proRes422: [.proRes422, .proRes422HQ, .proRes422LT, .hevcHQ, .hevc]
+        case .proRes422LT: [.proRes422LT, .proRes422, .proRes422Proxy, .hevcHQ, .hevc]
+        case .proRes422Proxy: [.proRes422Proxy, .proRes422LT, .proRes422, .hevcHQ, .hevc]
         }
         guard let encoding = encodingOrder.first(where: { candidate in
             found.contains { $0.compatibleCodecs.contains(candidate.codec.rawValue) &&
@@ -1651,6 +1897,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish {
             self.formats = found; self.codecs = union; self.selectedCodec = encoding.codec
             self.selectedEncoding = encoding
+            if encoding.isRAW { self.setLUTBurnEnabled(false) }
             self.selectedFormatIndex = self.chosenIndex
         }
         guard let index = chosenIndex else { fail("No compatible format on selected lens"); return false }
@@ -1686,6 +1933,29 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if !self.applyFormat(target, reason: "codec_change") {
                 self.chosenCodec = previousCodec; self.chosenEncoding = previousEncoding
             }
+        }
+    }
+
+    func chooseRecordingColorSpace(_ colorSpace: RecordingColorSpace) {
+        queue.async {
+            guard !self.output.isRecording, !self.recordingStarting, !self.captureFinishing,
+                  self.rawWriterExperiment == nil, let index = self.chosenIndex,
+                  self.formatObjects.indices.contains(index) else {
+                self.fail("Color space cannot change during recording"); return
+            }
+            guard colorSpace.isAvailable(for: self.formatObjects[index].format,
+                                         encoding: self.chosenEncoding) else {
+                self.fail("Color space unavailable for this format"); return
+            }
+            guard self.chosenRecordingColorSpace != colorSpace else { return }
+            let previous = self.chosenRecordingColorSpace
+            let wasRunning = self.session.isRunning
+            if wasRunning { self.session.stopRunning() }
+            self.chosenRecordingColorSpace = colorSpace
+            if !self.applyFormat(index, reason: "color_space_change") {
+                self.chosenRecordingColorSpace = previous
+            }
+            if wasRunning { self.session.startRunning() }
         }
     }
 
@@ -1754,6 +2024,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let previousFormat = camera.activeFormat
         let previousMin = camera.activeVideoMinFrameDuration
         let previousMax = camera.activeVideoMaxFrameDuration
+        let previousColorSpace = camera.activeColorSpace
+        let previousAutomaticWideColor = session.automaticallyConfiguresCaptureDeviceForWideColor
+        let requestedColorSpace = chosenRecordingColorSpace.isAvailable(for: info.format,
+            encoding: chosenEncoding) ? chosenRecordingColorSpace : .systemDefault
         let exposureToRestore = manualExposure ?? (reason != "initial_selection" ? manualExposurePreference(camera) : nil)
         logger.event("configuration_request", ["kind": reason, "requestedCodec": codec.rawValue, "requestedFormat": index, "before": before])
         do {
@@ -1768,10 +2042,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.addOutput(intrinsicOutput)
             }
             logProVideoStorage("format_before_sensor_change")
+            session.automaticallyConfiguresCaptureDeviceForWideColor = requestedColorSpace == .systemDefault
             try camera.lockForConfiguration()
             camera.activeFormat = info.format
+            if let colorSpace = requestedColorSpace.captureColorSpace {
+                camera.activeColorSpace = colorSpace
+            } else if (reason == "color_space_change" || chosenRecordingColorSpace != .systemDefault),
+                      info.format.supportedColorSpaces.contains(.sRGB) {
+                // Returning from an explicit Log/HDR choice must not leave that
+                // transfer function active under the "System Default" label.
+                camera.activeColorSpace = .sRGB
+            }
             let requestedFPS = CaptureFrameRatePolicy.normalized(chosenFPS)
-            let targetFPS = info.supports(requestedFPS) ? requestedFPS : nearestFPS(to: requestedFPS, in: info)
+            let targetFPS = availableFPS(for: info).contains(where: { abs($0 - requestedFPS) < 0.01 })
+                ? requestedFPS : nearestFPS(to: requestedFPS, in: info)
             let duration = CMTime(value: 1_000_000, timescale: CMTimeScale((targetFPS * 1_000_000).rounded()))
             camera.activeVideoMinFrameDuration = duration
             camera.activeVideoMaxFrameDuration = duration
@@ -1787,6 +2071,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             logProVideoStorage("format_after_encoder_change")
             try resetCameraControls(camera, fps: targetFPS, manualExposure: exposureToRestore)
             chosenIndex = index; chosenFPS = targetFPS
+            chosenRecordingColorSpace = requestedColorSpace
+            lutPreview.setExpectedColorSpace(requestedColorSpace)
+            if !chosenEncoding.isRAW { configureLUTPreview() }
             persistCaptureConfiguration()
             if reason != "initial_selection" {
                 let preferences = UserDefaults.standard
@@ -1800,6 +2087,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let telemetryEmbeddable = currentTelemetrySupport
             publish {
                 self.selectedCodec = codec; self.selectedEncoding = self.chosenEncoding
+                if self.chosenEncoding.isRAW { self.setLUTBurnEnabled(false) }
+                self.selectedRecordingColorSpace = requestedColorSpace
                 self.selectedFormatIndex = index; self.fps = targetFPS
                 self.telemetryEmbeddable = telemetryEmbeddable
                 self.isoRange = Double(camera.activeFormat.minISO)...Double(camera.activeFormat.maxISO)
@@ -1808,9 +2097,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             return true
         } catch {
+            session.automaticallyConfiguresCaptureDeviceForWideColor = previousAutomaticWideColor
             do {
                 try camera.lockForConfiguration()
                 camera.activeFormat = previousFormat
+                if previousFormat.supportedColorSpaces.contains(previousColorSpace) {
+                    camera.activeColorSpace = previousColorSpace
+                }
                 camera.activeVideoMinFrameDuration = previousMin
                 camera.activeVideoMaxFrameDuration = previousMax
                 camera.unlockForConfiguration()
@@ -1899,13 +2192,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                   self.formatObjects.indices.contains(index), let codec = self.chosenCodec else {
                 self.fail("No active video format"); return
             }
+            guard self.formatObjects.contains(where: {
+                $0.compatibleCodecs.contains(codec.rawValue) &&
+                $0.width == self.formatObjects[index].width && $0.height == self.formatObjects[index].height &&
+                self.availableFPS(for: $0).contains(where: { abs($0 - value) < 0.01 })
+            }) else { self.fail("FPS unavailable for this codec and resolution"); return }
             let preferredIndex = self.preferredIntrinsicFormatIndex(near: index, fps: value,
                                                                     codec: codec, in: self.formatObjects)
             if !self.formatObjects[index].supports(value) || preferredIndex != index {
                 let current = self.formatObjects[index]
                 let candidates = self.formatObjects.filter {
                     $0.width == current.width && $0.height == current.height &&
-                    $0.compatibleCodecs.contains(codec.rawValue) && $0.supports(value)
+                    $0.compatibleCodecs.contains(codec.rawValue) &&
+                    self.availableFPS(for: $0).contains(where: { abs($0 - value) < 0.01 })
                 }
                 guard let alternate = candidates.min(by: {
                     ($0.format.autoFocusSystem == .none ? 1 : 0,
@@ -2036,7 +2335,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func availableFPS(for format: FormatInfo) -> [Double] {
-        CaptureFrameRatePolicy.available(for: format)
+        let rates = CaptureFrameRatePolicy.available(for: format)
+        // A 4K/120 ProRes 422 switch reports codec availability, then fails
+        // at session start with AVFoundation -11872 (hardware resources).
+        return chosenEncoding.isProRes422 && format.width >= 3840
+            ? rates.filter { $0 <= 60.01 } : rates
     }
 
     var availableFPS: [Double] {
@@ -2054,10 +2357,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         guard let camera = device else { return [:] }
         return ["selectedCodec": chosenCodec?.rawValue ?? "none", "selectedFormat": chosenIndex ?? -1,
                 "selectedEncoding": chosenEncoding.title, "selectedFPS": chosenFPS,
+                "selectedColorSpace": chosenRecordingColorSpace.rawValue,
+                "activeColorSpace": camera.activeColorSpace.rawValue,
                 "actualFormat": camera.formats.firstIndex(where: { $0 === camera.activeFormat }) ?? -1,
                 "minFrameDurationSeconds": CMTimeGetSeconds(camera.activeVideoMinFrameDuration),
                 "maxFrameDurationSeconds": CMTimeGetSeconds(camera.activeVideoMaxFrameDuration),
                 "focusMode": focusName(camera.focusMode), "adjustingFocus": camera.isAdjustingFocus,
+                "focusPoint": ["x": camera.focusPointOfInterest.x, "y": camera.focusPointOfInterest.y],
                 "lensPosition": camera.lensPosition,
                 "exposureMode": camera.exposureMode.rawValue, "exposureSeconds": camera.exposureDuration.seconds,
                 "iso": camera.iso, "shutterAngle": activeShutterAngle as Any? ?? NSNull(),
@@ -2103,12 +2409,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let desired: AVCaptureDevice.FocusMode = switch choice {
                 case .continuous: .continuousAutoFocus
                 case .single, .tap: .autoFocus
-                case .locked, .manual: .locked
+                // A hold on the preview first focuses at that location. Apple's
+                // single AF holds the resulting lens position after its scan.
+                case .locked: point == nil ? .locked : .autoFocus
+                case .manual: .locked
                 }
                 guard camera.isFocusModeSupported(desired) else { throw CameraError.unsupportedFocus(choice.rawValue) }
                 if let point {
                     guard camera.isFocusPointOfInterestSupported else { throw CameraError.unsupportedFocus("focus point") }
-                    camera.focusPointOfInterest = point
+                    camera.focusPointOfInterest = CGPoint(x: min(1, max(0, point.x)), y: min(1, max(0, point.y)))
                 }
                 if choice == .manual {
                     guard camera.isLockingFocusWithCustomLensPositionSupported else { throw CameraError.unsupportedFocus("manual lens position") }
@@ -2135,7 +2444,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     func tapFocus(_ point: CGPoint) { chooseFocus(.continuous, point: point) }
-    func lockFocus(at _: CGPoint) { chooseFocus(.locked) }
+    func lockFocus(at point: CGPoint) { chooseFocus(.locked, point: point) }
     func setManualPosition(_ value: Float) { chooseFocus(.manual, manualPosition: value) }
     func setExposureAuto(_ enabled: Bool) {
         queue.async {
@@ -2296,7 +2605,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 defer { camera.unlockForConfiguration() }
                 self.chosenWhiteBalance = choice
                 self.restoreAutoWhiteBalanceAfterRecording = false
-                self.autoLockWhiteBalanceActive = choice == .autoLock && self.output.isRecording
+                self.autoLockWhiteBalanceActive = choice == .autoLock && (self.output.isRecording || self.realtimeLUTWriter != nil)
                 if choice == .manual && self.manualWhiteBalanceKelvin == nil {
                     self.manualWhiteBalanceKelvin = min(max(self.whiteBalanceKelvin, 2500), 10000)
                 }
@@ -2571,6 +2880,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     @available(iOS 27.0, *)
     private func startRAWWriterExperiment() {
+        recordingLUTBurn = nil
         guard !recordingStarting, !captureFinishing, !output.isRecording,
               let camera = device, let codec = chosenCodec else { return }
         let storage = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
@@ -2691,6 +3001,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     func toggleRecording() {
         queue.async {
+            if let writer = self.realtimeLUTWriter {
+                self.publish { self.finalizing = true }
+                writer.stop(); return
+            }
             if #available(iOS 27.0, *), let experiment = self.rawWriterExperiment as? RAWInternalWriterExperiment {
                 self.publish { self.finalizing = true }
                 experiment.stop()
@@ -2716,11 +3030,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.logger.event("record_start_pending")
                 return
             }
-            if (self.chosenCodec?.rawValue == "aprn" || self.chosenCodec?.rawValue == "aprh"),
+            if (self.chosenEncoding.isRAW ||
+                (self.chosenEncoding.isProRes422 && ProVideoStorageBridge.isOutputSupported(self.output))),
                (UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件") == "内部文件" {
-                self.failStorage("ProRes RAW 需要专用视频存储或外部 SSD。请在设置中选择存储位置。")
+                self.failStorage("ProRes 录制需要专用视频存储或外部 SSD。请在设置中选择存储位置。")
                 return
             }
+            do {
+                self.recordingLUTBurn = try LUTBurnRecipe.snapshot(encoding: self.chosenEncoding,
+                    profile: self.chosenRecordingColorSpace, directory: self.logger.sessionURL.deletingLastPathComponent())
+            } catch { self.fail(error.localizedDescription); return }
             guard self.storagePreflight() else { return }
             guard self.session.isRunning else { self.fail("Camera session is not running"); return }
             guard self.audioReady else { self.fail("需要麦克风权限才能录制声音。请在系统设置中允许麦克风访问。"); return }
@@ -2779,13 +3098,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 arguments.contains("--first-buffer-probe") ||
                 arguments.contains("--hevc-1080p120-smoke") ||
                 arguments.contains("--raw-hq-ssd-smoke") || arguments.contains("--raw-long-hq-ssd-smoke") ||
-                arguments.contains("--raw-hotplug-smoke")
+                arguments.contains("--raw-hotplug-smoke") ||
+                arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") })
             let baseName = isTest && !arguments.contains("--slate-smoke") ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
             let storageLocation = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
-            if (codec.rawValue == "aprn" || codec.rawValue == "aprh"),
+            if (self.chosenEncoding.isRAW ||
+                (self.chosenEncoding.isProRes422 && ProVideoStorageBridge.isOutputSupported(self.output))),
                storageLocation != "外部 SSD", storageLocation != "专用视频存储" {
                 self.restoreRAWWhiteBalance()
-                self.failStorage("ProRes RAW 请在设置中选择专用视频存储或外部 SSD")
+                self.failStorage("ProRes 请在设置中选择专用视频存储或外部 SSD")
                 return
             }
             if storageLocation == "专用视频存储" {
@@ -2837,7 +3158,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                arguments.contains("--raw-hotplug-smoke") ||
                arguments.contains("--hevc-4k60-smoke") || arguments.contains("--imu-sync-4k60-probe") ||
                arguments.contains("--first-buffer-probe") ||
-               arguments.contains("--hevc-1080p120-smoke") {
+               arguments.contains("--hevc-1080p120-smoke") ||
+               arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") }) {
                 self.rawSmokeMovieName = url.lastPathComponent
             }
             #endif
@@ -2896,6 +3218,78 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    private func startRealtimeLUTRecording(url: URL, recipe: LUTBurnRecipe) {
+        do {
+            guard let index = chosenIndex, let connection = output.connection(with: .video) else {
+                throw RecorderError.unavailable("LUT recording configuration unavailable")
+            }
+            let format = formatObjects[index]
+            var settings = try encodingSettings(for: format, fps: chosenFPS, connection: connection)
+            settings[AVVideoWidthKey] = format.width; settings[AVVideoHeightKey] = format.height
+            settings[AVVideoColorPropertiesKey] = [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2]
+            if !chosenEncoding.isProRes422 {
+                var compression = settings[AVVideoCompressionPropertiesKey] as? [String: Any] ?? [:]
+                compression[AVVideoExpectedSourceFrameRateKey] = chosenFPS
+                compression[AVVideoAllowFrameReorderingKey] = false
+                if recipe.highBitDepth == true { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
+                settings[AVVideoCompressionPropertiesKey] = compression
+            }
+            let writer = try RealtimeLUTWriter(url: url, recipe: recipe, settings: settings,
+                width: Int(format.width), height: Int(format.height), fps: chosenFPS, orientation: recordingOrientation,
+                dedicated: UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储",
+                metadata: recordingSlate.metadata, started: { [weak self] pts in
+                    guard let self else { return }
+                    self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
+                }, finished: { [weak self] error, details in
+                    guard let self else { return }
+                    self.queue.async {
+                        self.previewFanout.setRecordingWriter(nil)
+                        if let writer = self.realtimeLUTWriter {
+                            self.session.beginConfiguration()
+                            self.session.removeOutput(writer.audioOutput)
+                            if let settings = self.realtimeLUTVideoSettings { self.intrinsicOutput.videoSettings = settings }
+                            self.realtimeLUTVideoSettings = nil
+                            self.session.commitConfiguration()
+                            self.enableIntrinsicDelivery()
+                        }
+                        self.realtimeLUTWriter = nil
+                        self.logger.event("lut_realtime_finished", details)
+                        self.fileOutput(self.output, didFinishRecordingTo: url, from: [], error: error)
+                    }
+                })
+            session.beginConfiguration()
+            guard session.canAddOutput(writer.audioOutput) else {
+                session.commitConfiguration()
+                throw RecorderError.unavailable("LUT audio capture unavailable")
+            }
+            if recipe.highBitDepth == true || chosenEncoding.isProRes422 {
+                let pixelFormat = kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+                guard intrinsicOutput.availableVideoPixelFormatTypes.contains(pixelFormat) else {
+                    session.commitConfiguration()
+                    throw RecorderError.unavailable("当前配置不支持高位深 LUT 实时录制")
+                }
+                realtimeLUTVideoSettings = intrinsicOutput.videoSettings
+                intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
+            }
+            session.addOutput(writer.audioOutput)
+            session.commitConfiguration()
+            enableIntrinsicDelivery()
+            captureFinishing = true
+            recordingTimeSource = "Realtime LUT writer; original VideoDataOutput capture PTS preserved"
+            realtimeLUTWriter = writer
+            logger.event("lut_realtime_started", ["file": url.path, "width": format.width,
+                "height": format.height, "fps": chosenFPS, "codec": recipe.codec])
+            previewFanout.setRecordingWriter(writer)
+        } catch {
+            recordingStarting = false
+            try? intrinsicRecorder.stop(); try? imuRecorder?.stop(); imuRecorder = nil
+            releaseExternalMovieAccess(); restoreRAWWhiteBalance()
+            fail(error.localizedDescription)
+        }
+    }
+
     private func startMovieWhenIMUReady(url: URL, deadline: Double) {
         let uptime = ProcessInfo.processInfo.systemUptime
         guard let imu = imuRecorder else { recordingStarting = false; return }
@@ -2909,6 +3303,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 releaseExternalMovieAccess()
                 restoreRAWWhiteBalance()
                 fail(error.localizedDescription)
+                return
+            }
+            if let recipe = recordingLUTBurn {
+                startRealtimeLUTRecording(url: url, recipe: recipe)
                 return
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
@@ -2987,7 +3385,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 expectedFPS: self.chosenFPS,
                 intrinsicsUnavailableReason: self.intrinsicsUnavailableReason,
                 timingSource: self.recordingTimeSource,
-                exposureTimingModel: ExposureTimingModel.recordingModel)
+                exposureTimingModel: ExposureTimingModel.recordingModel,
+                lutBurn: self.chosenEncoding.isRAW || self.realtimeLUTWriter != nil ? nil : self.recordingLUTBurn)
             do {
                 try job.save(in: self.logger.sessionURL.deletingLastPathComponent())
                 self.pendingRecordingJob = job
@@ -3008,7 +3407,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let elapsed = CMClockGetTime(CMClockGetHostTimeClock()).seconds - firstHost
                 self.queue.asyncAfter(deadline: .now() + max(0, limit - elapsed)) {
                     guard self.currentFile == fileURL, !ProRecordingAccess.shared.unlimited,
-                          self.output.isRecording || self.isRAWWriterActive else { return }
+                          self.output.isRecording || self.isRAWWriterActive || self.realtimeLUTWriter != nil else { return }
                     self.logger.event("raw_free_limit_reached", ["seconds": limit, "codec": codec])
                     // Use the normal stop/finalization path so audio and IMU survive.
                     self.toggleRecording()
@@ -3023,16 +3422,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let seconds = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--ssd-duration=") }
                     .flatMap { Double($0.dropFirst("--ssd-duration=".count)) } ?? 8
                 self.queue.asyncAfter(deadline: .now() + seconds) {
-                    if self.currentFile == fileURL && (self.output.isRecording || self.isRAWWriterActive) { self.toggleRecording() }
+                    if self.currentFile == fileURL && (self.output.isRecording || self.isRAWWriterActive || self.realtimeLUTWriter != nil) { self.toggleRecording() }
                 }
             }
             if !ProcessInfo.processInfo.arguments.contains("--ssd-matrix") &&
                (ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ||
                ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")) {
-                let smokeSeconds: Double = ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20
+                let smokeSeconds: Double = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--lut-test-seconds=") }
+                    .flatMap { Double($0.dropFirst("--lut-test-seconds=".count)) }
+                    .map { min(120, max(3, $0)) } ?? (ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20)
                 self.queue.asyncAfter(deadline: .now() + smokeSeconds) {
-                    if self.output.isRecording { self.toggleRecording() }
+                    if self.output.isRecording || self.realtimeLUTWriter != nil { self.toggleRecording() }
                 }
             }
             #endif
@@ -3043,6 +3444,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         recordingSetupFailure = reason
         logger.event("record_setup_failed", ["reason": reason, "state": configurationSnapshot()])
         publish { self.finalizing = true; self.recording = false; self.recordingStartedAt = nil }
+        if let writer = realtimeLUTWriter { writer.abort(reason); return }
         if #available(iOS 27.0, *), let experiment = rawWriterExperiment as? RAWInternalWriterExperiment {
             experiment.stop(); return
         }
@@ -3094,6 +3496,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let result = Result { () throws -> PendingIMUJob in
                     let job = try JSONDecoder().decode(PendingIMUJob.self, from: Data(contentsOf: file))
                     try job.complete(in: directory) { stage, seconds in
+                        if stage == "LUT" { self.publish { self.status = "LUT \(Int(seconds * 100))%" } }
                         self.logger.event("imu_finalize_stage", ["movie": job.movieName, "stage": stage, "seconds": seconds])
                     }
                     return job
@@ -3180,6 +3583,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 publish {
                     self.finalizing = false
+                    if reason.contains("LUT"), self.errorText == nil { self.errorText = reason }
                     self.status = reason.contains("视频帧时间异常") || reason.contains("视频帧率严重不足")
                         ? "视频帧异常 · 请检查原片" : permanent ? "Camera ready" : "等待返回 App 补写 IMU"
                     self.endFinalizationLease()
@@ -3279,6 +3683,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self?.logger.event(change.newValue == true ? "af_adjusting_start" : "af_adjusting_end",
                                    ["old": change.oldValue ?? false, "new": change.newValue ?? false])
                 self?.publish { self?.adjusting = change.newValue ?? false }
+                if change.oldValue == true && change.newValue == false {
+                    self?.queue.async { [weak self, weak camera] in
+                        guard let self, let camera, self.device === camera,
+                              self.chosenFocus == .locked,
+                              (camera.focusMode == .autoFocus || camera.focusMode == .locked),
+                              !camera.isAdjustingFocus else { return }
+                        // Save the completed focus, not the position before the scan.
+                        self.savedControls.focusPosition = camera.lensPosition
+                        self.savedControls.save()
+                        self.logger.event("point_focus_locked", ["position": camera.lensPosition,
+                            "point": ["x": camera.focusPointOfInterest.x, "y": camera.focusPointOfInterest.y]])
+                    }
+                }
             },
             camera.observe(\.lensPosition, options: [.old, .new]) { [weak self] _, change in
                 self?.logger.event("lens_position_kvo", ["old": change.oldValue ?? 0, "new": change.newValue ?? 0])
@@ -3319,7 +3736,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.whiteBalanceAuto = whiteBalanceAuto
                 }
             }
-            if (self.output.isRecording || self.isRAWWriterActive) && self.telemetryReadoutTick % 10 == 0 {
+            if (self.output.isRecording || self.isRAWWriterActive || self.realtimeLUTWriter != nil) && self.telemetryReadoutTick % 10 == 0 {
                 self.logger.event("recording_health", [
                     "thermalState": ProcessInfo.processInfo.thermalState.rawValue,
                     "pressureLevel": camera.systemPressureState.level.rawValue,
@@ -3393,6 +3810,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.logger.event("lifecycle", ["name": name.rawValue,
                                                     "error": note.userInfo?[AVCaptureSessionErrorKey].map { String(describing: $0) } ?? ""])
                     if (name == UIApplication.willResignActiveNotification || name == UIScene.willDeactivateNotification || name == UIApplication.didEnterBackgroundNotification || name == UIScene.didEnterBackgroundNotification), self.output.isRecording { self.output.stopRecording() }
+                    if let writer = self.realtimeLUTWriter,
+                       [UIApplication.willResignActiveNotification, UIScene.willDeactivateNotification,
+                        UIApplication.didEnterBackgroundNotification, AVCaptureSession.wasInterruptedNotification,
+                        AVCaptureSession.runtimeErrorNotification].contains(name) {
+                        self.publish { self.finalizing = true }; writer.stop()
+                    }
                     if #available(iOS 27.0, *), let experiment = self.rawWriterExperiment as? RAWInternalWriterExperiment,
                        [UIApplication.willResignActiveNotification, UIScene.willDeactivateNotification,
                         UIApplication.didEnterBackgroundNotification, AVCaptureSession.wasInterruptedNotification,

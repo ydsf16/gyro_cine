@@ -3,6 +3,72 @@ import simd
 @testable import GyroCine
 
 final class PreviewColorTransformTests: XCTestCase {
+    func testRAWAlwaysRejectsLUTBurnRecipe() throws {
+        let defaults = UserDefaults.standard
+        let oldBurn = defaults.object(forKey: "lutBurnEnabled")
+        let oldPreview = defaults.object(forKey: "previewLUTEnabled")
+        defer {
+            defaults.set(oldBurn, forKey: "lutBurnEnabled")
+            defaults.set(oldPreview, forKey: "previewLUTEnabled")
+        }
+        defaults.set(true, forKey: "lutBurnEnabled"); defaults.set(true, forKey: "previewLUTEnabled")
+        for encoding: VideoEncoding in [.proResRAW, .proResRAWHQ] {
+            XCTAssertNil(try LUTBurnRecipe.snapshot(encoding: encoding, profile: .appleLog2,
+                directory: FileManager.default.temporaryDirectory))
+        }
+    }
+
+    func testImportedLUTCopiesPersistsAndDeletesOnlyItsOwnFile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let library = root.appendingPathComponent("library")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("My Look.cube")
+        try ("LUT_3D_SIZE 2\n" + Array(repeating: "1 0 0", count: 8).joined(separator: "\n"))
+            .write(to: source, atomically: true, encoding: .utf8)
+        let item = try PreviewLUTLibrary.importFile(source, in: library)
+        try FileManager.default.removeItem(at: source)
+        XCTAssertEqual(PreviewLUTLibrary.load(in: library), [item])
+        let data = try PreviewLUTLibrary.cube(item, profile: .rec709, in: library)
+        XCTAssertEqual(data.withUnsafeBytes { Array($0.bindMemory(to: Float.self).prefix(4)) }, [1, 0, 0, 1])
+        let other = library.appendingPathComponent("untouched.txt")
+        try Data("keep".utf8).write(to: other)
+        try PreviewLUTLibrary.remove(item, in: library)
+        XCTAssertTrue(PreviewLUTLibrary.load(in: library).isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: item.file(in: library).path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: other.path))
+    }
+
+    func testImportedLUTRejectsInvalidAndOversizedFilesWithoutSaving() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let library = root.appendingPathComponent("library")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("invalid.cube")
+        for text in ["LUT_3D_SIZE 2\n0 0 0", "LUT_1D_SIZE 2\n0 0 0", "LUT_3D_SIZE 9999"] {
+            try text.write(to: source, atomically: true, encoding: .utf8)
+            XCTAssertThrowsError(try PreviewLUTLibrary.importFile(source, in: library))
+        }
+        try Data(repeating: 32, count: 16 * 1024 * 1024 + 1).write(to: source)
+        XCTAssertThrowsError(try PreviewLUTLibrary.importFile(source, in: library))
+        XCTAssertTrue(PreviewLUTLibrary.load(in: library).isEmpty)
+    }
+
+    func testSourceLUTDoesNotApplyLogConversionTwice() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var lines = ["LUT_3D_SIZE 2"]
+        for b in 0...1 { for g in 0...1 { for r in 0...1 { lines.append("\(r) \(g) \(b)") } } }
+        let source = root.appendingPathComponent("identity.cube")
+        try lines.joined(separator: "\n").write(to: source, atomically: true, encoding: .utf8)
+        let item = try PreviewLUTLibrary.importFile(source, in: root)
+        for profile: PreviewColorTransform.Profile in [.rec709, .appleLog, .appleLog2] {
+            let direct = try PreviewLUTLibrary.cube(item, profile: profile, in: root)
+            XCTAssertEqual(direct, PreviewColorTransform.cube(.rec709))
+        }
+    }
+
     func testAppleLogReferencePoints() {
         XCTAssertEqual(PreviewColorTransform.decodeLog(0.69336945), 0.99035948, accuracy: 1e-8)
         XCTAssertEqual(PreviewColorTransform.decodeLog(0), -0.05641088, accuracy: 1e-8)

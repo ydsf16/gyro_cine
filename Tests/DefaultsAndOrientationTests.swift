@@ -3,6 +3,19 @@ import AVFoundation
 @testable import GyroCine
 
 final class DefaultsAndOrientationTests: XCTestCase {
+    func testFreshWhiteBalanceDefaultsToAutoLockWithoutOverridingSavedChoice() {
+        let name = "wb-default-\(UUID().uuidString)"
+        let preferences = UserDefaults(suiteName: name)!
+        defer { preferences.removePersistentDomain(forName: name) }
+        XCTAssertEqual(SavedCameraControls.load(preferences).whiteBalance, "Auto-L")
+        for choice in ["Auto", "Manual", "Auto-L"] {
+            var controls = SavedCameraControls.load(preferences)
+            controls.whiteBalance = choice
+            controls.save(preferences)
+            XCTAssertEqual(SavedCameraControls.load(preferences).whiteBalance, choice)
+        }
+    }
+
     func testHEVCBitratePresetsScaleWithRasterAndFrameRate() {
         XCTAssertEqual(HEVCBitratePreset.allCases.count, 4)
         XCTAssertEqual(HEVCBitratePreset.stored(nil), .balanced)

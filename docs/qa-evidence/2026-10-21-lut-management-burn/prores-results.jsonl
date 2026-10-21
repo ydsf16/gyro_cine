@@ -1,0 +1,4 @@
+{"data":{"codec":"apco","pass":true},"eventType":"lut_prores_file_result","monotonicSeconds":98913.111711500009,"sessionID":"9183E764-E4E0-4FAD-93BB-A42726D5CD42","wallTime":"2026-10-21T12:01:41Z"}
+{"data":{"codec":"apcs","pass":true},"eventType":"lut_prores_file_result","monotonicSeconds":98913.381476208335,"sessionID":"9183E764-E4E0-4FAD-93BB-A42726D5CD42","wallTime":"2026-10-21T12:01:41Z"}
+{"data":{"codec":"apcn","pass":true},"eventType":"lut_prores_file_result","monotonicSeconds":98913.668657875009,"sessionID":"9183E764-E4E0-4FAD-93BB-A42726D5CD42","wallTime":"2026-10-21T12:01:41Z"}
+{"data":{"codec":"apch","pass":true},"eventType":"lut_prores_file_result","monotonicSeconds":98913.954052375004,"sessionID":"9183E764-E4E0-4FAD-93BB-A42726D5CD42","wallTime":"2026-10-21T12:01:42Z"}

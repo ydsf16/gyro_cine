@@ -1,0 +1,409 @@
+[
+  {
+    "data": {
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 50,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.012496,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 2040.923095703125,
+        "lensPosition": 0.8196078538894653,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "systemDefault",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 50,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          1.852783203125,
+          1,
+          2.436767578125
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "white_balance_autol_locked",
+    "monotonicSeconds": 93891.977193,
+    "sessionID": "3FCAF677-3FB7-4110-8F63-A1333ADBBD67",
+    "wallTime": "2026-10-21T10:37:36Z"
+  },
+  {
+    "data": {
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 50,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.012493,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 4124.4921875,
+        "lensPosition": 0.8117647171020508,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "systemDefault",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 50,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          1.852783203125,
+          1,
+          2.436767578125
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "white_balance_autol_restored",
+    "monotonicSeconds": 93897.30720625,
+    "sessionID": "3FCAF677-3FB7-4110-8F63-A1333ADBBD67",
+    "wallTime": "2026-10-21T10:37:41Z"
+  },
+  {
+    "data": {
+      "bytes": 574992,
+      "look": "custom:BECD25ED-EEAA-4A20-A5D7-EFD93C3C2C13:rec709",
+      "profile": "rec709"
+    },
+    "eventType": "lut_preview_prepared",
+    "monotonicSeconds": 94668.35182466668,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:32Z"
+  },
+  {
+    "data": {
+      "id": "custom:FFE55CF7-1A54-4397-9805-5532E37C2FE7",
+      "name": "UITEST_PreviewRed"
+    },
+    "eventType": "lut_import_smoke",
+    "monotonicSeconds": 94668.38126237501,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:32Z"
+  },
+  {
+    "data": {
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 50,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.010031,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.7695618033968785,
+          "y": 0.8532817459310167
+        },
+        "iso": 97.06640625,
+        "lensPosition": 1,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "systemDefault",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 50,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.419189453125,
+          1,
+          1.760498046875
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "white_balance_autol_locked",
+    "monotonicSeconds": 94668.399175625,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:32Z"
+  },
+  {
+    "data": {
+      "bytes": 574992,
+      "look": "custom:FFE55CF7-1A54-4397-9805-5532E37C2FE7:rec709",
+      "profile": "rec709"
+    },
+    "eventType": "lut_preview_prepared",
+    "monotonicSeconds": 94668.48435429168,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:32Z"
+  },
+  {
+    "data": {
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 50,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.010002,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.7695618033968785,
+          "y": 0.8532817459310167
+        },
+        "iso": 97.81307220458984,
+        "lensPosition": 0.07450979948043823,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "systemDefault",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 50,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.419189453125,
+          1,
+          1.760498046875
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "white_balance_autol_restored",
+    "monotonicSeconds": 94673.71778704168,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:37Z"
+  },
+  {
+    "data": {
+      "bytes": 574992,
+      "look": "custom:FFE55CF7-1A54-4397-9805-5532E37C2FE7:rec709",
+      "profile": "rec709"
+    },
+    "eventType": "lut_preview_prepared",
+    "monotonicSeconds": 94765.47946220834,
+    "sessionID": "AD76BC50-8024-48CA-AA36-646C9CFC6739",
+    "wallTime": "2026-10-21T10:52:09Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 301.3607500033686,
+      "cpuMeanMS": 301.3607500033686,
+      "frames": 1,
+      "gpuBusySkips": 12,
+      "gpuMaxMS": 1.7230833327630535,
+      "gpuMeanMS": 1.7230833327630535,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 0,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94668.66666683333,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:32Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 4.464249999728054,
+      "cpuMeanMS": 1.1727541320945698,
+      "frames": 122,
+      "gpuBusySkips": 12,
+      "gpuMaxMS": 3.7016249989392236,
+      "gpuMeanMS": 2.0926615020283306,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 59.833729544737146,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94670.68500754167,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:34Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 4.516958331805654,
+      "cpuMeanMS": 1.617440277186688,
+      "frames": 242,
+      "gpuBusySkips": 12,
+      "gpuMaxMS": 3.550875000655651,
+      "gpuMeanMS": 1.3867708332933641,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 59.49440132902126,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94672.68519195834,
+    "sessionID": "62471CD5-22C9-403C-A795-72823B53F880",
+    "wallTime": "2026-10-21T10:50:36Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 5.1434166671242565,
+      "cpuMeanMS": 2.285226583981132,
+      "frames": 1891,
+      "gpuBusySkips": 166,
+      "gpuMaxMS": 3.725416667293757,
+      "gpuMeanMS": 1.9530292696844833,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 59.599438382786026,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94799.76203670834,
+    "sessionID": "AD76BC50-8024-48CA-AA36-646C9CFC6739",
+    "wallTime": "2026-10-21T10:52:43Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 3.0869583424646407,
+      "cpuMeanMS": 1.4681569443685778,
+      "frames": 2011,
+      "gpuBusySkips": 166,
+      "gpuMaxMS": 3.9109166682465,
+      "gpuMeanMS": 2.5390968742916207,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 59.41778311845621,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94801.76480491667,
+    "sessionID": "AD76BC50-8024-48CA-AA36-646C9CFC6739",
+    "wallTime": "2026-10-21T10:52:45Z"
+  },
+  {
+    "data": {
+      "bufferSlots": 2,
+      "cpuMaxMS": 2.6407083205413073,
+      "cpuMeanMS": 1.5063887734537607,
+      "frames": 2132,
+      "gpuBusySkips": 166,
+      "gpuMaxMS": 3.791249997448176,
+      "gpuMeanMS": 1.8730840214224116,
+      "height": 1920,
+      "profile": "rec709",
+      "renderFPS": 59.484184136394305,
+      "renderOnMain": false,
+      "width": 886
+    },
+    "eventType": "lut_preview_render",
+    "monotonicSeconds": 94803.78215695833,
+    "sessionID": "AD76BC50-8024-48CA-AA36-646C9CFC6739",
+    "wallTime": "2026-10-21T10:52:47Z"
+  }
+]

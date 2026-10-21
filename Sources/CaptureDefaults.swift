@@ -57,7 +57,7 @@ struct SavedCameraControls: Codable, Equatable {
     var angle = 180.0
     var maximumSeconds: Double? = nil
     var ev = 0.0
-    var whiteBalance = "Auto"
+    var whiteBalance = "Auto-L"
     var kelvin: Float? = nil
     var focus = "Continuous AF"
     var focusPosition: Float = 0.5

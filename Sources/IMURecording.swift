@@ -1,4 +1,7 @@
 import AVFoundation
+import CoreImage
+import Metal
+import VideoToolbox
 import CoreMotion
 import Foundation
 
@@ -379,6 +382,7 @@ struct PendingIMUJob: Codable {
     var intrinsicsUnavailableReason: String?
     var timingSource: String? = nil
     var exposureTimingModel: ExposureTimingModel? = nil
+    var lutBurn: LUTBurnRecipe? = nil
 
     func url(in directory: URL) -> URL {
         directory.appendingPathComponent(movieName).appendingPathExtension("pending-imu.json")
@@ -430,6 +434,7 @@ struct PendingIMUJob: Codable {
         }
         if let recordingFailure { throw RecorderError.unavailable(recordingFailure) }
         try MOVTelemetryMuxer.recoverIfNeeded(movie)
+        if let lutBurn { try LUTMovieBurner.apply(lutBurn, movie: movie, progress: progress) }
         if intrinsicsUnavailableReason != nil {
             let video = try MovieIMUFinalizer.inspect(movie)
             if let expectedFPS, video.duration.isFinite, video.duration > 0 {
@@ -483,6 +488,123 @@ struct PendingIMUJob: Codable {
         if !retainDebug {
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(imuName))
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(framesName))
+        }
+    }
+}
+
+/// Runs only on the finalization worker. Original capture survives until the complete
+/// replacement has passed frame/time/audio checks. A metadata marker makes retries idempotent.
+enum LUTMovieBurner {
+    static let marker = "com.tinygrape.lutBurnID"
+    static func apply(_ recipe: LUTBurnRecipe, movie: URL, progress: ((String, Double) -> Void)?) throws {
+        let asset = AVURLAsset(url: movie)
+        if asset.metadata.contains(where: { ($0.key as? String) == marker && $0.stringValue == recipe.id }) { return }
+        guard !["aprn", "aprh"].contains(recipe.codec), let video = asset.tracks(withMediaType: .video).first else {
+            throw RecorderError.unavailable("LUT burn-in is unavailable for RAW")
+        }
+        if let description = video.formatDescriptions.first {
+            let code = CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription)
+            guard code != 0x6170726e, code != 0x61707268 else { throw RecorderError.unavailable("LUT burn-in is unavailable for RAW") }
+        }
+        let original = try MovieIMUFinalizer.inspect(movie)
+        let attributes = try FileManager.default.attributesOfItem(atPath: movie.path)
+        let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let free = (try FileManager.default.attributesOfFileSystem(forPath: movie.deletingLastPathComponent().path)[.systemFreeSize] as? NSNumber)?.int64Value ?? 0
+        guard free > bytes + 1_000_000_000 else { throw RecorderError.unavailable("LUT burn-in needs more free storage; original retained") }
+        let temporary = movie.deletingLastPathComponent().appendingPathComponent(".lut-\(recipe.id).mov")
+        try? FileManager.default.removeItem(at: temporary)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        guard let metal = MTLCreateSystemDefaultDevice() else { throw RecorderError.unavailable("LUT GPU unavailable") }
+        let context = CIContext(mtlDevice: metal, options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
+        let isProRes = recipe.codec.hasPrefix("ap")
+        let highBitDepth = isProRes || recipe.highBitDepth == true
+        let reader = try AVAssetReader(asset: asset)
+        let source = AVAssetReaderTrackOutput(track: video, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: isProRes ? kCVPixelFormatType_64ARGB : (highBitDepth ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)])
+        source.alwaysCopiesSampleData = false
+        reader.add(source)
+        let writer = try AVAssetWriter(outputURL: temporary, fileType: .mov)
+        let dimensions = video.naturalSize
+        var settings: [String: Any] = [AVVideoCodecKey: recipe.codec,
+            AVVideoWidthKey: Int(dimensions.width), AVVideoHeightKey: Int(dimensions.height),
+            AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2]]
+        if !isProRes { settings[AVVideoCompressionPropertiesKey] = [AVVideoAverageBitRateKey: max(1_000_000, Int(video.estimatedDataRate)), AVVideoExpectedSourceFrameRateKey: video.nominalFrameRate] }
+        if highBitDepth, !isProRes {
+            var compression = settings[AVVideoCompressionPropertiesKey] as? [String: Any] ?? [:]
+            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel
+            settings[AVVideoCompressionPropertiesKey] = compression
+        }
+        guard writer.canApply(outputSettings: settings, forMediaType: .video) else { throw RecorderError.unavailable("LUT output codec unavailable") }
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+        input.transform = video.preferredTransform
+        input.mediaTimeScale = max(video.naturalTimeScale, 60_000)
+        writer.add(input)
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: highBitDepth ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: Int(dimensions.width), kCVPixelBufferHeightKey as String: Int(dimensions.height),
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]])
+        var audioPairs: [(AVAssetReaderTrackOutput, AVAssetWriterInput)] = []
+        for track in asset.tracks(withMediaType: .audio) {
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            output.alwaysCopiesSampleData = false; reader.add(output)
+            let audio = AVAssetWriterInput(mediaType: .audio, outputSettings: nil,
+                sourceFormatHint: track.formatDescriptions.first as! CMAudioFormatDescription?)
+            writer.add(audio); audioPairs.append((output, audio))
+        }
+        let tag = AVMutableMetadataItem(); tag.keySpace = .quickTimeMetadata; tag.key = marker as NSString; tag.value = recipe.id as NSString
+        writer.metadata = asset.metadata + [tag]
+        guard writer.startWriting(), reader.startReading() else { throw writer.error ?? reader.error ?? RecorderError.unavailable("LUT reader/writer start failed") }
+        writer.startSession(atSourceTime: .zero)
+        var videoEnded = false, audioEnded = Set<Int>(), count = 0
+        var lastProgress = ProcessInfo.processInfo.systemUptime
+        do {
+            while !videoEnded || audioEnded.count != audioPairs.count {
+                var advanced = false
+                if !videoEnded, input.isReadyForMoreMediaData {
+                    try autoreleasepool {
+                        if let sample = source.copyNextSampleBuffer(), let pixels = CMSampleBufferGetImageBuffer(sample) {
+                            guard let pool = adaptor.pixelBufferPool else { throw RecorderError.unavailable("LUT buffer pool unavailable") }
+                            var rendered: CVPixelBuffer?
+                            guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &rendered) == kCVReturnSuccess, let rendered else { throw RecorderError.unavailable("LUT buffer allocation failed") }
+                            let image = CIImage(cvPixelBuffer: pixels, options: [.colorSpace: NSNull()])
+                                .applyingFilter("CIColorCube", parameters: ["inputCubeDimension": PreviewColorTransform.dimension, "inputCubeData": recipe.cube])
+                            context.render(image, to: rendered, bounds: image.extent, colorSpace: CGColorSpace(name: CGColorSpace.itur_709)!)
+                            guard adaptor.append(rendered, withPresentationTime: sample.presentationTimeStamp) else { throw writer.error ?? RecorderError.unavailable("LUT frame write failed") }
+                            count += 1
+                            if count % 60 == 0 { progress?("LUT", Double(count) / Double(max(1, original.frames.count))) }
+                        } else { videoEnded = true; input.markAsFinished() }
+                    }
+                    advanced = true
+                }
+                for (index, pair) in audioPairs.enumerated() where !audioEnded.contains(index) && pair.1.isReadyForMoreMediaData {
+                    if let sample = pair.0.copyNextSampleBuffer() {
+                        guard pair.1.append(sample) else { throw writer.error ?? RecorderError.unavailable("LUT audio write failed") }
+                    } else { audioEnded.insert(index); pair.1.markAsFinished() }
+                    advanced = true
+                }
+                if let error = reader.error ?? writer.error { throw error }
+                if advanced { lastProgress = ProcessInfo.processInfo.systemUptime }
+                else {
+                    guard ProcessInfo.processInfo.systemUptime - lastProgress < 30 else { throw RecorderError.unavailable("LUT storage write timeout") }
+                    Thread.sleep(forTimeInterval: 0.002)
+                }
+            }
+            guard reader.status == .completed, count == original.frames.count else { throw RecorderError.unavailable("LUT decoded frame count mismatch") }
+            writer.endSession(atSourceTime: CMTimeRangeGetEnd(video.timeRange))
+            let done = DispatchSemaphore(value: 0)
+            writer.finishWriting { done.signal() }
+            guard done.wait(timeout: .now() + 60) == .success, writer.status == .completed else { throw writer.error ?? RecorderError.unavailable("LUT finalization timeout") }
+            let result = try MovieIMUFinalizer.inspect(temporary)
+            guard result.frames.count == original.frames.count,
+                  zip(result.frames, original.frames).allSatisfy({ abs($0.pts - $1.pts) < 0.0001 }),
+                  AVURLAsset(url: temporary).tracks(withMediaType: .audio).count == audioPairs.count else {
+                throw RecorderError.unavailable("LUT timeline/audio verification failed")
+            }
+            guard rename(temporary.path, movie.path) == 0 else { throw RecorderError.unavailable("LUT atomic replacement failed") }
+        } catch {
+            reader.cancelReading(); writer.cancelWriting()
+            throw RecorderError.unavailable("LUT: \(error.localizedDescription); original retained")
         }
     }
 }

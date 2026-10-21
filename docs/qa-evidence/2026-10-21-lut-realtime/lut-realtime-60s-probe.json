@@ -1,0 +1,53 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "hevc",
+            "codec_type": "video",
+            "width": 3840,
+            "height": 2160,
+            "pix_fmt": "yuv420p",
+            "avg_frame_rate": "216120000/3601639",
+            "duration": "60.027300",
+            "nb_read_frames": "3602",
+            "side_data_list": [
+                {
+
+                }
+            ]
+        },
+        {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "44100",
+            "channels": 2,
+            "avg_frame_rate": "0/0",
+            "duration": "59.964263",
+            "nb_read_frames": "2582"
+        },
+        {
+            "codec_type": "data",
+            "avg_frame_rate": "0/0",
+            "duration": "60.027300"
+        }
+    ],
+    "format": {
+        "tags": {
+            "major_brand": "qt  ",
+            "minor_version": "0",
+            "compatible_brands": "qt  ",
+            "creation_time": "2026-10-21T12:23:42.000000Z",
+            "com.apple.quicktime.camera.identifier": "A",
+            "com.apple.quicktime.reel": "1",
+            "com.apple.quicktime.scene": "1",
+            "com.apple.quicktime.take": "16",
+            "com.tinygrape.gyrocine.slate": "{\"production\":\"\",\"reel\":1,\"cinematographer\":\"\",\"autoTake\":true,\"timeOfDay\":\"\",\"scene\":1,\"take\":16,\"camera\":\"A\",\"environment\":\"\",\"director\":\"\"}",
+            "com.tinygrape.lutBurnID": "5A835A50-ECEC-4EDB-9CB2-883D622868A0"
+        }
+    }
+}

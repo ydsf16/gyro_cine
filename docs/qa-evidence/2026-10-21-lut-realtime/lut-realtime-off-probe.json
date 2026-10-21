@@ -1,0 +1,51 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "hevc",
+            "codec_type": "video",
+            "width": 3840,
+            "height": 2160,
+            "pix_fmt": "yuv420p",
+            "duration": "5.483333",
+            "nb_read_frames": "329",
+            "side_data_list": [
+                {
+
+                }
+            ]
+        },
+        {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "duration": "5.481678",
+            "nb_read_frames": "237"
+        },
+        {
+            "codec_type": "data",
+            "duration": "5.483333"
+        },
+        {
+            "codec_type": "data",
+            "duration": "5.483333"
+        }
+    ],
+    "format": {
+        "tags": {
+            "major_brand": "qt  ",
+            "minor_version": "0",
+            "compatible_brands": "qt  ",
+            "creation_time": "2026-10-21T12:28:37.000000Z",
+            "com.apple.quicktime.camera.identifier": "A",
+            "com.apple.quicktime.reel": "1",
+            "com.apple.quicktime.scene": "1",
+            "com.apple.quicktime.take": "18",
+            "com.tinygrape.gyrocine.slate": "{\"scene\":1,\"take\":18,\"camera\":\"A\",\"timeOfDay\":\"\",\"production\":\"\",\"autoTake\":true,\"environment\":\"\",\"director\":\"\",\"cinematographer\":\"\",\"reel\":1}"
+        }
+    }
+}

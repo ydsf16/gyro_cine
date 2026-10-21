@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import SwiftUI
 import MetalKit
+import UniformTypeIdentifiers
 
 private struct Preview: UIViewRepresentable {
     let session: AVCaptureSession
@@ -360,6 +361,7 @@ struct CameraView: View {
             }
         }
         .sheet(isPresented: $showingWBPresets) { whiteBalancePresets }
+        .onChange(of: camera.selectedLUTID) { _, value in lutCard = value }
         .alert("GyroCine", isPresented: Binding(get: { camera.errorText != nil }, set: { if !$0 { camera.clearError() } })) {
             if camera.storageSetupRequired {
                 Button(t("设置存储", "Set up storage")) {
@@ -447,7 +449,7 @@ struct CameraView: View {
                 showingCaptureSetup = true
             } label: {
                 HStack(spacing: 6) {
-                    Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT \(camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized)" : ""))
+                    Text(specification + (camera.lutEnabled && camera.lutSupported && ["active", "rec709"].contains(camera.lutStatus) ? " · LUT \(camera.selectedImportedLUT != nil ? t("自定", "Custom") : (camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized))" : ""))
                     Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
                 }
                 .font(.system(size: 13, weight: .medium))
@@ -534,7 +536,7 @@ struct CameraView: View {
         switch parameter {
         case .lut:
             !camera.lutEnabled || !camera.lutSupported ? t("关", "Off") :
-                (["active", "rec709"].contains(camera.lutStatus) ? (camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized) : "…")
+                (["active", "rec709"].contains(camera.lutStatus) ? (camera.selectedImportedLUT != nil ? t("自定", "Custom") : (camera.lutLook == .rec709 ? "709" : camera.lutLook.rawValue.capitalized)) : "…")
         case .lens: camera.lenses.first(where: { $0.id == camera.selectedLensID })?.label ?? "—"
         case .shutter:
             exposureType == "angle" ? shutterAngleLabel(camera.exposureSeconds) : shutterLabel(camera.exposureSeconds)
@@ -706,11 +708,11 @@ struct CameraView: View {
                         .disabled(camera.focusChoice != .manual)
                 }
             }
-            .frame(height: 60)
+            .frame(height: parameter == .lut ? 106 : 60)
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .frame(height: 136)
+        .frame(height: parameter == .lut ? 172 : 136)
         .background(.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
     }
@@ -719,39 +721,67 @@ struct CameraView: View {
         VStack(spacing: 5) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(["off"] + PreviewLook.allCases.map(\.rawValue), id: \.self) { id in
+                    ForEach(["off"] + camera.visibleBuiltinLUTs.map(\.rawValue) + camera.visibleImportedLUTs.map(\.selectionID), id: \.self) { id in
                         let look = PreviewLook(rawValue: id)
-                        let active = (camera.lutEnabled && camera.lutSupported ? camera.lutLook.rawValue : "off") == id
+                        let imported = camera.importedLUTs.first { $0.selectionID == id }
+                        let active = (camera.lutEnabled && camera.lutSupported ? camera.selectedLUTID : "off") == id
                         Button {
-                            if let look { camera.setLUTLook(look) } else { camera.setLUTEnabled(false) }
+                            if let imported { camera.selectImportedLUT(imported) }
+                            else if let look { camera.setLUTLook(look) }
+                            else { camera.setLUTEnabled(false) }
                             withAnimation(.easeInOut(duration: 0.2)) { lutCard = id }
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: look == nil ? "circle.slash" : "square.stack.3d.up")
-                                Text(look?.title ?? t("关闭", "Off"))
+                                Image(systemName: id == "off" ? "circle.slash" : "square.stack.3d.up")
+                                Text(imported?.name ?? look?.title ?? t("关闭", "Off")).lineLimit(1)
                             }
                             .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 225, height: 38)
+                            .frame(width: 150, height: 34)
                             .foregroundStyle(active ? .white : .white.opacity(0.55))
                             .background(active ? accent.opacity(0.45) : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
                             .overlay(RoundedRectangle(cornerRadius: 9).stroke(active ? accent : .clear, lineWidth: 2))
                         }
                         .id(id).buttonStyle(.plain)
-                        .disabled(look != nil && !camera.lutSupported)
+                        .disabled(camera.lutControlsLocked || (id != "off" && !camera.lutSupported))
                         .accessibilityIdentifier("lut.\(id)")
+
                     }
                 }.scrollTargetLayout().padding(.horizontal, 2)
             }
             .accessibilityIdentifier("lut.carousel")
-            .contentMargins(.horizontal, 70, for: .scrollContent)
+            .contentMargins(.horizontal, 90, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $lutCard, anchor: .center)
-            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported ? camera.lutLook.rawValue : "off" }
+            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported ? camera.selectedLUTID : "off" }
             .onChange(of: lutCard) { _, selected in
-                guard let selected, camera.lutSupported else { return }
-                if let look = PreviewLook(rawValue: selected) { camera.setLUTLook(look) }
+                guard let selected, camera.lutSupported, !camera.lutControlsLocked else { return }
+                if let item = camera.importedLUTs.first(where: { $0.selectionID == selected }) { camera.selectImportedLUT(item) }
+                else if let look = PreviewLook(rawValue: selected) { camera.setLUTLook(look) }
                 else { camera.setLUTEnabled(false) }
             }
+            Toggle(isOn: Binding(
+                get: { camera.lutBurnEnabled && !camera.selectedEncoding.isRAW },
+                set: camera.setLUTBurnEnabled)) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(camera.lutBurnEnabled ? Color.orange : Color.white)
+                        Text(camera.selectedEncoding.isRAW
+                             ? t("RAW 不支持烧录", "Unavailable for RAW")
+                             : t("烧录到视频", "Burn LUT into video"))
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(.orange)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(camera.lutBurnEnabled ? Color.orange.opacity(0.22) : Color.white.opacity(0.09),
+                            in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10)
+                    .stroke(camera.lutBurnEnabled ? Color.orange : Color.white.opacity(0.2), lineWidth: 1))
+                .disabled(camera.selectedEncoding.isRAW || camera.lutControlsLocked)
+                .accessibilityIdentifier("lut.burn")
             HStack {
                 Text(lutDescription).accessibilityIdentifier("lut.status")
                 Button { showingLUTCredits = true } label: { Image(systemName: "info.circle") }
@@ -764,12 +794,11 @@ struct CameraView: View {
             if ["aprn", "aprh"].contains(camera.selectedCodec?.rawValue ?? "") {
                 return t("此配置暂不支持 LUT 预览", "LUT preview unavailable for this configuration")
             }
-            return t("仅支持 RAW 预览 · 不写入视频", "RAW preview only · Not recorded")
+            return t("此配置暂不支持 LUT 预览", "LUT preview unavailable for this configuration")
         }
         if !camera.lutEnabled { return t("LUT 已关闭 · 不写入视频", "LUT off · Not recorded") }
         switch camera.lutStatus {
-        case "active": return "\(camera.lutLook.title) · \(t("仅预览", "Preview only"))"
-        case "rec709": return t("预览源已为 Rec.709 · 仅预览", "Source is Rec.709 · Preview only")
+        case "active", "rec709": return "\(camera.selectedLUTTitle) · \(camera.lutBurnEnabled ? t("烧录开启", "Recorded to clip") : t("仅预览", "Preview only"))"
         case "unsupported", "unavailable": return t("当前预览不支持转换 · 已显示原画面", "Conversion unavailable · Original preview")
         default: return t("正在准备 LUT 预览…", "Preparing LUT preview…")
         }

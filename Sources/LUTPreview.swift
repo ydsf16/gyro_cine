@@ -9,6 +9,8 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private let lock = NSLock()
     private let renderQueue = DispatchQueue(label: "GyroCine.LUTRender", qos: .userInitiated)
     private let gpuSlot = DispatchSemaphore(value: 1)
+    private let sharedSlot = DispatchSemaphore(value: 1)
+    private var usesSharedSource = false // lock protected
     let metalDevice = MTLCreateSystemDefaultDevice()
     private lazy var commands = metalDevice?.makeCommandQueue()
     private lazy var context: CIContext? = metalDevice.map {
@@ -20,6 +22,8 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private var pendingCubes = Set<String>()
     private var failedCubes = Set<String>()
     private var look: PreviewLook = .rec709 // lock protected
+    private var importedLook: ImportedPreviewLUT? // lock protected
+    private var expectedColorSpace: RecordingColorSpace = .systemDefault // lock protected
     private var latest: (CVPixelBuffer, PreviewColorTransform.Profile, Data?, Double)?
     private var enabled = false
     private var rendered = 0 // render queue
@@ -82,13 +86,26 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     func setLook(_ value: PreviewLook) {
         lock.lock()
-        let changed = look != value
-        if changed { look = value; latest = nil; generation += 1 }
+        let changed = look != value || importedLook != nil
+        if changed { look = value; importedLook = nil; latest = nil; generation += 1 }
         lock.unlock()
         if changed { report("preparing") }
     }
-    private func preparedCube(profile: PreviewColorTransform.Profile, look: PreviewLook) -> Data? {
-        let key = "\(profile.rawValue):\(look.rawValue)"
+    func setImportedLook(_ value: ImportedPreviewLUT) {
+        lock.lock()
+        let changed = importedLook != value
+        if changed { importedLook = value; latest = nil; generation += 1 }
+        lock.unlock()
+        if changed { report("preparing") }
+    }
+    func setExpectedColorSpace(_ value: RecordingColorSpace) {
+        lock.lock()
+        if expectedColorSpace != value { expectedColorSpace = value; latest = nil; generation += 1 }
+        lock.unlock()
+    }
+    private func preparedCube(profile: PreviewColorTransform.Profile, look: PreviewLook, imported: ImportedPreviewLUT?) -> Data? {
+        let lookID = imported.map { $0.selectionID } ?? look.rawValue
+        let key = "\(profile.rawValue):\(lookID)"
         lock.lock()
         if let cube = cubes[key] { lock.unlock(); return cube }
         if failedCubes.contains(key) { lock.unlock(); report("unavailable"); return nil }
@@ -100,9 +117,12 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 do {
                     let technical = self.technicalCubes[profile] ?? PreviewColorTransform.cube(profile)
                     self.technicalCubes[profile] = technical
-                    let cube = try look.load()?.compose(technical: technical) ?? technical
-                    self.lock.lock(); self.cubes[key] = cube; self.pendingCubes.remove(key); self.lock.unlock()
-                    self.log?("lut_preview_prepared", ["profile": profile.rawValue, "look": look.rawValue, "bytes": cube.count])
+                    let cube = try imported.map { try PreviewLUTLibrary.cube($0, profile: profile) }
+                        ?? look.load()?.compose(technical: technical) ?? technical
+                    self.lock.lock()
+                    if self.cubes.count >= 8 { self.cubes.removeAll(keepingCapacity: true) }
+                    self.cubes[key] = cube; self.pendingCubes.remove(key); self.lock.unlock()
+                    self.log?("lut_preview_prepared", ["profile": profile.rawValue, "look": lookID, "bytes": cube.count])
                 } catch {
                     self.lock.lock(); self.failedCubes.insert(key); self.pendingCubes.remove(key); self.lock.unlock()
                     self.log?("lut_preview_load_error", ["look": look.rawValue, "error": String(describing: error)])
@@ -140,6 +160,19 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         }
         if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
     }
+    func setSharedSource(_ value: Bool) {
+        lock.lock(); usesSharedSource = value; latest = nil; generation += 1; lock.unlock()
+    }
+    /// One retained handoff at most. Metadata and recording never wait for preview work.
+    func offerSharedSample(_ sample: CMSampleBuffer, connection: AVCaptureConnection) {
+        lock.lock(); let wanted = usesSharedSource && enabled && foreground; lock.unlock()
+        guard wanted, sharedSlot.wait(timeout: .now()) == .success else { return }
+        queue.async { [self] in
+            defer { sharedSlot.signal() }
+            lock.lock(); let active = usesSharedSource; lock.unlock()
+            if active { captureOutput(output, didOutput: sample, from: connection) }
+        }
+    }
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         proxyDrops += 1
         if proxyDrops == 1 || proxyDrops % 30 == 0 {
@@ -155,7 +188,8 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 "pixelFormat": CVPixelBufferGetPixelFormatType(buffer),
                 "attachments": String(describing: CVBufferCopyAttachments(buffer, .shouldPropagate))])
         }
-        lock.lock(); let wanted = enabled; let version = generation; let selectedLook = look; lock.unlock()
+        lock.lock(); let wanted = enabled; let version = generation
+        let selectedLook = look; let imported = importedLook; let expected = expectedColorSpace; lock.unlock()
         guard wanted, count % frameStride == 0 else { return }
         let now = ProcessInfo.processInfo.systemUptime
         let logTag = CVBufferCopyAttachment(buffer, kCVImageBufferLogTransferFunctionKey, nil) as? String
@@ -166,8 +200,13 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         else if #available(iOS 26, *), logTag == kCVImageBufferLogTransferFunction_AppleLog2 as String { profile = .appleLog2 }
         else if logTag == nil, transfer == kCVImageBufferTransferFunction_ITU_R_709_2 as String,
                 primaries == kCVImageBufferColorPrimaries_ITU_R_709_2 as String { profile = .rec709 }
+        else if logTag == nil, expected == .p3D65 { profile = .p3D65 }
+        else if logTag == nil, expected == .rec2020HDR { profile = .rec2020HLG }
+        else if logTag == nil, expected == .appleLog { profile = .appleLog }
+        else if logTag == nil, expected == .appleLog2 { profile = .appleLog2 }
+        else if logTag == nil, expected == .rec709 { profile = .rec709 }
         else { report("unsupported"); return }
-        guard let cube = preparedCube(profile: profile, look: selectedLook) else { return }
+        guard let cube = preparedCube(profile: profile, look: selectedLook, imported: imported) else { return }
         lock.lock()
         if generation == version && enabled { latest = (buffer, profile, cube, now) }
         lock.unlock()
@@ -246,14 +285,243 @@ final class LUTPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         cpuTotal += cpuMS; cpuMax = max(cpuMax, cpuMS)
         gpuTotal += gpuMS; gpuMax = max(gpuMax, gpuMS)
         if rendered == 1 || (metricCount >= 60 && now - metricStart >= 2) {
-            lock.lock(); let skips = gpuBusySkips; lock.unlock()
+            lock.lock(); let skips = gpuBusySkips; let slots = usesSharedSource ? 3 : 2; lock.unlock()
             log?("lut_preview_render", ["frames": rendered, "profile": profile.rawValue,
-                "width": Int(size.width), "height": Int(size.height), "bufferSlots": 2,
+                "width": Int(size.width), "height": Int(size.height), "bufferSlots": slots,
                 "renderFPS": Double(max(0, metricCount - 1)) / max(now - metricStart, 0.001),
                 "cpuMeanMS": cpuTotal / Double(metricCount), "cpuMaxMS": cpuMax,
                 "gpuMeanMS": gpuTotal / Double(metricCount), "gpuMaxMS": gpuMax,
                 "gpuBusySkips": skips, "renderOnMain": Thread.isMainThread])
             metricStart = now; metricCount = 0; cpuTotal = 0; cpuMax = 0; gpuTotal = 0; gpuMax = 0
         }
+    }
+}
+
+/// Preserve the existing metadata delegate and offer a bounded preview-only handoff afterward.
+final class IntrinsicsPreviewFanout: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    private let recordingLock = NSLock()
+    private var recordingWriter: RealtimeLUTWriter?
+    func setRecordingWriter(_ writer: RealtimeLUTWriter?) {
+        recordingLock.lock(); recordingWriter = writer; recordingLock.unlock()
+    }
+    let recorder: CameraIntrinsicsRecorder
+    let preview: LUTPreview
+    init(recorder: CameraIntrinsicsRecorder, preview: LUTPreview) {
+        self.recorder = recorder; self.preview = preview
+    }
+    func captureOutput(_ output: AVCaptureOutput, didOutput sample: CMSampleBuffer, from connection: AVCaptureConnection) {
+        recordingLock.lock(); let writer = recordingWriter; recordingLock.unlock()
+        writer?.offer(sample)
+        recorder.captureOutput(output, didOutput: sample, from: connection)
+        preview.offerSharedSample(sample, connection: connection)
+    }
+    func captureOutput(_ output: AVCaptureOutput, didDrop sample: CMSampleBuffer, from connection: AVCaptureConnection) {
+        recorder.captureOutput(output, didDrop: sample, from: connection)
+    }
+}
+
+/// Recording owns a full-resolution GPU pipeline. No rendered preview frames enter it.
+/// Admission is bounded across queued, rendering and encoder-backpressured frames.
+final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
+    let audioOutput = AVCaptureAudioDataOutput()
+    private let queue = DispatchQueue(label: "GyroCine.LUTRecording", qos: .userInitiated)
+    private let audioQueue = DispatchQueue(label: "GyroCine.LUTAudio", qos: .userInitiated)
+    private let admission = NSLock()
+    private var accepting = true
+    private var encoderReady = false // admission lock; startup is outside the recorded interval
+    private var videoCount = 0, audioCount = 0, peak = 0
+    private var stopped = false, completed = false, retry = false
+    private var deadline = 0.0
+    private let writer: AVAssetWriter
+    private let input: AVAssetWriterInput
+    private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let context: CIContext
+    private let filter: CIFilter
+    private let fps: Double
+    private let started: (CMTime) -> Void
+    private let finished: (Error?, [String: Any]) -> Void
+    private var audioInput: AVAssetWriterInput?
+    private var firstPTS: CMTime?, lastPTS: CMTime?
+    private var videoPending: [CMSampleBuffer] = [], audioPending: [CMSampleBuffer] = []
+    private var frames = 0, audioPackets = 0
+    private var maxGPUms = 0.0, totalGPUms = 0.0
+    #if DEBUG
+    private var injectedStall = false
+    #endif
+    private var reported = false
+    private var stopTime: Double?
+    private var cadence = RAWCadenceGuard()
+    private let width: Int, height: Int
+
+    init(url: URL, recipe: LUTBurnRecipe, settings: [String: Any], width: Int, height: Int,
+         fps: Double, orientation: RecordingOrientation, dedicated: Bool, metadata: [AVMetadataItem],
+         started: @escaping (CMTime) -> Void,
+         finished: @escaping (Error?, [String: Any]) -> Void) throws {
+        guard !["aprn", "aprh"].contains(recipe.codec), let gpu = MTLCreateSystemDefaultDevice(),
+              let filter = CIFilter(name: "CIColorCube") else {
+            throw RecorderError.unavailable("LUT GPU recording unavailable")
+        }
+        self.width = width; self.height = height; self.fps = fps
+        self.started = started; self.finished = finished
+        context = CIContext(mtlDevice: gpu, options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
+        self.filter = filter
+        filter.setValue(PreviewColorTransform.dimension, forKey: "inputCubeDimension")
+        filter.setValue(recipe.cube, forKey: "inputCubeData")
+        writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        writer.movieTimeScale = 60_000
+        if dedicated {
+            if #available(iOS 27.0, *), writer.isProVideoStorageSupported { writer.usesProVideoStorage = true }
+            else { throw RecorderError.unavailable("LUT writer: dedicated storage unavailable") }
+        }
+        guard writer.canApply(outputSettings: settings, forMediaType: .video) else { throw RecorderError.unavailable("LUT encoder configuration unavailable") }
+        input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+        input.expectsMediaDataInRealTime = true
+        input.mediaTimeScale = 60_000
+        input.transform = orientation.movieTransform(width: width, height: height)
+        adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: recipe.highBitDepth == true || recipe.codec.hasPrefix("ap") ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferMetalCompatibilityKey as String: true])
+        guard writer.canAdd(input) else { throw RecorderError.unavailable("LUT video input unavailable") }
+        writer.add(input)
+        let tag = AVMutableMetadataItem(); tag.keySpace = .quickTimeMetadata
+        tag.key = LUTMovieBurner.marker as NSString; tag.value = recipe.id as NSString
+        writer.metadata = metadata + [tag]
+        super.init()
+        audioOutput.setSampleBufferDelegate(self, queue: audioQueue)
+        queue.asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self, self.firstPTS == nil, !self.completed else { return }
+            self.fail("LUT 录制启动超时：未收到可用的视频或音频")
+        }
+    }
+    func offer(_ sample: CMSampleBuffer, audio: Bool = false) {
+        admission.lock()
+        guard accepting else { admission.unlock(); return }
+        if !audio && !encoderReady && videoCount > 0 { admission.unlock(); return }
+        guard audio ? audioCount < 32 : videoCount < 10 else {
+            accepting = false; admission.unlock()
+            queue.async { self.fail("LUT 实时处理或存储写入跟不上，缓冲已满，已停止录制并保留文件") }
+            return
+        }
+        if audio { audioCount += 1 } else { videoCount += 1; peak = max(peak, videoCount) }
+        queue.async {
+            guard !self.completed else { self.release(audio); return }
+            if audio { self.audioPending.append(sample) } else { self.videoPending.append(sample) }
+            self.drain()
+        }
+        admission.unlock()
+    }
+    private func release(_ audio: Bool) {
+        admission.lock(); if audio { audioCount -= 1 } else { videoCount -= 1 }; admission.unlock()
+    }
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) { offer(sampleBuffer, audio: true) }
+    func stop() {
+        admission.lock(); accepting = false
+        queue.async {
+            guard !self.completed, !self.stopped else { return }
+            self.stopped = true; self.stopTime = ProcessInfo.processInfo.systemUptime
+            self.deadline = ProcessInfo.processInfo.systemUptime + 5
+            self.drain()
+        }
+        admission.unlock()
+    }
+    func abort(_ message: String) { queue.async { self.fail(message) } }
+    private func drain() {
+        guard !completed else { return }
+        do {
+            if audioInput == nil, let audio = audioPending.first,
+               let format = CMSampleBufferGetFormatDescription(audio),
+               let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee {
+                let i = AVAssetWriterInput(mediaType: .audio, outputSettings: [AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: asbd.mSampleRate, AVNumberOfChannelsKey: asbd.mChannelsPerFrame,
+                    AVEncoderBitRateKey: asbd.mChannelsPerFrame == 1 ? 128_000 : 320_000], sourceFormatHint: format)
+                i.expectsMediaDataInRealTime = true
+                guard writer.canAdd(i) else { throw RecorderError.unavailable("LUT audio input unavailable") }
+                writer.add(i); audioInput = i
+                guard writer.startWriting() else { throw writer.error ?? RecorderError.unavailable("LUT encoder failed to start") }
+                // Discard only pre-session warmup frames. The next fresh capture
+                // establishes time zero, so encoder setup cannot create a start gap.
+                let warmup = videoPending.count; videoPending.removeAll()
+                admission.lock(); videoCount -= warmup; encoderReady = true; admission.unlock()
+            }
+            if firstPTS == nil, audioInput != nil, let video = videoPending.first {
+                let pts = video.presentationTimeStamp
+                firstPTS = pts; writer.startSession(atSourceTime: pts); started(pts)
+            }
+            if let firstPTS {
+                while input.isReadyForMoreMediaData, !videoPending.isEmpty {
+                    let sample = videoPending.removeFirst(); defer { release(false) }
+                    try autoreleasepool {
+                        guard let pixels = CMSampleBufferGetImageBuffer(sample),
+                              CVPixelBufferGetWidth(pixels) == width, CVPixelBufferGetHeight(pixels) == height,
+                              let pool = adaptor.pixelBufferPool else { throw RecorderError.unavailable("LUT recording frame dimensions changed") }
+                        let pts = sample.presentationTimeStamp
+                        guard lastPTS == nil || pts > lastPTS! else { throw RecorderError.unavailable("LUT 视频时间戳异常") }
+                        if cadence.observe(pts.seconds, fps: fps) != nil { throw RecorderError.unavailable("LUT 录制持续丢帧，已停止；请降低录制规格") }
+                        var buffer: CVPixelBuffer?
+                        guard CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool,
+                            [kCVPixelBufferPoolAllocationThresholdKey as String: 10] as CFDictionary, &buffer) == kCVReturnSuccess,
+                            let buffer else { throw RecorderError.unavailable("LUT 编码缓冲已满，请降低录制规格") }
+                        #if DEBUG
+                        if !injectedStall, frames > 120, ProcessInfo.processInfo.arguments.contains("--lut-stall-smoke") {
+                            injectedStall = true; Thread.sleep(forTimeInterval: 0.3)
+                        }
+                        #endif
+                        let begin = ProcessInfo.processInfo.systemUptime
+                        filter.setValue(CIImage(cvPixelBuffer: pixels, options: [.colorSpace: NSNull()]), forKey: kCIInputImageKey)
+                        guard let image = filter.outputImage else { throw RecorderError.unavailable("LUT GPU filter failed") }
+                        context.render(image, to: buffer, bounds: image.extent, colorSpace: nil)
+                        filter.setValue(nil, forKey: kCIInputImageKey)
+                        let ms = (ProcessInfo.processInfo.systemUptime - begin) * 1000
+                        maxGPUms = max(maxGPUms, ms); totalGPUms += ms
+                        guard adaptor.append(buffer, withPresentationTime: pts) else { throw writer.error ?? RecorderError.unavailable("LUT video append failed") }
+                        frames += 1; lastPTS = pts
+                    }
+                }
+                if let audioInput {
+                    while audioInput.isReadyForMoreMediaData, !audioPending.isEmpty {
+                        let sample = audioPending.removeFirst(); defer { release(true) }
+                        if sample.presentationTimeStamp < firstPTS { continue }
+                        guard audioInput.append(sample) else { throw writer.error ?? RecorderError.unavailable("LUT audio append failed") }
+                        audioPackets += 1
+                    }
+                }
+            }
+            if stopped && videoPending.isEmpty && audioPending.isEmpty {
+                guard firstPTS != nil, let lastPTS else { fail("LUT 录制尚未开始"); return }
+                writer.endSession(atSourceTime: CMTimeAdd(lastPTS, CMTime(seconds: 1 / fps, preferredTimescale: 60_000)))
+                complete(nil)
+            } else if !retry && (stopped || (!videoPending.isEmpty || !audioPending.isEmpty) && firstPTS != nil) {
+                if stopped && ProcessInfo.processInfo.systemUptime > deadline { fail("LUT 录制缓冲排空超时"); return }
+                retry = true
+                queue.asyncAfter(deadline: .now() + 0.003) { [weak self] in
+                    guard let self else { return }; self.retry = false; self.drain()
+                }
+            }
+            if writer.status == .failed { throw writer.error ?? RecorderError.unavailable("LUT writer failed") }
+        } catch { fail(error.localizedDescription) }
+    }
+    private func fail(_ message: String) { complete(RecorderError.unavailable(message)) }
+    private func complete(_ error: Error?) {
+        guard !completed else { return }; completed = true
+        admission.lock(); accepting = false; let peak = peak; admission.unlock()
+        videoPending.removeAll(); audioPending.removeAll()
+        let report = { [self] in
+            guard !reported else { return }; reported = true
+            finished(error ?? writer.error, ["frames": frames, "audioPackets": audioPackets,
+                "peakBuffered": peak, "maxGPUms": maxGPUms, "meanGPUms": totalGPUms / Double(max(1, frames)),
+                "stopToWriterSeconds": stopTime.map { ProcessInfo.processInfo.systemUptime - $0 } ?? 0,
+                "error": (error ?? writer.error)?.localizedDescription ?? ""])
+        }
+        if writer.status == .writing {
+            input.markAsFinished(); audioInput?.markAsFinished()
+            writer.finishWriting { self.queue.async(execute: report) }
+            queue.asyncAfter(deadline: .now() + 10) { [self] in
+                guard !reported else { return }; reported = true
+                writer.cancelWriting()
+                finished(RecorderError.unavailable("LUT 视频保存超时，文件已保留"),
+                    ["frames": frames, "error": "finishWriting timeout"])
+            }
+        } else { report() }
     }
 }

@@ -121,6 +121,15 @@ struct SettingsView: View {
                     #endif
                     storageSection
                     recordingSection
+                    Section {
+                        Toggle(t("烧录 LUT", "Burn LUT into video"), isOn: Binding(
+                            get: { camera.lutBurnEnabled && !camera.selectedEncoding.isRAW },
+                            set: camera.setLUTBurnEnabled))
+                            .disabled(camera.selectedEncoding.isRAW || camera.lutControlsLocked)
+                            .accessibilityIdentifier("settings.lutBurn")
+                        NavigationLink(t("LUT 管理", "LUT Management")) { LUTManagementView() }
+                            .accessibilityIdentifier("settings.lutManagement")
+                    }.disabled(locked)
                     viewfinderSection
                     advancedSection
                     Section {
@@ -209,6 +218,28 @@ struct SettingsView: View {
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
+            if !camera.selectedEncoding.isRAW, let format = currentFormat {
+                SettingsChoices(title: t("色彩空间", "Color space")) {
+                    ForEach(RecordingColorSpace.allCases.filter {
+                        $0.isAvailable(for: format.format, encoding: camera.selectedEncoding)
+                    }) { colorSpace in
+                        Button {
+                            camera.chooseRecordingColorSpace(colorSpace)
+                        } label: {
+                            if camera.selectedRecordingColorSpace == colorSpace {
+                                Label(colorSpace.title(locale: locale), systemImage: "checkmark")
+                            } else {
+                                Text(colorSpace.title(locale: locale))
+                            }
+                        }
+                        .accessibilityIdentifier("colorSpaceOption.\(colorSpace.rawValue)")
+                    }
+                } label: {
+                    row(t("色彩空间", "Color space"), camera.selectedRecordingColorSpace.title(locale: locale))
+                }
+                .tint(.primary).disabled(locked)
+                .accessibilityIdentifier("colorSpaceMenu")
+            }
             if camera.selectedEncoding == .hevc {
                 SettingsChoices(title: t("码率档位", "Bitrate")) {
                     ForEach(HEVCBitratePreset.allCases) { preset in
@@ -463,5 +494,55 @@ private struct SettingsChoices<Options: View, Row: View>: View {
         }
         .menuStyle(.borderlessButton)
         .menuOrder(.fixed)
+    }
+}
+
+
+struct LUTManagementView: View {
+    @EnvironmentObject private var camera: CameraManager
+    @Environment(\.locale) private var locale
+    @Environment(\.dismiss) private var dismiss
+    @State private var importing = false
+    @State private var deleting: ImportedPreviewLUT?
+    private func t(_ zh: String, _ en: String) -> String { AppText.value(zh, en, locale: locale) }
+    var body: some View {
+        Form {
+            Section {
+                Button { importing = true } label: {
+                    Label(t("导入 LUT", "Import LUT"), systemImage: "square.and.arrow.down")
+                }.accessibilityIdentifier("lut.import").disabled(camera.importingLUT)
+            }
+            Section(t("内置 LUT", "Built-in LUTs")) {
+                ForEach(PreviewLook.allCases) { look in
+                    Toggle(look.title, isOn: Binding(
+                        get: { !camera.disabledLUTIDs.contains(look.rawValue) },
+                        set: { camera.setLUTVisible(look, enabled: $0) }))
+                        .accessibilityIdentifier("lut.visible.builtin.\(look.rawValue)")
+                }
+            }
+            Section(t("导入的 LUT", "Imported LUTs")) {
+                ForEach(camera.importedLUTs) { item in
+                    Toggle(item.name, isOn: Binding(
+                        get: { !camera.disabledLUTIDs.contains(item.selectionID) },
+                        set: { camera.setLUTVisible(item, enabled: $0) }))
+                        .accessibilityIdentifier("lut.visible.\(item.name)")
+                        .swipeActions { Button(role: .destructive) { deleting = item } label: { Label(t("删除", "Delete"), systemImage: "trash") } }
+                }
+            }
+        }.disabled(camera.lutControlsLocked)
+            .navigationTitle(t("LUT 管理", "LUT Management"))
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { dismiss() }.accessibilityIdentifier("lut.managementDone") } }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data]) { result in
+                switch result {
+                case .success(let url): camera.importPreviewLUT(url)
+                case .failure(let error): camera.reportLUTImportError(error)
+                }
+            }
+            .confirmationDialog(t("删除 LUT？", "Delete LUT?"), isPresented: Binding(
+                get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
+                Button(t("删除", "Delete"), role: .destructive) {
+                    if let item = deleting { camera.deleteImportedLUT(item) }; deleting = nil
+                }
+            }
     }
 }

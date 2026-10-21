@@ -1,0 +1,61 @@
+{
+  "heldPointApplied" : true,
+  "heldPositionStable" : true,
+  "heldState" : {
+    "activeColorSpace" : 0,
+    "actualFormat" : 29,
+    "adjustingFocus" : false,
+    "exposureBias" : 0,
+    "exposureMode" : 2,
+    "exposureSeconds" : 0.012493000000000001,
+    "focusMode" : "locked",
+    "focusPoint" : {
+      "x" : 0.70999999999999996,
+      "y" : 0.62
+    },
+    "iso" : 4124.4921875,
+    "lensPosition" : 0.83137255907058716,
+    "maxFrameDurationSeconds" : 0.016666666666666666,
+    "minFrameDurationSeconds" : 0.016666666666666666,
+    "outputSettings" : {
+      "AVVideoCodecKey" : "hvc1",
+      "AVVideoCompressionPropertiesKey" : {
+        "AllowFrameReordering" : true,
+        "AllowOpenGOP" : true,
+        "AverageBitRate" : 12441600,
+        "BaseLayerFrameRate" : 30,
+        "EnableMCTF" : true,
+        "ExpectedFrameRate" : 60,
+        "MaxAllowedFrameQP" : 41,
+        "MaximumRealTimeFrameRate" : 60,
+        "MaxKeyFrameIntervalDuration" : 1,
+        "MinAllowedFrameQP" : 15,
+        "MinimizeMemoryUsage" : true,
+        "Priority" : 80,
+        "ProfileLevel" : "HEVC_Main_AutoLevel",
+        "RealTime" : true,
+        "RelaxAverageBitRateTarget" : true
+      },
+      "AVVideoHeightKey" : 1080,
+      "AVVideoWidthKey" : 1920
+    },
+    "requestedExposureSeconds" : null,
+    "requestedISO" : null,
+    "selectedCodec" : "hvc1",
+    "selectedColorSpace" : "systemDefault",
+    "selectedEncoding" : "H.265",
+    "selectedFormat" : 29,
+    "selectedFPS" : 60,
+    "shutterAngle" : null,
+    "whiteBalanceChoice" : "Auto-L",
+    "whiteBalanceGains" : [
+      1.852783203125,
+      1,
+      2.436767578125
+    ],
+    "whiteBalanceMode" : 2
+  },
+  "pass" : true,
+  "tapPointApplied" : true,
+  "tapReleasesLock" : true
+}
