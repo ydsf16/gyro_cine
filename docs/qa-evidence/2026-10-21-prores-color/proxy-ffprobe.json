@@ -1,0 +1,31 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "prores",
+            "profile": "Proxy",
+            "pix_fmt": "yuv422p10le",
+            "color_space": "bt709",
+            "color_transfer": "bt709",
+            "color_primaries": "bt709",
+            "nb_read_frames": "121",
+            "side_data_list": [
+                {
+
+                }
+            ]
+        },
+        {
+            "codec_name": "aac",
+            "nb_read_frames": "171"
+        },
+        {
+
+        }
+    ]
+}

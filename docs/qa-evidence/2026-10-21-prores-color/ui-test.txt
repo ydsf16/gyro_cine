@@ -1,0 +1,6 @@
+testProResAndColorMenus
+iPhone 16 / iOS 18.2.1 / USB
+Passed, 120.603 seconds, 0 failures
+Result bundle: /tmp/prores-color-ui3.xcresult
+Four ProRes codecs x Rec.709 / HLG / P3 selections, return to H.265.
+Initial attempts hit XCTest native Menu presentation / hit-point timing; final test waits for menu presentation and taps verified element coordinates.

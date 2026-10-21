@@ -1,0 +1,54 @@
+[
+  {
+    "test": "p3D65-burn",
+    "previewMeanRGB": [
+      254.12,
+      1.34,
+      1.34
+    ],
+    "videoMeanRGB": [
+      253,
+      0,
+      0
+    ]
+  },
+  {
+    "test": "p3D65-preview",
+    "previewMeanRGB": [
+      254.12,
+      1.34,
+      1.34
+    ],
+    "videoMeanRGB": [
+      166.47,
+      163.13,
+      154.7
+    ]
+  },
+  {
+    "test": "rec2020HDR-burn",
+    "previewMeanRGB": [
+      254.12,
+      1.34,
+      1.34
+    ],
+    "videoMeanRGB": [
+      253,
+      0,
+      0
+    ]
+  },
+  {
+    "test": "rec709-burn",
+    "previewMeanRGB": [
+      254.12,
+      1.34,
+      1.34
+    ],
+    "videoMeanRGB": [
+      253,
+      0,
+      0
+    ]
+  }
+]

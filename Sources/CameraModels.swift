@@ -53,6 +53,11 @@ enum VideoEncoding: String, CaseIterable, Identifiable {
 enum RecordingColorSpace: String, CaseIterable, Identifiable {
     case systemDefault, rec709, rec2020HDR, p3D65, appleLog, appleLog2
     var id: Self { self }
+    static var selectableCases: [Self] { allCases.filter { $0 != .systemDefault } }
+    static func restored(_ value: String?) -> Self {
+        let stored = value.flatMap(Self.init(rawValue:)) ?? .rec709
+        return stored == .systemDefault ? .rec709 : stored
+    }
 
     func title(locale: Locale) -> String {
         switch self {

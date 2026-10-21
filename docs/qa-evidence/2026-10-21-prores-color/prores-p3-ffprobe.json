@@ -1,0 +1,23 @@
+{
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+    {
+      "codec_name": "prores",
+      "profile": "Standard",
+      "pix_fmt": "yuv422p10le",
+      "color_space": "smpte170m",
+      "color_transfer": "bt709",
+      "color_primaries": "smpte432",
+      "nb_read_frames": "94",
+      "side_data_list": [
+        {}
+      ]
+    },
+    {
+      "codec_name": "aac",
+      "nb_read_frames": "131"
+    },
+    {}
+  ]
+}

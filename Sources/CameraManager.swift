@@ -128,7 +128,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var codecs: [AVVideoCodecType] = []
     @Published private(set) var selectedCodec: AVVideoCodecType?
     @Published private(set) var selectedEncoding: VideoEncoding = .hevc
-    @Published private(set) var selectedRecordingColorSpace: RecordingColorSpace = .systemDefault
+    @Published private(set) var selectedRecordingColorSpace: RecordingColorSpace = .rec709
     @Published private(set) var hevcBitratePreset = HEVCBitratePreset.stored(
         UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     @Published private(set) var selectedFormatIndex: Int?
@@ -317,7 +317,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var supportedCodecs: [AVVideoCodecType] = []
     private var chosenCodec: AVVideoCodecType?
     private var chosenEncoding: VideoEncoding = .hevc
-    private var chosenRecordingColorSpace: RecordingColorSpace = .systemDefault
+    private var chosenRecordingColorSpace: RecordingColorSpace = .rec709
     private var chosenHEVCBitratePreset = HEVCBitratePreset.stored(
         UserDefaults.standard.string(forKey: "hevcBitratePreset"))
     private var chosenIndex: Int?
@@ -1102,6 +1102,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
 
     private func runProRes422Smoke() {
+        prepareImportedLUTSmoke()
         guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--prores422-smoke=") }),
               let encoding = VideoEncoding(rawValue: String(argument.dropFirst("--prores422-smoke=".count))),
               encoding.isProRes422 else { return }
@@ -1111,16 +1112,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             ?? (ProcessInfo.processInfo.arguments.contains("--prores422-log-smoke") ? .appleLog : .systemDefault)
         chosenEncoding = encoding
         chosenCodec = encoding.codec
-        chosenFPS = 30
+        chosenFPS = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--prores422-fps=") }
+            .flatMap { Double($0.dropFirst("--prores422-fps=".count)) } ?? 30
         chosenRecordingColorSpace = .systemDefault
         guard let target = closestFormatIndex(in: formatObjects, codec: encoding.codec,
-            preference: CapturePreference(encoding: encoding, width: 3840, height: 2160, fps: 30)),
+            preference: CapturePreference(encoding: encoding, width: 3840, height: 2160, fps: chosenFPS)),
             applyFormat(target, reason: requestedColor == .systemDefault ? "color_space_change" : "prores422_smoke") else {
             logger.event("prores422_smoke_failed", ["codec": encoding.title, "reason": "configuration"])
             return
         }
         if requestedColor != .systemDefault {
-            guard requestedColor.isAvailable(for: formatObjects[target].format, encoding: encoding) else {
+            guard colorFormatIndex(near: target, color: requestedColor) != nil else {
                 logger.event("prores422_smoke_failed", ["codec": encoding.title,
                     "reason": "Color space unavailable", "color": requestedColor.rawValue])
                 return
@@ -1187,12 +1189,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    private func runHEVCCadenceSmoke() {
-        if ProcessInfo.processInfo.arguments.contains("--lut-realtime-smoke") {
-            UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
-            UserDefaults.standard.set(true, forKey: "previewLUTEnabled")
-            publish { self.setLUTLook(.rec709); self.setLUTBurnEnabled(true) }
-        }
+    private func prepareImportedLUTSmoke() {
         if ProcessInfo.processInfo.arguments.contains("--lut-import-smoke") {
             do {
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("UITEST_PreviewRed.cube")
@@ -1207,6 +1204,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 logger.event("lut_import_smoke", ["id": item.selectionID, "name": item.name])
             } catch { logger.event("lut_import_smoke_failed", ["error": error.localizedDescription]); return }
         }
+    }
+
+    private func runHEVCCadenceSmoke() {
+        if ProcessInfo.processInfo.arguments.contains("--lut-realtime-smoke") {
+            UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
+            UserDefaults.standard.set(true, forKey: "previewLUTEnabled")
+            publish { self.setLUTLook(.rec709); self.setLUTBurnEnabled(true) }
+        }
+        prepareImportedLUTSmoke()
         if ProcessInfo.processInfo.arguments.contains("--whitebalance-autol-smoke") {
             chosenWhiteBalance = .autoLock
             savedControls.whiteBalance = WhiteBalanceChoice.autoLock.rawValue
@@ -1621,8 +1627,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 guard let encoding = VideoEncoding(rawValue: value.encoding) else { return nil }
                 return CapturePreference(encoding: encoding, width: value.width, height: value.height, fps: value.fps)
             }
-            self.chosenRecordingColorSpace = RecordingColorSpace(rawValue:
-                UserDefaults.standard.string(forKey: "capture.colorSpace.\(camera.uniqueID)") ?? "") ?? .systemDefault
+            self.chosenRecordingColorSpace = RecordingColorSpace.restored(
+                UserDefaults.standard.string(forKey: "capture.colorSpace.\(camera.uniqueID)"))
             guard discoverCapabilities(camera, preference: longRAWTest ? nil : preference, manualExposure: manualExposureIntent) else { return }
             startSampling(camera)
             session.startRunning()
@@ -1813,6 +1819,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let oldMax = camera.activeVideoMaxFrameDuration
         var found: [FormatInfo] = []
         var union: [AVVideoCodecType] = []
+        var proResProbe: [String: Bool] = [:]
         session.beginConfiguration()
         func restoreProbe() {
             do {
@@ -1830,7 +1837,24 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 try camera.lockForConfiguration()
                 camera.activeFormat = format
                 camera.unlockForConfiguration()
-                let available = output.availableVideoCodecTypes
+                var available = output.availableVideoCodecTypes
+                // Probe the actual encoder, once per codec/raster. Capture must also
+                // expose a video-data connection; RAW formats are not candidates.
+                if available.contains(.hevc), intrinsicOutput.connection(with: .video) != nil {
+                    for encoding in VideoEncoding.allCases where encoding.isProRes422 && !available.contains(encoding.codec) {
+                        let key = "\(encoding.codec.rawValue)-\(info.width)x\(info.height)"
+                        if proResProbe[key] == nil {
+                            var encoder: VTCompressionSession?
+                            let code = encoding.codec.rawValue.utf8.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+                            let status = VTCompressionSessionCreate(allocator: nil, width: info.width, height: info.height,
+                                codecType: code, encoderSpecification: nil, imageBufferAttributes: nil,
+                                compressedDataAllocator: nil, outputCallback: nil, refcon: nil, compressionSessionOut: &encoder)
+                            proResProbe[key] = status == noErr && encoder != nil
+                            if let encoder { VTCompressionSessionInvalidate(encoder) }
+                        }
+                        if proResProbe[key] == true { available.append(encoding.codec) }
+                    }
+                }
                 info.compatibleCodecs = Set(available.map(\.rawValue))
                 info.supportsIntrinsics = intrinsicOutput.connection(with: .video)?
                     .isCameraIntrinsicMatrixDeliverySupported ?? false
@@ -1943,8 +1967,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                   self.formatObjects.indices.contains(index) else {
                 self.fail("Color space cannot change during recording"); return
             }
-            guard colorSpace.isAvailable(for: self.formatObjects[index].format,
-                                         encoding: self.chosenEncoding) else {
+            guard self.colorFormatIndex(near: index, color: colorSpace) != nil else {
                 self.fail("Color space unavailable for this format"); return
             }
             guard self.chosenRecordingColorSpace != colorSpace else { return }
@@ -2013,8 +2036,24 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    @discardableResult private func applyFormat(_ index: Int, reason: String,
+    private func colorFormatIndex(near index: Int, color: RecordingColorSpace) -> Int? {
+        guard formatObjects.indices.contains(index) else { return nil }
+        let current = formatObjects[index]
+        if color.isAvailable(for: current.format, encoding: chosenEncoding), current.supports(chosenFPS) { return index }
+        return formatObjects.filter {
+            $0.width == current.width && $0.height == current.height && $0.supports(chosenFPS) &&
+            $0.compatibleCodecs.contains(chosenEncoding.codec.rawValue) &&
+            color.isAvailable(for: $0.format, encoding: chosenEncoding)
+        }.min {
+            ($0.supportsIntrinsics ? 0 : 1, abs($0.index - index)) <
+            ($1.supportsIntrinsics ? 0 : 1, abs($1.index - index))
+        }?.index
+    }
+
+    @discardableResult private func applyFormat(_ requestedIndex: Int, reason: String,
                                                 manualExposure: ManualExposurePreference? = nil) -> Bool {
+        if !chosenEncoding.isRAW, chosenRecordingColorSpace == .systemDefault { chosenRecordingColorSpace = .rec709 }
+        let index = colorFormatIndex(near: requestedIndex, color: chosenRecordingColorSpace) ?? requestedIndex
         guard !output.isRecording, !recordingStarting, !captureFinishing else { fail("Format cannot change during recording"); return false }
         guard let camera = device, let codec = chosenCodec, formatObjects.indices.contains(index) else { fail("Invalid format selection"); return false }
         let info = formatObjects[index]
@@ -2026,8 +2065,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let previousMax = camera.activeVideoMaxFrameDuration
         let previousColorSpace = camera.activeColorSpace
         let previousAutomaticWideColor = session.automaticallyConfiguresCaptureDeviceForWideColor
-        let requestedColorSpace = chosenRecordingColorSpace.isAvailable(for: info.format,
-            encoding: chosenEncoding) ? chosenRecordingColorSpace : .systemDefault
+        let requestedColorSpace: RecordingColorSpace = chosenEncoding.isRAW ? .systemDefault :
+            (chosenRecordingColorSpace.isAvailable(for: info.format, encoding: chosenEncoding) ? chosenRecordingColorSpace :
+             RecordingColorSpace.selectableCases.first { $0.isAvailable(for: info.format, encoding: chosenEncoding) } ?? .rec709)
         let exposureToRestore = manualExposure ?? (reason != "initial_selection" ? manualExposurePreference(camera) : nil)
         logger.event("configuration_request", ["kind": reason, "requestedCodec": codec.rawValue, "requestedFormat": index, "before": before])
         do {
@@ -2060,11 +2100,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             camera.activeVideoMinFrameDuration = duration
             camera.activeVideoMaxFrameDuration = duration
             camera.unlockForConfiguration()
-            guard output.availableVideoCodecTypes.contains(codec), let connection = output.connection(with: .video) else {
+            guard (usesProResDataWriter || output.availableVideoCodecTypes.contains(codec)), let connection = output.connection(with: .video) else {
                 throw CameraError.unavailableCodec(codec.rawValue, index)
             }
             enableIntrinsicDelivery()
-            let settings = try encodingSettings(for: info, fps: targetFPS, connection: connection)
+            let settings = usesProResDataWriter ? [AVVideoCodecKey: AVVideoCodecType.hevc.rawValue] :
+                try encodingSettings(for: info, fps: targetFPS, connection: connection)
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.setOutputSettings(settings, for: connection)
             }) { throw CameraError.unsupportedFocus("Encoding settings: \(exception)") }
@@ -2225,7 +2266,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 return
             }
-            if self.usesRAWWriterExperiment {
+            if self.usesRAWWriterExperiment || self.usesProResDataWriter {
                 let previous = self.chosenFPS
                 self.chosenFPS = value
                 if !self.applyFormat(index, reason: "fps_change") { self.chosenFPS = previous }
@@ -3045,7 +3086,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard self.audioReady else { self.fail("需要麦克风权限才能录制声音。请在系统设置中允许麦克风访问。"); return }
             guard let codec = self.chosenCodec, let index = self.chosenIndex,
                   self.formatObjects[index].compatibleCodecs.contains(codec.rawValue),
-                  self.output.availableVideoCodecTypes.contains(codec) else {
+                  (self.usesProResDataWriter || self.output.availableVideoCodecTypes.contains(codec)) else {
                 self.fail("当前视频配置暂不可用，请在设置中重新选择编码、分辨率和帧率。"); return
             }
             if codec.rawValue != "aprn" && codec.rawValue != "aprh" {
@@ -3127,7 +3168,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
             }
             if let message = ProVideoStorageBridge.configureOutput(self.output,
-                enabled: storageLocation == "专用视频存储") {
+                enabled: storageLocation == "专用视频存储" && !self.usesProResDataWriter) {
                 self.restoreRAWWhiteBalance()
                 self.logProVideoStorage("record_storage_rejected")
                 let supported = ProVideoStorageBridge.isOutputSupported(self.output)
@@ -3218,7 +3259,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    private func startRealtimeLUTRecording(url: URL, recipe: LUTBurnRecipe) {
+    /// Older devices can have a ProRes encoder without MovieFileOutput exposing it.
+    private var usesProResDataWriter: Bool {
+        chosenEncoding.isProRes422 && !output.availableVideoCodecTypes.contains(chosenEncoding.codec)
+    }
+
+    private func startRealtimeLUTRecording(url: URL, recipe: LUTBurnRecipe?) {
         do {
             guard let index = chosenIndex, let connection = output.connection(with: .video) else {
                 throw RecorderError.unavailable("LUT recording configuration unavailable")
@@ -3226,14 +3272,15 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let format = formatObjects[index]
             var settings = try encodingSettings(for: format, fps: chosenFPS, connection: connection)
             settings[AVVideoWidthKey] = format.width; settings[AVVideoHeightKey] = format.height
-            settings[AVVideoColorPropertiesKey] = [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+            if recipe != nil { settings[AVVideoColorPropertiesKey] = [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2]
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2] }
+            // Without LUT, AVAssetWriter inherits color attachments from capture samples.
             if !chosenEncoding.isProRes422 {
                 var compression = settings[AVVideoCompressionPropertiesKey] as? [String: Any] ?? [:]
                 compression[AVVideoExpectedSourceFrameRateKey] = chosenFPS
                 compression[AVVideoAllowFrameReorderingKey] = false
-                if recipe.highBitDepth == true { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
+                if recipe?.highBitDepth == true { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
                 settings[AVVideoCompressionPropertiesKey] = compression
             }
             let writer = try RealtimeLUTWriter(url: url, recipe: recipe, settings: settings,
@@ -3264,23 +3311,30 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.commitConfiguration()
                 throw RecorderError.unavailable("LUT audio capture unavailable")
             }
-            if recipe.highBitDepth == true || chosenEncoding.isProRes422 {
-                let pixelFormat = kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
-                guard intrinsicOutput.availableVideoPixelFormatTypes.contains(pixelFormat) else {
+            if recipe?.highBitDepth == true {
+                let pixelFormat = [kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+                                   kCVPixelFormatType_420YpCbCr10BiPlanarFullRange]
+                    .first { intrinsicOutput.availableVideoPixelFormatTypes.contains($0) }
+                // SDR capture can be 8-bit even when the destination ProRes is
+                // 10-bit. HDR/Log capture must never silently fall back to 8-bit.
+                let needsTenBitSource = !chosenEncoding.isProRes422 ||
+                    [.rec2020HDR, .appleLog, .appleLog2].contains(chosenRecordingColorSpace)
+                if let pixelFormat {
+                    realtimeLUTVideoSettings = intrinsicOutput.videoSettings
+                    intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
+                } else if needsTenBitSource {
                     session.commitConfiguration()
                     throw RecorderError.unavailable("当前配置不支持高位深 LUT 实时录制")
                 }
-                realtimeLUTVideoSettings = intrinsicOutput.videoSettings
-                intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
             }
             session.addOutput(writer.audioOutput)
             session.commitConfiguration()
             enableIntrinsicDelivery()
             captureFinishing = true
-            recordingTimeSource = "Realtime LUT writer; original VideoDataOutput capture PTS preserved"
+            recordingTimeSource = recipe == nil ? "ProRes writer; original VideoDataOutput capture PTS preserved" : "Realtime LUT writer; original VideoDataOutput capture PTS preserved"
             realtimeLUTWriter = writer
             logger.event("lut_realtime_started", ["file": url.path, "width": format.width,
-                "height": format.height, "fps": chosenFPS, "codec": recipe.codec])
+                "height": format.height, "fps": chosenFPS, "codec": chosenEncoding.codec.rawValue])
             previewFanout.setRecordingWriter(writer)
         } catch {
             recordingStarting = false
@@ -3305,8 +3359,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 fail(error.localizedDescription)
                 return
             }
-            if let recipe = recordingLUTBurn {
-                startRealtimeLUTRecording(url: url, recipe: recipe)
+            if recordingLUTBurn != nil || usesProResDataWriter {
+                startRealtimeLUTRecording(url: url, recipe: recordingLUTBurn)
                 return
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {

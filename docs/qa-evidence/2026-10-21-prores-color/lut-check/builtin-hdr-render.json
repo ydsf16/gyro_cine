@@ -1,0 +1,38 @@
+[
+  {
+    "event": "lut_preview_prepared",
+    "data": {
+      "bytes": 574992,
+      "look": "rec709",
+      "profile": "p3D65"
+    }
+  },
+  {
+    "event": "lut_preview_prepared",
+    "data": {
+      "bytes": 574992,
+      "look": "rec709",
+      "profile": "rec709"
+    }
+  },
+  {
+    "event": "lut_preview_prepared",
+    "data": {
+      "bytes": 574992,
+      "look": "rec709",
+      "profile": "rec2020HLG"
+    }
+  },
+  {
+    "event": "lut_realtime_finished",
+    "data": {
+      "audioPackets": 139,
+      "error": "",
+      "frames": 91,
+      "maxGPUms": 10.188291678787209,
+      "meanGPUms": 6.055569140449074,
+      "peakBuffered": 1,
+      "stopToWriterSeconds": 0.013928041676990688
+    }
+  }
+]

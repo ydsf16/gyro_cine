@@ -3,6 +3,13 @@ import simd
 @testable import GyroCine
 
 final class PreviewColorTransformTests: XCTestCase {
+    func testExplicitColorSpaceDefaultsAndLegacyMigration() {
+        XCTAssertFalse(RecordingColorSpace.selectableCases.contains(.systemDefault))
+        XCTAssertEqual(RecordingColorSpace.restored(nil), .rec709)
+        XCTAssertEqual(RecordingColorSpace.restored("systemDefault"), .rec709)
+        XCTAssertEqual(RecordingColorSpace.restored("rec2020HDR"), .rec2020HDR)
+    }
+
     func testRAWAlwaysRejectsLUTBurnRecipe() throws {
         let defaults = UserDefaults.standard
         let oldBurn = defaults.object(forKey: "lutBurnEnabled")

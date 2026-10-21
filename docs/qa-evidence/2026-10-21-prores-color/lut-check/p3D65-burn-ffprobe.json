@@ -1,0 +1,37 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "prores",
+            "profile": "Proxy",
+            "pix_fmt": "yuv422p10le",
+            "color_space": "bt709",
+            "color_transfer": "bt709",
+            "color_primaries": "bt709",
+            "nb_read_frames": "92",
+            "side_data_list": [
+                {
+
+                }
+            ]
+        },
+        {
+            "codec_name": "aac",
+            "profile": "LC",
+            "nb_read_frames": "130"
+        },
+        {
+
+        }
+    ],
+    "format": {
+        "tags": {
+            "com.tinygrape.lutBurnID": "75E6E203-699D-4F87-8916-F38188D25711"
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+  "audioTracks": 1,
+  "averageFPS": 59.97689414733668,
+  "bytes": 457154810,
+  "codec": "apcs",
+  "decodedFrames": 0,
+  "decodeError": "",
+  "decodeStatus": "notRequested",
+  "duration": 4.068233333333334,
+  "estimatedMissingFrames": 0,
+  "expectedFPS": 60,
+  "frames": 244,
+  "hasTelemetry": true,
+  "height": 2160,
+  "maximumFrameGapMS": 16.70000000000016,
+  "movie": "UITEST_IMG_2026-10-21-21-22-06.mov",
+  "width": 3840
+}

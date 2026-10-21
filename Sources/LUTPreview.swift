@@ -335,6 +335,7 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
     private let writer: AVAssetWriter
     private let input: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let appliesLUT: Bool
     private let context: CIContext
     private let filter: CIFilter
     private let fps: Double
@@ -353,20 +354,21 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
     private var cadence = RAWCadenceGuard()
     private let width: Int, height: Int
 
-    init(url: URL, recipe: LUTBurnRecipe, settings: [String: Any], width: Int, height: Int,
+    init(url: URL, recipe: LUTBurnRecipe?, settings: [String: Any], width: Int, height: Int,
          fps: Double, orientation: RecordingOrientation, dedicated: Bool, metadata: [AVMetadataItem],
          started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?, [String: Any]) -> Void) throws {
-        guard !["aprn", "aprh"].contains(recipe.codec), let gpu = MTLCreateSystemDefaultDevice(),
+        guard !["aprn", "aprh"].contains(settings[AVVideoCodecKey] as? String ?? ""), let gpu = MTLCreateSystemDefaultDevice(),
               let filter = CIFilter(name: "CIColorCube") else {
             throw RecorderError.unavailable("LUT GPU recording unavailable")
         }
         self.width = width; self.height = height; self.fps = fps
+        appliesLUT = recipe != nil
         self.started = started; self.finished = finished
         context = CIContext(mtlDevice: gpu, options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])
         self.filter = filter
         filter.setValue(PreviewColorTransform.dimension, forKey: "inputCubeDimension")
-        filter.setValue(recipe.cube, forKey: "inputCubeData")
+        filter.setValue(recipe?.cube, forKey: "inputCubeData")
         writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         writer.movieTimeScale = 60_000
         if dedicated {
@@ -379,14 +381,14 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
         input.mediaTimeScale = 60_000
         input.transform = orientation.movieTransform(width: width, height: height)
         adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: recipe.highBitDepth == true || recipe.codec.hasPrefix("ap") ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
+            kCVPixelBufferPixelFormatTypeKey as String: recipe?.highBitDepth == true || (settings[AVVideoCodecKey] as? String ?? "").hasPrefix("ap") ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
             kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferMetalCompatibilityKey as String: true])
         guard writer.canAdd(input) else { throw RecorderError.unavailable("LUT video input unavailable") }
         writer.add(input)
         let tag = AVMutableMetadataItem(); tag.keySpace = .quickTimeMetadata
-        tag.key = LUTMovieBurner.marker as NSString; tag.value = recipe.id as NSString
-        writer.metadata = metadata + [tag]
+        tag.key = LUTMovieBurner.marker as NSString; tag.value = recipe?.id as NSString?
+        writer.metadata = metadata + (recipe == nil ? [] : [tag])
         super.init()
         audioOutput.setSampleBufferDelegate(self, queue: audioQueue)
         queue.asyncAfter(deadline: .now() + 10) { [weak self] in
@@ -453,11 +455,18 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
                     let sample = videoPending.removeFirst(); defer { release(false) }
                     try autoreleasepool {
                         guard let pixels = CMSampleBufferGetImageBuffer(sample),
-                              CVPixelBufferGetWidth(pixels) == width, CVPixelBufferGetHeight(pixels) == height,
-                              let pool = adaptor.pixelBufferPool else { throw RecorderError.unavailable("LUT recording frame dimensions changed") }
+                              CVPixelBufferGetWidth(pixels) == width, CVPixelBufferGetHeight(pixels) == height else { throw RecorderError.unavailable("LUT recording frame dimensions changed") }
                         let pts = sample.presentationTimeStamp
                         guard lastPTS == nil || pts > lastPTS! else { throw RecorderError.unavailable("LUT 视频时间戳异常") }
                         if cadence.observe(pts.seconds, fps: fps) != nil { throw RecorderError.unavailable("LUT 录制持续丢帧，已停止；请降低录制规格") }
+                        // Native ProRes keeps the capture buffer, attachments and original PTS.
+                        // Only LUT baking renders through Core Image.
+                        if !appliesLUT {
+                            guard input.append(sample) else { throw writer.error ?? RecorderError.unavailable("ProRes video append failed") }
+                            frames += 1; lastPTS = pts
+                            return
+                        }
+                        guard let pool = adaptor.pixelBufferPool else { throw RecorderError.unavailable("LUT pixel pool unavailable") }
                         var buffer: CVPixelBuffer?
                         guard CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(nil, pool,
                             [kCVPixelBufferPoolAllocationThresholdKey as String: 10] as CFDictionary, &buffer) == kCVReturnSuccess,

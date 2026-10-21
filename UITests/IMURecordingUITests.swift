@@ -1,6 +1,73 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testExplicitColorSpaceMenuBothLanguages() {
+        for language in ["zh-Hans", "en"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-testing", "-AppleLanguages", "(\(language))"]
+            app.launch()
+            XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+            app.buttons["settingsOpen"].tap()
+            let menu = app.buttons["colorSpaceMenu"]
+            XCTAssertTrue(menu.waitForExistence(timeout: 10))
+            for _ in 0..<3 {
+                menu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                if app.buttons["colorSpaceOption.rec709"].waitForExistence(timeout: 3) { break }
+            }
+            XCTAssertTrue(app.buttons["colorSpaceOption.rec709"].exists)
+            XCTAssertTrue(app.buttons["colorSpaceOption.rec2020HDR"].exists)
+            XCTAssertTrue(app.buttons["colorSpaceOption.p3D65"].exists)
+            XCTAssertFalse(app.buttons["colorSpaceOption.systemDefault"].exists)
+            XCTAssertFalse(app.staticTexts["System Default"].exists)
+            XCTAssertFalse(app.staticTexts["系统默认"].exists)
+            controlScreenshot(app, "explicit-color-space-\(language)")
+            app.terminate()
+        }
+    }
+
+    func testProResAndColorMenus() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+        func select(_ menu: String, _ optionName: String) {
+            let option = app.buttons[optionName]
+            for _ in 0..<3 {
+                let row = app.buttons[menu]
+                XCTAssertTrue(row.waitForExistence(timeout: 5))
+                row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                if option.waitForExistence(timeout: 3) {
+                    if menu == "colorSpaceMenu" { XCTAssertFalse(app.buttons["colorSpaceOption.systemDefault"].exists) }
+                    Thread.sleep(forTimeInterval: 0.5) // Native menu presentation animation.
+                    let frame = option.frame
+                    if frame.midX.isFinite && frame.width > 0 {
+                        app.coordinate(withNormalizedOffset: .zero)
+                            .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
+                        Thread.sleep(forTimeInterval: 0.5)
+                        return
+                    }
+                }
+            }
+            XCTFail("Menu option unavailable: \(optionName)")
+        }
+        for codec in ["ProRes 422 HQ", "ProRes 422", "ProRes 422 LT", "ProRes 422 Proxy"] {
+            select("codecMenu", codec)
+            for (id, label) in [("rec709", "Rec.709"), ("rec2020HDR", "Rec.2020 · HDR"), ("p3D65", "P3 D65")] {
+                select("colorSpaceMenu", "colorSpaceOption.\(id)")
+                let applied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", label),
+                    object: app.buttons["colorSpaceMenu"])
+                XCTAssertEqual(XCTWaiter.wait(for: [applied], timeout: 10), .completed)
+                XCTAssertFalse(app.alerts.firstMatch.exists)
+            }
+        }
+        controlScreenshot(app, "prores-color-settings")
+        select("colorSpaceMenu", "colorSpaceOption.rec709")
+        select("codecMenu", "H.265")
+        app.buttons["captureSettingsClose"].tap()
+        XCTAssertTrue(app.buttons["recordToggle"].waitForExistence(timeout: 5))
+    }
+
     func testBuiltinLUTManagementChineseAndEnglish() {
         for (language, title, amber, group) in [
             ("zh-Hans", "LUT 管理", "暖阳 · Amber", "内置 LUT"),

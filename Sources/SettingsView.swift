@@ -220,8 +220,11 @@ struct SettingsView: View {
                 .accessibilityIdentifier("fpsMenu")
             if !camera.selectedEncoding.isRAW, let format = currentFormat {
                 SettingsChoices(title: t("色彩空间", "Color space")) {
-                    ForEach(RecordingColorSpace.allCases.filter {
-                        $0.isAvailable(for: format.format, encoding: camera.selectedEncoding)
+                    ForEach(RecordingColorSpace.selectableCases.filter {
+                        color in compatibleFormats.contains {
+                            $0.width == format.width && $0.height == format.height && $0.supports(camera.fps) &&
+                            color.isAvailable(for: $0.format, encoding: camera.selectedEncoding)
+                        }
                     }) { colorSpace in
                         Button {
                             camera.chooseRecordingColorSpace(colorSpace)

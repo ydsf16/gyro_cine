@@ -1,0 +1,37 @@
+{
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+    {
+      "codec_name": "prores",
+      "profile": "Proxy",
+      "pix_fmt": "yuv422p10le",
+      "color_space": "bt709",
+      "color_transfer": "bt709",
+      "color_primaries": "bt709",
+      "nb_read_frames": "94",
+      "side_data_list": [
+        {}
+      ]
+    },
+    {
+      "codec_name": "aac",
+      "nb_read_frames": "131"
+    },
+    {}
+  ],
+  "format": {
+    "tags": {
+      "major_brand": "qt  ",
+      "minor_version": "0",
+      "compatible_brands": "qt  ",
+      "creation_time": "2026-10-21T13:25:02.000000Z",
+      "com.apple.quicktime.camera.identifier": "A",
+      "com.apple.quicktime.reel": "1",
+      "com.apple.quicktime.scene": "1",
+      "com.apple.quicktime.take": "35",
+      "com.tinygrape.gyrocine.slate": "{\"environment\":\"\",\"reel\":1,\"production\":\"\",\"camera\":\"A\",\"autoTake\":true,\"director\":\"\",\"scene\":1,\"take\":35,\"cinematographer\":\"\",\"timeOfDay\":\"\"}",
+      "com.tinygrape.lutBurnID": "FB8EF3CC-71F8-4217-A631-3D4DD7F5803D"
+    }
+  }
+}

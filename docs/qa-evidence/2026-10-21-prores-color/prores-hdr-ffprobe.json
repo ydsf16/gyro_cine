@@ -1,0 +1,34 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "prores",
+            "profile": "HQ",
+            "pix_fmt": "yuv422p10le",
+            "color_space": "bt2020nc",
+            "color_transfer": "arib-std-b67",
+            "color_primaries": "bt2020",
+            "nb_read_frames": "121",
+            "side_data_list": [
+                {
+
+                },
+                {
+
+                }
+            ]
+        },
+        {
+            "codec_name": "aac",
+            "nb_read_frames": "171"
+        },
+        {
+
+        }
+    ]
+}

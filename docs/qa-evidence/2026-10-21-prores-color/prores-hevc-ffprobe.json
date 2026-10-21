@@ -1,0 +1,25 @@
+{
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+    {
+      "codec_name": "hevc",
+      "profile": "Main",
+      "pix_fmt": "yuv420p",
+      "color_space": "bt709",
+      "color_transfer": "bt709",
+      "color_primaries": "bt709",
+      "nb_read_frames": "250",
+      "side_data_list": [
+        {}
+      ]
+    },
+    {
+      "codec_name": "aac",
+      "profile": "LC",
+      "nb_read_frames": "180"
+    },
+    {},
+    {}
+  ]
+}

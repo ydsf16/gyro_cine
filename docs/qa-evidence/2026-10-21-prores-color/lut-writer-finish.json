@@ -1,0 +1,9 @@
+{
+  "audioPackets": 142,
+  "error": "",
+  "frames": 94,
+  "maxGPUms": 139.56429167592432,
+  "meanGPUms": 6.983184397153734,
+  "peakBuffered": 5,
+  "stopToWriterSeconds": 0.02840558333264198
+}
