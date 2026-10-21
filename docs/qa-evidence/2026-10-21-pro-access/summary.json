@@ -1,0 +1,30 @@
+{
+  "device": "iPhone 16 / iOS 18.2.1",
+  "scope": "All six ProRes codecs require Pro beyond 120 seconds; Apple offer-code UI and verified entitlement handling",
+  "passed": [
+    "CommerceQA ProAccessTests: 3 passed including all codec policies, purchase, restore, refund, cancelled/empty redemption, verified redemption transaction handling",
+    "ProRes Proxy 4K30 reached DEBUG accelerated 5-second paywall stop: 5.033s, 151 frames, audio + IMU, full FFmpeg video decode without errors",
+    "H265 4K60 with same accelerated-limit flag continued to 8.052s, 483 frames, audio + IMU",
+    "Chinese and English Pro screens visually inspected from physical-device screenshots",
+    "Release TESTFLIGHT_FREE build succeeded",
+    "git diff --check",
+    "Real Apple sandbox code redeemed in system settings; verified Pro entitlement delivered after sandbox re-login",
+    "Real ProRes Proxy recording passed 120 seconds: 125.092s, 3753 frames, audio + IMU",
+    "Verified-entitlement restore path passed on device after fix",
+    "Real 120-second recording deadline with DEBUG free-access simulation (sandbox purchase preserved): 120.026s, 3601 frames, audio + IMU, no estimated missing frames",
+    "Unlocked Pro UI hides Restore Purchases; physical-device screenshot verified",
+    "120-second limit clip: last 3 seconds video/audio decoded with FFmpeg -xerror, exit 0"
+  ],
+  "limitations": [
+    "XCUITest UI driver failed handshake twice; bilingual UI verified by devicectl screenshots instead",
+    "RAW hardware unavailable on iPhone 16; codec policy covered in tests",
+    "Real sandbox redemption used system settings; app redemption and sync with no local entitlement still require independent acceptance",
+    "Full-duration free stop used DEBUG recording-access override; did not reset sandbox purchases or validate a new unpaid sandbox account"
+  ],
+  "results": [
+    "/tmp/prores-paywall-commerce2.xcresult",
+    "/tmp/prores-paywall-ui.xcresult",
+    "/tmp/prores-paywall-ui2.xcresult",
+    "/tmp/prores-paywall-free-build.log"
+  ]
+}

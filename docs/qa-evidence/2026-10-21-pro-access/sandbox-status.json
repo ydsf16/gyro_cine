@@ -1,0 +1,44 @@
+{
+  "status": "sandbox_redemption_verified_long_recording_passed",
+  "product": "com.tinygrape.gyrocine.pro",
+  "productStatus": "Approved",
+  "offer": "GyroCine Pro Sandbox QA 20261021",
+  "offerID": "89795757-fcad-4a8f-a249-95d50fd57bef",
+  "sandboxBatchID": "eb72e682-d01c-4f04-8abd-5f8aa0300e8a",
+  "sandboxCodeCount": 100,
+  "productionCodeCount": 0,
+  "uiAutomation": "XCTest runner failed before handshake; user will enter sandbox code on physical phone",
+  "remaining": [
+    "Direct sandbox purchase with unowned entitlement",
+    "AppStore.sync path when no local verified entitlement: previous system authentication failure not independently resolved",
+    "In-app offer redemption end-to-end without system-settings workaround"
+  ],
+  "environmentCorrection": {
+    "observed": "Redemption sheet displayed Environment: Xcode with no input field after local StoreKit tests",
+    "action": "Ran normal GyroCine scheme without StoreKit configuration, then relaunched Pro UI",
+    "verified": "Xcode console now reports client-environment-type=Sandbox and requests mzstorekit-sb.itunes.apple.com",
+    "serverError": "Transaction history endpoint returned HTTP 500 / errorCode 5000001",
+    "pending": "User reopening redemption sheet to verify input and redeem"
+  },
+  "restoreResult": {
+    "error": "StoreKit.StoreKitError:3",
+    "ui": "请求已取消",
+    "userConfirmedPasswordSubmitted": true,
+    "verifiedEntitlement": false,
+    "nextStep": "Check Sandbox Account Settings and initiate offer redemption there to isolate system authentication from app UI"
+  },
+  "entitlementProbe": {
+    "currentEntitlements": "no verified Pro entitlement",
+    "latestTransaction": "none",
+    "systemRedemption": "user reports success; transaction delivery not verified",
+    "restore": "StoreKitError code 2 on previous attempt; subsequent retry requested account authentication"
+  },
+  "resolution": "Signing out and back into the same Sandbox Apple Account made the verified non-consumable transaction available. Exact cause of prior authentication/history failure remains unknown.",
+  "passed": [
+    "Verified Sandbox non-consumable entitlement, no revocation",
+    "Entitlement retained across app relaunch and update",
+    "Restore button confirms existing verified entitlement without unnecessary AppStore.sync authentication",
+    "ProRes 422 Proxy 3840x2160 30fps recorded 125.092s, 3753 frames, audio and telemetry, zero estimated missing frames",
+    "Full video and audio FFmpeg decode completed with -xerror, exit 0"
+  ]
+}

@@ -111,11 +111,11 @@ struct SettingsView: View {
                             }
                         }.tint(.primary).accessibilityIdentifier("proSettings")
                         Text(proStore.testFlightBypass
-                             ? t("TestFlight 测试版：RAW 长录制已开放。", "TestFlight: longer RAW recordings enabled.")
+                             ? t("TestFlight 测试版：ProRes 长录制已开放。", "TestFlight: longer ProRes recordings enabled.")
                              : proStore.purchased
-                             ? t("Pro 已解锁：RAW 长录制已开放。", "Pro unlocked: longer RAW recordings enabled.")
-                             : t("RAW 每段免费录制 2 分钟；Pro 一次性解锁长录制。其他功能免费。",
-                                 "RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
+                             ? t("Pro 已解锁：ProRes 长录制已开放。", "Pro unlocked: longer ProRes recordings enabled.")
+                             : t("ProRes / ProRes RAW 每段免费录制 2 分钟；Pro 一次性解锁长录制。其他功能免费。",
+                                 "ProRes / ProRes RAW: 2 minutes free per clip. Pro unlocks longer recordings with a one-time purchase. All other features are free."))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     #endif
@@ -135,13 +135,15 @@ struct SettingsView: View {
                     Section {
                         Link(t("帮助与支持", "Help & Support"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/")!)
                         Link(t("隐私政策", "Privacy Policy"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/privacy.html")!)
+                        Link("TinyGrapeLab", destination: URL(string: "https://tinygrapelab.com/")!)
+                            .accessibilityIdentifier("settings.tinyGrapeLabWebsite")
                     }.tint(.primary)
                     Section {
                         VStack(spacing: 4) {
                             Text("GyroCine").font(.footnote.weight(.semibold))
                             Text(appVersion).font(.caption)
                             #if TESTFLIGHT_FREE
-                            Text(t("TestFlight 测试版 · RAW 长录制开放", "TestFlight build · longer RAW recordings enabled"))
+                            Text(t("TestFlight 测试版 · ProRes 长录制开放", "TestFlight build · longer ProRes recordings enabled"))
                                 .font(.caption2)
                             #endif
                         }

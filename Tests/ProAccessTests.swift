@@ -1,12 +1,13 @@
 import XCTest
+import StoreKit
 import StoreKitTest
 import MarketplaceKit
 import UIKit
 @testable import GyroCine
 
 final class ProAccessTests: XCTestCase {
-    func testOnlyRAWHasFreeLimit() {
-        for codec in ["aprn", "aprh"] {
+    func testAllProResFormatsHaveFreeLimit() {
+        for codec in ["aprn", "aprh", "apch", "apcn", "apcs", "apco"] {
             XCTAssertEqual(ProRecordingAccess.freeLimit(codec: codec, purchased: false, bypass: false), 120)
             XCTAssertNil(ProRecordingAccess.freeLimit(codec: codec, purchased: true, bypass: false))
             XCTAssertNil(ProRecordingAccess.freeLimit(codec: codec, purchased: false, bypass: true))
@@ -45,6 +46,11 @@ final class ProAccessTests: XCTestCase {
         let store = ProStore()
         await store.refreshEntitlements()
         XCTAssertFalse(store.purchased)
+        await store.completeRedemption(.success(()))
+        XCTAssertFalse(store.purchased, "Closing redemption without a transaction must not unlock Pro")
+        await store.completeRedemption(.failure(SKError(.paymentCancelled)))
+        XCTAssertFalse(store.purchased)
+        XCTAssertNil(store.message)
         await store.loadProduct()
         XCTAssertEqual(store.product?.id, ProStore.productID)
         await ProStore.shared.loadProduct()
@@ -59,8 +65,23 @@ final class ProAccessTests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
         }
+        // The test host can start before SwiftUI has attached its purchase anchor.
+        for _ in 0..<100 {
+            if UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                .contains(where: { $0.activationState == .foregroundActive && $0.windows.contains(where: \.isKeyWindow) }) { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try await Task.sleep(for: .seconds(1))
         await store.purchase()
         XCTAssertTrue(store.purchased, store.message ?? "No verified entitlement")
+        let redeemed = ProStore()
+        for await result in StoreKit.Transaction.currentEntitlements {
+            await redeemed.acceptRedemption(.success(result))
+        }
+        XCTAssertTrue(redeemed.purchased, "Verified Pro transaction should unlock redemption")
+        let refreshed = ProStore()
+        await refreshed.completeRedemption(.success(()))
+        XCTAssertTrue(refreshed.purchased, "Legacy redemption must refresh verified entitlements")
         let restored = ProStore()
         await restored.restore()
         XCTAssertTrue(restored.purchased, restored.message ?? "Restore failed")

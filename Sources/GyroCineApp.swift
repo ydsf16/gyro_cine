@@ -9,7 +9,7 @@ struct GyroCineApp: App {
             Group {
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--pro-ui-preview") {
-                    ProAccessView()
+                    ProAccessPreviewHost()
                 } else if ProcessInfo.processInfo.arguments.contains("--slate-ui-preview") {
                     RecordingSlateView()
                 } else if ProcessInfo.processInfo.arguments.contains("--settings-ui-preview") {
@@ -28,3 +28,23 @@ struct GyroCineApp: App {
         }
     }
 }
+
+#if DEBUG
+// Present the QA entry point in the same sheet context as Settings.
+// A root ProAccessView has no presentation for its Done action to dismiss.
+private struct ProAccessPreviewHost: View {
+    @State private var showingPro = true
+    var body: some View {
+        CameraView()
+            .sheet(isPresented: $showingPro) { ProAccessView() }
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("--pro-sandbox-restore") {
+                    await ProStore.shared.prepare()
+                    #if !TESTFLIGHT_FREE
+                    await ProStore.shared.restore()
+                    #endif
+                }
+            }
+    }
+}
+#endif

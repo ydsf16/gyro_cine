@@ -12,7 +12,13 @@ final class ProRecordingAccess {
     #else
     private var value = false
     #endif
-    var unlimited: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    var unlimited: Bool {
+        #if DEBUG && !TESTFLIGHT_FREE
+        // Exercise the full recording deadline without changing sandbox purchases.
+        if ProcessInfo.processInfo.arguments.contains("--pro-free-limit-realtime-qa") { return false }
+        #endif
+        lock.lock(); defer { lock.unlock() }; return value
+    }
     func update(unlimited: Bool) {
         lock.lock()
         #if TESTFLIGHT_FREE
@@ -24,7 +30,7 @@ final class ProRecordingAccess {
     }
 
     static func freeLimit(codec: String, purchased: Bool, bypass: Bool) -> TimeInterval? {
-        ["aprn", "aprh"].contains(codec) && !purchased && !bypass ? 120 : nil
+        ["aprn", "aprh", "apch", "apcn", "apcs", "apco"].contains(codec) && !purchased && !bypass ? 120 : nil
     }
 
     static func permitsBypass(enabled: Bool, distributor: AppDistributor) -> Bool {
@@ -54,6 +60,7 @@ final class ProStore: ObservableObject {
         return
         #else
         guard !prepared else {
+            await refreshEntitlements()
             await refreshTestFlightBypass()
             return
         }
@@ -127,6 +134,21 @@ final class ProStore: ObservableObject {
         }
         purchased = active
         publishAccess()
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--pro-sandbox-diagnostic") {
+            NSLog("GyroCine verified Pro entitlement: %@", active ? "yes" : "no")
+            if let latest = await Transaction.latest(for: Self.productID) {
+                switch latest {
+                case .verified(let transaction):
+                    NSLog("GyroCine latest Pro transaction: verified, environment=%@, revoked=%@, type=%@",
+                          String(describing: transaction.environment),
+                          transaction.revocationDate == nil ? "no" : "yes",
+                          String(describing: transaction.productType))
+                case .unverified: NSLog("GyroCine latest Pro transaction: unverified")
+                }
+            } else { NSLog("GyroCine latest Pro transaction: none") }
+        }
+        #endif
     }
     #endif
 
@@ -157,17 +179,68 @@ final class ProStore: ObservableObject {
         } catch { message = error.localizedDescription }
     }
 
+    func completeRedemption(_ result: Result<Void, Error>) async {
+        // Closing a redemption sheet is not proof of purchase.
+        if case .failure(let error) = result {
+            if (error as? SKError)?.code != .paymentCancelled { message = error.localizedDescription }
+        }
+        await refreshEntitlements()
+    }
+
+    func acceptRedemption(_ result: Result<VerificationResult<StoreKit.Transaction>, Error>) async {
+        switch result {
+        case .success(.verified(let transaction)):
+            guard transaction.productID == Self.productID,
+                  transaction.productType == .nonConsumable,
+                  transaction.revocationDate == nil, !transaction.isUpgraded else { return }
+            purchased = true
+            publishAccess()
+            await transaction.finish()
+        case .success(.unverified):
+            message = AppText.value("无法验证兑换结果，请稍后恢复购买。", "Unable to verify redemption. Please try Restore Purchases later.", locale: .current)
+        case .failure(let error): await completeRedemption(.failure(error))
+        }
+    }
+
     func restore() async {
         guard !busy else { return }
         busy = true; message = nil
         defer { busy = false }
+        // A verified current entitlement already proves ownership. Avoid an
+        // unnecessary authentication prompt after a successful redemption.
+        await refreshEntitlements()
+        if purchased {
+            message = AppText.value("已恢复 Pro 购买。", "Pro purchase restored.", locale: .current)
+            return
+        }
         do {
             try await AppStore.sync()
             await refreshEntitlements()
             message = purchased
                 ? AppText.value("已恢复 Pro 购买。", "Pro purchase restored.", locale: .current)
                 : AppText.value("此 Apple 账户暂无 Pro 购买记录。", "No Pro purchase was found for this Apple Account.", locale: .current)
-        } catch { message = error.localizedDescription }
+        } catch {
+            message = error.localizedDescription
+            var details: [String] = []
+            var current: NSError? = error as NSError
+            if let storeError = error as? StoreKitError {
+                switch storeError {
+                case .systemError(let underlying): current = underlying as NSError
+                case .networkError(let underlying): current = underlying as NSError
+                default: break
+                }
+            }
+            for _ in 0..<6 {
+                guard let item = current else { break }
+                details.append("\(item.domain):\(item.code)")
+                current = item.userInfo[NSUnderlyingErrorKey] as? NSError
+            }
+            // Log codes only; StoreKit userInfo can contain account and signed data.
+            logger.error("Restore failed: \(details.joined(separator: " -> "), privacy: .public)")
+            #if DEBUG
+            NSLog("GyroCine restore failed: %@", details.joined(separator: " -> "))
+            #endif
+        }
     }
     #endif
 }
@@ -180,7 +253,7 @@ struct ProAccessView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Label("TestFlight · RAW 长录制已开放", systemImage: "testtube.2")
+                Label("TestFlight · ProRes 长录制已开放", systemImage: "testtube.2")
                     .foregroundStyle(.green)
             }
             .navigationTitle("GyroCine")
@@ -193,6 +266,7 @@ struct ProAccessView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @ObservedObject private var store = ProStore.shared
+    @State private var showingRedemption = false
     var limitReached = false
     private func t(_ zh: String, _ en: String) -> String { AppText.value(zh, en, locale: locale) }
 
@@ -203,14 +277,14 @@ struct ProAccessView: View {
                     Label("GyroCine Pro", systemImage: "camera.aperture")
                         .font(.title2.bold()).padding(.vertical, 8)
                     if limitReached {
-                        Text(t("已达到本段 RAW 的 2 分钟免费时长，录制已停止并按正常流程保存。",
-                               "This RAW clip reached the free 2-minute limit. Recording stopped and is being saved normally."))
+                        Text(t("已达到本段 ProRes 的 2 分钟免费时长，录制已停止并按正常流程保存。",
+                               "This ProRes clip reached the free 2-minute limit. Recording stopped and is being saved normally."))
                     }
                     if !store.purchased && !store.testFlightBypass {
-                        Text(t("一次性购买，解锁 ProRes RAW 与 ProRes RAW HQ 长时间录制。",
-                               "A one-time purchase unlocks longer ProRes RAW and ProRes RAW HQ recordings."))
-                        Text(t("免费版：每段 RAW 最长 2 分钟。H.265 及其他功能免费。",
-                               "Free: up to 2 minutes per RAW clip. H.265 and all other features remain free."))
+                        Text(t("一次性购买，解锁所有 ProRes 及 ProRes RAW 格式的长时间录制。",
+                               "A one-time purchase unlocks longer recordings in all ProRes and ProRes RAW formats."))
+                        Text(t("免费版：每段 ProRes / ProRes RAW 最长 2 分钟。H.265 及其他功能免费。",
+                               "Free: up to 2 minutes per ProRes / ProRes RAW clip. H.265 and all other features remain free."))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -235,8 +309,20 @@ struct ProAccessView: View {
                             }
                         }
                     }
-                    Button(t("恢复购买", "Restore Purchases")) { Task { await store.restore() } }
-                        .accessibilityIdentifier("restorePro")
+                    if !store.purchased {
+                        Button {
+                            store.message = nil
+                            showingRedemption = true
+                        } label: {
+                            Label(t("兑换优惠码", "Redeem Offer Code"), systemImage: "gift")
+                        }.accessibilityIdentifier("redeemPro")
+                        Text(t("使用 GyroCine Pro 优惠码兑换永久使用权。", "Redeem a GyroCine Pro offer code for lifetime access."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if !store.purchased {
+                        Button(t("恢复购买", "Restore Purchases")) { Task { await store.restore() } }
+                            .accessibilityIdentifier("restorePro")
+                    }
                     if store.busy { ProgressView() }
                     if let message = store.message { Text(message).font(.footnote) }
                 }.disabled(store.busy)
@@ -250,7 +336,26 @@ struct ProAccessView: View {
             }
             .navigationTitle("GyroCine Pro").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { dismiss() } } }
+            .modifier(ProRedemptionSheet(isPresented: $showingRedemption, store: store))
             .task { await store.prepare() }
+        }
+    }
+}
+#endif
+
+#if !TESTFLIGHT_FREE
+private struct ProRedemptionSheet: ViewModifier {
+    @Binding var isPresented: Bool
+    let store: ProStore
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 27.0, *) {
+            content.offerCodeRedemption(options: [], isPresented: $isPresented) { result in
+                Task { await store.acceptRedemption(result) }
+            }
+        } else {
+            content.offerCodeRedemption(isPresented: $isPresented) { result in
+                Task { await store.completeRedemption(result) }
+            }
         }
     }
 }
