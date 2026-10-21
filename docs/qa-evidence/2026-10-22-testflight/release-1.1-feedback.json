@@ -1,0 +1,17 @@
+{
+  "version": "1.1",
+  "build": "20261022.4",
+  "sourceCommit": "f1f69a9",
+  "testFlightFreeBuild": true,
+  "upload": "succeeded",
+  "groupDistribution": "waiting for Beta App Review",
+  "groups": [
+    "内部测试",
+    "熟人测试"
+  ],
+  "automaticTesterNotification": true,
+  "supersedes": "20261022.3 (removed from Beta App Review)",
+  "appStoreBuildChanged": false,
+  "change": "Bilingual Send Feedback link in Settings",
+  "buildURL": "https://appstoreconnect.apple.com/teams/771b92f3-3189-4f96-a52a-44f2e2d7f9e5/apps/6821620943/testflight/ios/2d76f6e5-eeea-41b9-bd52-26510c830f84"
+}
