@@ -1,0 +1,20 @@
+{
+  "version": "1.1",
+  "build": "20261022.1",
+  "sourceCommit": "72d8c67",
+  "changesAfterCommit": [
+    "MARKETING_VERSION 1.0 to 1.1; Apple closed approved 1.0 train"
+  ],
+  "testFlightFreeBuild": true,
+  "upload": "succeeded",
+  "groupDistribution": "withdrawn from Beta Review and expired per replacement request",
+  "rawConfigurationRiskFixesIncluded": false,
+  "uploadLog": "/tmp/gyrocine-testflight-1.1-20261022.1.log",
+  "groups": [
+    "内部测试",
+    "熟人测试"
+  ],
+  "automaticTesterNotification": true,
+  "appStoreBuildChanged": false,
+  "supersededBy": "1.0.1 (20261022.2)"
+}

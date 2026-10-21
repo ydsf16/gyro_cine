@@ -1,0 +1,15 @@
+{
+  "version": "1.1",
+  "build": "20261022.3",
+  "sourceCommit": "72d8c67",
+  "testFlightFreeBuild": true,
+  "upload": "succeeded",
+  "groupDistribution": "waiting for Beta App Review",
+  "rawConfigurationRiskFixesIncluded": false,
+  "groups": [
+    "内部测试",
+    "熟人测试"
+  ],
+  "automaticTesterNotification": true,
+  "appStoreBuildChanged": false
+}
