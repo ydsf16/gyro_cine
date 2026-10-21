@@ -134,6 +134,8 @@ struct SettingsView: View {
                     advancedSection
                     Section {
                         Link(t("帮助与支持", "Help & Support"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/")!)
+                        Link(t("问题反馈", "Send Feedback"), destination: URL(string: "https://my.feishu.cn/share/base/form/shrcnMISOxXt3zudB5W3uaFd5Zb")!)
+                            .accessibilityIdentifier("settings.feedback")
                         Link(t("隐私政策", "Privacy Policy"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/privacy.html")!)
                         Link("TinyGrapeLab", destination: URL(string: "https://tinygrapelab.com/")!)
                             .accessibilityIdentifier("settings.tinyGrapeLabWebsite")
