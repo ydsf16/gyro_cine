@@ -60,6 +60,11 @@ struct RecordingSlate: Codable, Equatable {
                       "com.apple.quicktime.reel": String(reel),
                       "com.apple.quicktime.scene": String(scene),
                       "com.apple.quicktime.take": String(take),
+                      "com.apple.proapps.cameraName": cameraID,
+                      "com.apple.proapps.reel": String(reel),
+                      "com.apple.proapps.scene": String(scene),
+                      "com.apple.proapps.shot": String(take),
+                      "com.apple.proapps.logNote": notes ?? "",
                       "com.tinygrape.gyrocine.cinematographer": cinematographer,
                       "com.tinygrape.gyrocine.environment": environment,
                       "com.tinygrape.gyrocine.timeOfDay": timeOfDay,
@@ -178,7 +183,7 @@ enum RecordingMetadata {
     }
 
     static func capture(device: AVCaptureDevice, model: String, color: String, codec: String,
-                        fps: Double, burnedLUT: Bool, date: Date = Date()) -> [AVMetadataItem] {
+                        fps: Double, burnedLUT: Bool, clipName: String = "", date: Date = Date()) -> [AVMetadataItem] {
         let wb = device.temperatureAndTintValues(for: device.deviceWhiteBalanceGains)
         let duration = CMTimeGetSeconds(device.exposureDuration)
         let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
@@ -197,6 +202,16 @@ enum RecordingMetadata {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
         var fields = ["com.apple.quicktime.make": "Apple", "com.apple.quicktime.model": model,
+                      "com.apple.proapps.manufacturer": "Apple Inc.",
+                      "com.apple.proapps.clipID": clipName,
+                      "com.tinygrape.gyrocine.camera.lensType": device.localizedName,
+                      "com.tinygrape.gyrocine.camera.iso": String(device.iso),
+                      "com.tinygrape.gyrocine.camera.aperture": String(device.lensAperture),
+                      "com.tinygrape.gyrocine.camera.shutterSeconds": duration.isFinite ? String(duration) : "",
+                      "com.tinygrape.gyrocine.camera.whiteBalanceKelvin": String(wb.temperature),
+                      "com.tinygrape.gyrocine.camera.whiteBalanceTint": String(wb.tint),
+                      "com.tinygrape.gyrocine.sensorFPS": String(fps),
+                      "com.tinygrape.gyrocine.colorSpace": color,
                       "com.apple.quicktime.software": "GyroCine \(version) (\(build))",
                       "com.apple.quicktime.creationdate": formatter.string(from: date)]
         if let data = try? JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys]),

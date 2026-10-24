@@ -54,9 +54,17 @@ enum RecordingColorSpace: String, CaseIterable, Identifiable {
     case systemDefault, rec709, rec2020HDR, p3D65, appleLog, appleLog2
     var id: Self { self }
     static var selectableCases: [Self] { allCases.filter { $0 != .systemDefault } }
+    static func selectableCases(for encoding: VideoEncoding) -> [Self] {
+        encoding.isRAW ? [.appleLog, .appleLog2] : selectableCases
+    }
     static func restored(_ value: String?) -> Self {
         let stored = value.flatMap(Self.init(rawValue:)) ?? .rec709
         return stored == .systemDefault ? .rec709 : stored
+    }
+    static func restoredRAW(_ value: String?) -> Self {
+        let stored = value.flatMap(Self.init(rawValue:))
+        if let stored, stored == .appleLog || stored == .appleLog2 { return stored }
+        return .appleLog2
     }
 
     func title(locale: Locale) -> String {
@@ -83,8 +91,9 @@ enum RecordingColorSpace: String, CaseIterable, Identifiable {
     }
 
     func isAvailable(for format: AVCaptureDevice.Format, encoding: VideoEncoding) -> Bool {
-        if self == .systemDefault { return true }
-        guard !encoding.isRAW, let captureColorSpace else { return false }
+        if self == .systemDefault { return !encoding.isRAW }
+        if encoding.isRAW && self != .appleLog && self != .appleLog2 { return false }
+        guard let captureColorSpace else { return false }
         return format.supportedColorSpaces.contains(captureColorSpace)
     }
 }

@@ -8,6 +8,11 @@ final class PreviewColorTransformTests: XCTestCase {
         XCTAssertEqual(RecordingColorSpace.restored(nil), .rec709)
         XCTAssertEqual(RecordingColorSpace.restored("systemDefault"), .rec709)
         XCTAssertEqual(RecordingColorSpace.restored("rec2020HDR"), .rec2020HDR)
+        XCTAssertEqual(RecordingColorSpace.selectableCases(for: .proResRAW), [.appleLog, .appleLog2])
+        XCTAssertEqual(RecordingColorSpace.selectableCases(for: .proResRAWHQ), [.appleLog, .appleLog2])
+        XCTAssertEqual(RecordingColorSpace.restoredRAW(nil), .appleLog2)
+        XCTAssertEqual(RecordingColorSpace.restoredRAW("rec709"), .appleLog2)
+        XCTAssertEqual(RecordingColorSpace.restoredRAW("appleLog"), .appleLog)
     }
 
     func testRAWAlwaysRejectsLUTBurnRecipe() throws {

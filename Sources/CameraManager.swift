@@ -800,12 +800,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     private var recordingSlate = RecordingSlate()
 
-    private func movieMetadata(burnedLUT: Bool = false) -> [AVMetadataItem] {
+    private func movieMetadata(url: URL, burnedLUT: Bool = false) -> [AVMetadataItem] {
         guard let device else { return recordingSlate.metadata }
         return recordingSlate.metadata + RecordingLocation.shared.snapshot() + RecordingMetadata.capture(device: device,
-            model: Self.hardwareModel(), color: chosenEncoding.isRAW ? "RAW" :
-                (burnedLUT ? "Rec.709" : chosenRecordingColorSpace.title(locale: Locale(identifier: "en"))),
-            codec: chosenEncoding.codec.rawValue, fps: chosenFPS, burnedLUT: burnedLUT)
+            model: Self.hardwareModel(), color: burnedLUT ? "Rec.709" :
+                chosenRecordingColorSpace.title(locale: Locale(identifier: "en")),
+            codec: chosenEncoding.codec.rawValue, fps: chosenFPS, burnedLUT: burnedLUT,
+            clipName: url.deletingPathExtension().lastPathComponent)
     }
 
 
@@ -1082,13 +1083,20 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             return
         }
         chosenEncoding = raw; chosenCodec = raw.codec; chosenFPS = targetFPS
+        if ProcessInfo.processInfo.arguments.contains("--raw-color-smoke=appleLog") {
+            chosenRecordingColorSpace = .appleLog
+        } else if ProcessInfo.processInfo.arguments.contains("--raw-color-smoke=appleLog2") {
+            chosenRecordingColorSpace = .appleLog2
+        }
         guard applyFormat(target.index, reason: "raw_ssd_smoke") else {
             logger.event("raw_smoke_failed", ["reason": "RAW format selection failed"])
             return
         }
         logger.event("raw_smoke_configuration", ["format": target.index, "width": target.width,
                                                    "height": target.height, "fps": chosenFPS,
-                                                   "codec": chosenCodec?.rawValue ?? "none"])
+                                                   "codec": chosenCodec?.rawValue ?? "none",
+                                                   "selectedColorSpace": chosenRecordingColorSpace.rawValue,
+                                                   "activeColorSpace": device.map { String(describing: $0.activeColorSpace) } ?? "none"])
         queue.asyncAfter(deadline: .now() + 4) { self.toggleRecording() }
         if matrix { return } // Stop relative to didStart, not the configuration request.
         let stopDelay: Double = longHQ ? 244 :
@@ -1718,8 +1726,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let info = formatObjects[index]
         SavedCaptureConfiguration(lensID: camera.uniqueID, encoding: chosenEncoding.rawValue,
             width: info.width, height: info.height, fps: chosenFPS).save()
-        UserDefaults.standard.set(chosenRecordingColorSpace.rawValue,
-                                  forKey: "capture.colorSpace.\(camera.uniqueID)")
+        let colorKey = chosenEncoding.isRAW ? "capture.rawColorSpace." : "capture.colorSpace."
+        UserDefaults.standard.set(chosenRecordingColorSpace.rawValue, forKey: colorKey + camera.uniqueID)
     }
 
     private func configureSession(audioAllowed: Bool) {
@@ -1813,8 +1821,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 guard let encoding = VideoEncoding(rawValue: value.encoding) else { return nil }
                 return CapturePreference(encoding: encoding, width: value.width, height: value.height, fps: value.fps)
             }
-            self.chosenRecordingColorSpace = RecordingColorSpace.restored(
-                UserDefaults.standard.string(forKey: "capture.colorSpace.\(camera.uniqueID)"))
+            self.chosenRecordingColorSpace = preference?.encoding.isRAW == true
+                ? RecordingColorSpace.restoredRAW(UserDefaults.standard.string(forKey: "capture.rawColorSpace.\(camera.uniqueID)"))
+                : RecordingColorSpace.restored(UserDefaults.standard.string(forKey: "capture.colorSpace.\(camera.uniqueID)"))
             guard discoverCapabilities(camera, preference: longRAWTest ? nil : preference, manualExposure: manualExposureIntent) else { return }
             startSampling(camera)
             session.startRunning()
@@ -2139,10 +2148,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard let target else { self.fail("No compatible format for \(codec.rawValue)"); return }
             let previousCodec = self.chosenCodec
             let previousEncoding = self.chosenEncoding
+            let previousColorSpace = self.chosenRecordingColorSpace
             self.chosenCodec = codec
             self.chosenEncoding = encoding
+            if encoding.isRAW && !previousEncoding.isRAW {
+                self.chosenRecordingColorSpace = .restoredRAW(UserDefaults.standard.string(
+                    forKey: "capture.rawColorSpace.\(self.device?.uniqueID ?? "")"))
+            } else if !encoding.isRAW && previousEncoding.isRAW {
+                self.chosenRecordingColorSpace = .restored(UserDefaults.standard.string(
+                    forKey: "capture.colorSpace.\(self.device?.uniqueID ?? "")"))
+            }
             if !self.applyFormat(target, reason: "codec_change") {
                 self.chosenCodec = previousCodec; self.chosenEncoding = previousEncoding
+                self.chosenRecordingColorSpace = previousColorSpace
             }
         }
     }
@@ -2252,9 +2270,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let previousMax = camera.activeVideoMaxFrameDuration
         let previousColorSpace = camera.activeColorSpace
         let previousAutomaticWideColor = session.automaticallyConfiguresCaptureDeviceForWideColor
-        let requestedColorSpace: RecordingColorSpace = chosenEncoding.isRAW ? .systemDefault :
-            (chosenRecordingColorSpace.isAvailable(for: info.format, encoding: chosenEncoding) ? chosenRecordingColorSpace :
-             RecordingColorSpace.selectableCases.first { $0.isAvailable(for: info.format, encoding: chosenEncoding) } ?? .rec709)
+        let requestedColorSpace: RecordingColorSpace = chosenRecordingColorSpace.isAvailable(for: info.format, encoding: chosenEncoding)
+            ? chosenRecordingColorSpace
+            : (RecordingColorSpace.selectableCases(for: chosenEncoding).first {
+                $0.isAvailable(for: info.format, encoding: chosenEncoding)
+              } ?? (chosenEncoding.isRAW ? .systemDefault : .rec709))
         let exposureToRestore = manualExposure ?? (reason != "initial_selection" ? manualExposurePreference(camera) : nil)
         logger.event("configuration_request", ["kind": reason, "requestedCodec": codec.rawValue, "requestedFormat": index, "before": before])
         do {
@@ -3170,7 +3190,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish { self.status = "准备 RAW 录制" }
         let recordingClock = session.synchronizationClock
         let experiment = RAWInternalWriterExperiment(camera: camera, codec: codec, url: url, queue: queue,
-            preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: movieMetadata(),
+            preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: movieMetadata(url: url),
             prepareRecovery: { [weak self] in
                 guard let self, self.activeExternalMovieURL != nil else { return }
                 let start = ProcessInfo.processInfo.systemUptime
@@ -3478,7 +3498,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let writer = try RealtimeLUTWriter(url: url, recipe: recipe, settings: settings,
                 width: Int(format.width), height: Int(format.height), fps: chosenFPS, orientation: recordingOrientation,
                 dedicated: UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储",
-                metadata: movieMetadata(burnedLUT: recipe != nil), started: { [weak self] pts in
+                metadata: movieMetadata(url: url, burnedLUT: recipe != nil), started: { [weak self] pts in
                     guard let self else { return }
                     self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
                 }, finished: { [weak self] error, details in
@@ -3562,7 +3582,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
-                self.output.metadata = self.movieMetadata()
+                self.output.metadata = self.movieMetadata(url: url)
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
                     self.captureStartProbe.arm()

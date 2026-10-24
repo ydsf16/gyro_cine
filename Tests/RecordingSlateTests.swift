@@ -66,6 +66,28 @@ final class RecordingSlateTests: XCTestCase {
         XCTAssertNil(restored.notes)
     }
 
+    func testProAppsSlateAliasesAndBinaryRAWMetadataSurviveMerge() {
+        var slate = RecordingSlate()
+        slate.camera = "B"; slate.reel = 2; slate.scene = 3; slate.take = 4
+        slate.notes = "测试 / notes"
+        let fields = Dictionary(uniqueKeysWithValues: slate.metadata.map { ($0.key as! String, $0.stringValue ?? "") })
+        XCTAssertEqual(fields["com.apple.proapps.cameraName"], "B")
+        XCTAssertEqual(fields["com.apple.proapps.reel"], "2")
+        XCTAssertEqual(fields["com.apple.proapps.scene"], "3")
+        XCTAssertEqual(fields["com.apple.proapps.shot"], "4")
+        XCTAssertEqual(fields["com.apple.proapps.logNote"], "测试 / notes")
+        let calibration = AVMutableMetadataItem()
+        calibration.keySpace = .quickTimeMetadata
+        calibration.key = "com.apple.proresraw.whitebalance.bycct.colormatrices" as NSString
+        calibration.value = Data([0, 1, 255, 128]) as NSData
+        calibration.dataType = kCMMetadataBaseDataType_RawData as String
+        let system = [calibration] + RecordingMetadata.items(["com.apple.quicktime.model": "System camera"])
+        let merged = RecordingMetadata.merging(system, with: slate.metadata + RecordingMetadata.items([
+            "com.apple.quicktime.model": "Fallback", "com.apple.proapps.manufacturer": "Apple Inc."]))
+        XCTAssertEqual(merged.first { $0.key as? String == calibration.key as? String }?.dataValue, Data([0, 1, 255, 128]))
+        XCTAssertEqual(merged.first { $0.key as? String == "com.apple.quicktime.model" }?.stringValue, "System camera")
+    }
+
     func testMetadataMergePreservesRAWCalibration() {
         let system = RecordingMetadata.items(["com.apple.quicktime.software": "old", "org.smpte.camera.matrix": "calibration"])
         let custom = RecordingMetadata.items(["com.apple.quicktime.software": "new"])
@@ -120,6 +142,8 @@ final class RecordingSlateTests: XCTestCase {
         XCTAssertEqual(info.tint, "-3.0")
         XCTAssertEqual(info.slate["com.apple.quicktime.description"], "测试备注 / Notes")
         XCTAssertEqual(info.slate["com.apple.quicktime.scene"], "7")
+        let persisted = try await AVURLAsset(url: url).load(.metadata)
+        XCTAssertEqual(persisted.first { $0.key as? String == "com.apple.proapps.scene" }?.stringValue, "7")
         XCTAssertNotNil(info.date)
         XCTAssertFalse(info.imu)
     }

@@ -224,9 +224,9 @@ struct SettingsView: View {
             } label: { row(t("帧率", "Frame rate"), fpsLabel(camera.fps)) }
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
-            if !camera.selectedEncoding.isRAW, let format = currentFormat {
+            if let format = currentFormat {
                 SettingsChoices(title: t("色彩空间", "Color space")) {
-                    ForEach(RecordingColorSpace.selectableCases.filter {
+                    ForEach(RecordingColorSpace.selectableCases(for: camera.selectedEncoding).filter {
                         color in compatibleFormats.contains {
                             $0.width == format.width && $0.height == format.height && $0.supports(camera.fps) &&
                             color.isAvailable(for: $0.format, encoding: camera.selectedEncoding)

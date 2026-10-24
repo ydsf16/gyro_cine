@@ -48,3 +48,21 @@
 - 构建：/tmp/raw-info-preview2-build.log、/tmp/raw-info-release.log。
 - 原始样本保留在 SSD/DCIM/100APPLE/IMG_0034.mov 至 IMG_0037.mov。
 - 本轮未 commit / push。
+
+## 素材显示优化复查
+
+- 卡片左下显示完整编码名、按方向换算后的像素尺寸、实际轨道帧率；保留右下时长。复用原缩略图后台读取，无额外视频解码流程。
+- 音频显示“立体声 · 48 kHz · PCM / Stereo · 48 kHz · PCM”；单声道和其他声道数量按实际信息显示。
+- RAW 色彩继续显示 RAW，未修改 MOV 色彩标签、相机预览或编码链路。灰片外观不能确定 RAW 解码输出的 Log 曲线。
+- Debug 构建通过；新版覆盖安装到 iPhone 17 Pro，通过 Wi-Fi 截屏核对混合编码网格、中英文 RAW HQ 音频信息。3 张截图以 media-friendly- 开头。
+- 此次未新增录制，未重试 XCTest。
+
+## RAW 预览色彩实录核对
+
+- 新录 IMG_0038.mov，ProRes RAW，4224×2240/30fps，5.1 秒，153/153 帧解码完成，IMU 已嵌入。
+- record_before_start.activeColorSpace = 4；当前 SDK 枚举对应 Apple Log 2。
+- 预览 sample buffer 的 LogTransferFunction = com.apple.apple-wide-gamut.apple-log；CoreVideo 运行时常量核对为 Apple Log 2（Apple Log 1 的常量是 com.apple.rec2020.apple-log）。
+- 实时预览截图显示 LUT 关闭。文件四字符编码 aprn，视频格式描述不含普通视频的 Log 传递函数标签；RAW 校准矩阵及白平衡字段存在。
+- 因此本次灰片预览为 Apple Log 2，MOV 为 RAW。建议以后分别展示文件数据类型与拍摄预览色彩，不能直接改 RAW 文件标签为 Log 2。
+- 当前信息页 RAW、日期、尺寸、音频及 IMU 显示与文件一致。未操作达芬奇，未声称两端视觉匹配通过；需对齐 RAW 解码输出、白平衡/曝光、色彩管理及 LUT 后比较。
+- 此次仅测试与记录证据，未修改录制代码。

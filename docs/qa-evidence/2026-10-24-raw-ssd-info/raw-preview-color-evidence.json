@@ -1,0 +1,65 @@
+[
+  {
+    "data": {
+      "attachments": "Optional({\n    CVImageBufferYCbCrMatrix = \"ITU_R_2020\";\n    HorizontalDisparityAdjustment = 0;\n    LogTransferFunction = \"com.apple.apple-wide-gamut.apple-log\";\n    MetadataDictionary =     {\n        AGC = 3855;\n        ExposureTime = \"0.016668\";\n        LuxLevel = 17;\n        NormalizedSNR = \"5.86226284633528\";\n        PortType = PortTypeBackSuperWide;\n        SNR = \"12.59642184497159\";\n        ScalingFactor = \"0.25\";\n        SensorID = 2418;\n        TemporalNoiseReductionBand0Strength = 255;\n        ispDGain = 3420;\n        ispDGainRangeExpansionFactor = \"1.015625\";\n        sensorDGain = 256;\n    };\n})",
+      "height": 2112,
+      "pixelFormat": 2016686642,
+      "width": 1120
+    },
+    "eventType": "lut_preview_source",
+    "monotonicSeconds": 61798.427968250006,
+    "sessionID": "320F084F-4759-4A90-BE93-1CB593E17FA1",
+    "wallTime": "2026-10-24T03:30:33Z"
+  },
+  {
+    "data": {
+      "path": "SSD/DCIM/100APPLE/IMG_0038.mov",
+      "state": {
+        "activeColorSpace": 4,
+        "actualFormat": 59,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.016667999,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5636918382913805,
+          "y": 0.47694719891516224
+        },
+        "iso": 124.80806732177734,
+        "lensPosition": 0.6235294342041016,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "aprn",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2240,
+          "AVVideoWidthKey": 4224
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "aprn",
+        "selectedColorSpace": "systemDefault",
+        "selectedEncoding": "ProRes RAW",
+        "selectedFormat": 59,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          1.760986328125,
+          1,
+          1.837890625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_before_start",
+    "monotonicSeconds": 61802.278675208334,
+    "sessionID": "320F084F-4759-4A90-BE93-1CB593E17FA1",
+    "wallTime": "2026-10-24T03:30:37Z"
+  }
+]

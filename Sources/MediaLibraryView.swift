@@ -240,7 +240,8 @@ struct MediaLibraryView: View {
 private struct MovieThumbnail: View {
     let url: URL
     @State private var image: UIImage?
-    @State private var isRaw = false
+    @State private var codec = "—"
+    @State private var specification = "—"
     @State private var duration = "—"
 
     var body: some View {
@@ -256,14 +257,16 @@ private struct MovieThumbnail: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.black)
             .clipped()
-            if isRaw {
-                Text("RAW")
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 4).padding(.vertical, 2)
-                    .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 3))
-                    .foregroundStyle(.white)
-                    .padding(3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(codec).font(.system(size: 10, weight: .semibold))
+                Text(specification).font(.system(size: 9).monospacedDigit())
             }
+            .lineLimit(1).minimumScaleFactor(0.75)
+            .padding(4)
+            .foregroundStyle(.white)
+            .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 4))
+            .padding(.trailing, 48).padding(4)
+            .accessibilityIdentifier("mediaFormat.\(url.lastPathComponent)")
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 9))
@@ -276,8 +279,9 @@ private struct MovieThumbnail: View {
             let result = await MediaThumbnailLoader.shared.load(url)
             guard !Task.isCancelled else { return }
             image = result.0
-            isRaw = result.1
+            codec = result.1
             duration = result.2
+            specification = result.3
         }
     }
 }
@@ -347,14 +351,19 @@ private struct StableMoviePlayer: View {
 /// requests when cards disappear so dismissing Media does not start more decoders.
 private actor MediaThumbnailLoader {
     static let shared = MediaThumbnailLoader()
-    func load(_ url: URL) -> (UIImage?, Bool, String) {
-        guard !Task.isCancelled else { return (nil, false, "—") }
+    func load(_ url: URL) -> (UIImage?, String, String, String) {
+        guard !Task.isCancelled else { return (nil, "—", "—", "—") }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let asset = AVURLAsset(url: url)
-        let rawCodes: Set<FourCharCode> = [0x6170726e, 0x61707268]
-        let raw = asset.tracks(withMediaType: .video).contains { track in
-            track.formatDescriptions.contains { description in
-                rawCodes.contains(CMFormatDescriptionGetMediaSubType(description as! CMFormatDescription))
-            }
+        var codec = "—", specification = "—"
+        if let track = asset.tracks(withMediaType: .video).first,
+           let description = track.formatDescriptions.first {
+            let format = description as! CMFormatDescription
+            codec = MediaDisplayText.codec(CMFormatDescriptionGetMediaSubType(format))
+            let dimensions = CMVideoFormatDescriptionGetDimensions(format)
+            let size = CGSize(width: Int(dimensions.width), height: Int(dimensions.height)).applying(track.preferredTransform)
+            specification = "\(Int(abs(size.width)))×\(Int(abs(size.height))) · \(MediaDisplayText.frameRate(Double(track.nominalFrameRate)))fps"
         }
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -363,7 +372,7 @@ private actor MediaThumbnailLoader {
         let seconds = CMTimeGetSeconds(asset.duration)
         let n = seconds.isFinite ? max(0, Int(seconds)) : 0
         let label = n >= 3600 ? String(format: "%d:%02d:%02d", n / 3600, n / 60 % 60, n % 60) : String(format: "%02d:%02d", n / 60, n % 60)
-        return (frame.map(UIImage.init(cgImage:)), raw, label)
+        return (frame.map(UIImage.init(cgImage:)), codec, label, specification)
     }
 }
 
@@ -391,7 +400,7 @@ private struct MovieInformationView: View {
                             row("拍摄位置", "Recording location", location)
                         }
                         row("色彩空间", "Color space", details.color)
-                        row("音频", "Audio", details.audio)
+                        row("音频", "Audio", MediaDisplayText.audio(codec: details.audioCodec, rate: details.audioSampleRate, channels: details.audioChannels, chinese: locale.language.languageCode?.identifier == "zh"))
                         row("IMU", "IMU", details.imu ? t("已嵌入", "Embedded") : t("未检测到", "Not detected"))
                     }
                     Section {
@@ -429,6 +438,18 @@ private struct MovieInformationView: View {
                 do {
                     details = try await MovieInformationLoader.shared.load(url)
                     #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--media-export-for-qa") {
+                        let source = url
+                        try await Task.detached(priority: .utility) {
+                            let scoped = source.startAccessingSecurityScopedResource()
+                            defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+                            let destination = RecordingStoragePaths.diagnosticDirectory.appendingPathComponent("UITEST_EXPORT_" + source.lastPathComponent)
+                            if !FileManager.default.fileExists(atPath: destination.path) {
+                                try FileManager.default.copyItem(at: source, to: destination)
+                            }
+                        }.value
+                    }
+
                     if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--media-info-section=") }) {
                         try? await Task.sleep(for: .milliseconds(500))
                         proxy.scrollTo(String(argument.dropFirst("--media-info-section=".count)), anchor: .top)
@@ -456,6 +477,7 @@ private struct MovieInformationView: View {
 
 struct MovieInformation {
     var codec = "—", resolution = "—", fps = "—", duration = "—", size = "—", color = "—", audio = "—"
+    var audioCodec = "", audioSampleRate = 0.0, audioChannels: UInt32 = 0
     var shutter = "—", aperture = "—", iso = "—", whiteBalance = "—", tint = "—"
     var model = "—", lens = "—", zoom = "—", lensType = "", position = ""
     var date: Date?
@@ -519,8 +541,7 @@ actor MovieInformationLoader {
                 let code = fourCC(CMFormatDescriptionGetMediaSubType(description))
                 if ["rtmd", "gyrf"].contains(code) { result.imu = true }
                 if track.mediaType == .video {
-                    let names = ["hvc1":"H.265", "hev1":"H.265", "avc1":"H.264", "apch":"ProRes 422 HQ", "apcn":"ProRes 422", "apcs":"ProRes 422 LT", "apco":"ProRes 422 Proxy", "aprn":"ProRes RAW", "aprh":"ProRes RAW HQ"]
-                    result.codec = names[code] ?? code
+                    result.codec = MediaDisplayText.codec(CMFormatDescriptionGetMediaSubType(description))
                     let dimensions = CMVideoFormatDescriptionGetDimensions(description)
                     let transform = try await track.load(.preferredTransform)
                     let size = CGSize(width: Int(dimensions.width), height: Int(dimensions.height)).applying(transform)
@@ -538,10 +559,33 @@ actor MovieInformationLoader {
                     else if primaries.contains("709") { result.color = "Rec.709" }
                     else { result.color = snapshot["colorSpace"] as? String ?? "—" }
                 } else if track.mediaType == .audio, let audio = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee {
-                    result.audio = "\(code.trimmingCharacters(in: .whitespaces)) · \(Int(audio.mSampleRate)) Hz · \(audio.mChannelsPerFrame) ch"
+                    result.audioCodec = code.trimmingCharacters(in: .whitespaces)
+                    result.audioSampleRate = audio.mSampleRate
+                    result.audioChannels = audio.mChannelsPerFrame
+                    result.audio = "\(result.audioCodec) · \(Int(audio.mSampleRate)) Hz · \(audio.mChannelsPerFrame) ch"
                 }
             }
         }
         return result
+    }
+}
+
+/// Presentation only; never changes the recorded codec or color metadata.
+enum MediaDisplayText {
+    static func codec(_ value: FourCharCode) -> String {
+        let code = String(bytes: [24,16,8,0].map { UInt8((value >> $0) & 255) }, encoding: .ascii) ?? "—"
+        return ["hvc1":"H.265", "hev1":"H.265", "avc1":"H.264", "apch":"ProRes 422 HQ",
+                "apcn":"ProRes 422", "apcs":"ProRes 422 LT", "apco":"ProRes 422 Proxy",
+                "aprn":"ProRes RAW", "aprh":"ProRes RAW HQ"][code] ?? code
+    }
+    static func frameRate(_ rate: Double) -> String {
+        guard rate.isFinite, rate > 0 else { return "—" }
+        return abs(rate - rate.rounded()) < 0.001 ? String(format: "%.0f", rate) : String(format: "%.3f", rate).replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
+    }
+    static func audio(codec: String, rate: Double, channels: UInt32, chinese: Bool) -> String {
+        guard !codec.isEmpty, rate.isFinite, rate > 0, channels > 0 else { return "—" }
+        let layout = channels == 2 ? (chinese ? "立体声" : "Stereo") : channels == 1 ? (chinese ? "单声道" : "Mono") : "\(channels) " + (chinese ? "声道" : "channels")
+        let encoding = codec == "lpcm" ? "PCM" : codec.uppercased()
+        return "\(layout) · \(frameRate(rate / 1000)) kHz · \(encoding)"
     }
 }
