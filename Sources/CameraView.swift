@@ -14,6 +14,8 @@ private struct Preview: UIViewRepresentable {
     let onAttached: () -> Void
     let onTap: (CGPoint) -> Void
     let onLongPress: (CGPoint) -> Void
+    let focusLockText: String
+    let focusAutoText: String
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.previewLayer.session = session
@@ -21,12 +23,15 @@ private struct Preview: UIViewRepresentable {
         view.installLUT(lut)
         view.onTap = onTap
         view.onLongPress = onLongPress
+        view.focusLockText = focusLockText
+        view.focusAutoText = focusAutoText
         view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         onAttached()
         return view
     }
     func updateUIView(_ view: PreviewUIView, context: Context) {
         view.onTap = onTap; view.onLongPress = onLongPress
+        view.focusLockText = focusLockText; view.focusAutoText = focusAutoText
         view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         lut.setDisplayActive(lutEnabled)
         view.lutView?.setRefreshActive(lutEnabled)
@@ -101,6 +106,9 @@ private final class PreviewUIView: UIView {
     }
 
     private let focusFrame = UIView()
+    private let focusHint = UILabel()
+    var focusLockText = "Focus locked"
+    var focusAutoText = "Autofocus on"
     var lutView: LUTMetalView?
     private var lutRenderer: LUTPreview?
     func installLUT(_ renderer: LUTPreview) {
@@ -141,24 +149,51 @@ private final class PreviewUIView: UIView {
         focusFrame.alpha = 0
         focusFrame.isUserInteractionEnabled = false
         addSubview(focusFrame)
+        focusHint.font = .systemFont(ofSize: 13, weight: .semibold)
+        focusHint.textColor = .white
+        focusHint.textAlignment = .center
+        focusHint.backgroundColor = UIColor.black.withAlphaComponent(0.78)
+        focusHint.layer.cornerRadius = 9
+        focusHint.clipsToBounds = true
+        focusHint.alpha = 0
+        focusHint.isUserInteractionEnabled = false
+        focusHint.accessibilityIdentifier = "focusNotice"
+        addSubview(focusHint)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     @objc private func tapped(_ sender: UITapGestureRecognizer) {
         let location = sender.location(in: self)
         onTap?(previewLayer.captureDevicePointConverted(fromLayerPoint: location))
         showFocusFrame(at: location, locked: false)
+        showFocusHint(focusAutoText, at: location)
     }
     @objc private func held(_ sender: UILongPressGestureRecognizer) {
         guard sender.state == .began else { return }
         let location = sender.location(in: self)
         onLongPress?(previewLayer.captureDevicePointConverted(fromLayerPoint: location))
         showFocusFrame(at: location, locked: true)
+        showFocusHint(focusLockText, at: location)
     }
     private func showFocusFrame(at location: CGPoint, locked: Bool) {
         focusFrame.center = location
         focusFrame.layer.borderColor = locked ? UIColor.systemOrange.cgColor : UIColor.white.cgColor
         focusFrame.alpha = 1
         UIView.animate(withDuration: 0.3, delay: locked ? 2.5 : 1.2, options: [.beginFromCurrentState]) { self.focusFrame.alpha = 0 }
+    }
+    private func showFocusHint(_ message: String, at location: CGPoint) {
+        focusHint.layer.removeAllAnimations()
+        focusHint.text = message
+        let width = min(bounds.width - 20, focusHint.intrinsicContentSize.width + 24)
+        let height: CGFloat = 32
+        let x = min(max(location.x, width / 2 + 10), bounds.width - width / 2 - 10)
+        let above = location.y - 72
+        let y = above >= safeAreaInsets.top + height / 2 ? above : location.y + 72
+        focusHint.bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        focusHint.center = CGPoint(x: x, y: min(max(y, height / 2 + 10), bounds.height - height / 2 - 10))
+        focusHint.alpha = 1
+        UIView.animate(withDuration: 0.25, delay: 2.4, options: [.beginFromCurrentState]) {
+            self.focusHint.alpha = 0
+        }
     }
 }
 
@@ -245,8 +280,6 @@ struct CameraView: View {
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
-    @State private var focusNotice: String?
-    @State private var focusNoticeID = UUID()
     @State private var lastControlSend = Date.distantPast
     @State private var lastCaptureShortcut = -Double.infinity
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
@@ -288,7 +321,9 @@ struct CameraView: View {
         ZStack {
             Preview(session: camera.session, lut: camera.lutPreview, lutEnabled: camera.lutEnabled && camera.lutSupported,
                     captureEnabled: captureControlsEnabled, onCapture: captureShortcut,
-                    captureLog: camera.logger.event, onAttached: camera.startCapture, onTap: camera.tapFocus, onLongPress: camera.lockFocus)
+                    captureLog: camera.logger.event, onAttached: camera.startCapture, onTap: camera.tapFocus,
+                    onLongPress: camera.lockFocus, focusLockText: t("对焦已锁定", "Focus locked"),
+                    focusAutoText: t("自动对焦已开启", "Autofocus on"))
                 .ignoresSafeArea()
             if showCompositionGrid {
                 CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
@@ -321,19 +356,6 @@ struct CameraView: View {
                             })
                 }
                 bottomBar
-            }
-            if let focusNotice {
-                VStack {
-                    Text(focusNotice)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .accessibilityIdentifier("focusNotice")
-                        .padding(.horizontal, 15).padding(.vertical, 9)
-                        .background(.black.opacity(0.8), in: Capsule())
-                        .padding(.top, 125)
-                    Spacer()
-                }
-                .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -392,13 +414,6 @@ struct CameraView: View {
         .onChange(of: camera.iso) { _, value in if camera.exposureAuto { isoValue = Double(value) } }
         .onChange(of: camera.whiteBalanceKelvin) { _, value in if camera.whiteBalanceAuto { wbValue = Double(value) } }
         .onChange(of: camera.lensPosition) { _, value in if camera.focusChoice != .manual { focusValue = Double(value) } }
-        .onChange(of: camera.focusChoice) { _, choice in
-            switch choice {
-            case .locked: showFocusNotice(t("对焦已锁定 · 轻点画面恢复自动", "Focus locked · Tap to return to auto"))
-            case .continuous, .single, .tap: showFocusNotice(t("自动对焦已开启", "Autofocus on"))
-            case .manual: break
-            }
-        }
         .onChange(of: camera.selectedLensID) { _, _ in
             if selected == .lens { dismissPanelAfterAdjustment() }
         }
@@ -408,15 +423,6 @@ struct CameraView: View {
         AppText.value(chinese, english, locale: locale)
     }
 
-    private func showFocusNotice(_ message: String) {
-        let id = UUID()
-        focusNoticeID = id
-        focusNotice = message
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_200_000_000)
-            if focusNoticeID == id { focusNotice = nil }
-        }
-    }
 
     private func closePanel() {
         panelDismissID = UUID()

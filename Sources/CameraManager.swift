@@ -3822,6 +3822,30 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         backgroundLease = .invalid
     }
     private var canFinalizeNow: Bool { finalizationAllowed }
+    func authorizeSSDNamingFolder(_ folder: URL) throws {
+        guard folder.startAccessingSecurityScopedResource() else {
+            throw RecorderError.unavailable("无法访问所选 SSD 文件夹")
+        }
+        defer { folder.stopAccessingSecurityScopedResource() }
+        let bookmark = try folder.bookmarkData(options: .minimalBookmark,
+            includingResourceValuesForKeys: nil, relativeTo: nil)
+        UserDefaults.standard.set(bookmark, forKey: "ssdNamingFolderBookmark")
+        UserDefaults.standard.set(folder.lastPathComponent, forKey: "ssdNamingFolderName")
+        logger.event("ssd_naming_folder_authorized", ["folder": folder.lastPathComponent])
+    }
+
+    private func coordinatedSSDMove(from source: URL, to target: URL) throws {
+        var coordinationError: NSError?
+        var moveError: Error?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: source, options: .forMoving,
+            writingItemAt: target, options: [], error: &coordinationError) { from, to in
+                do { try FileManager.default.moveItem(at: from, to: to) }
+                catch { moveError = error }
+            }
+        if let coordinationError { throw coordinationError }
+        if let moveError { throw moveError }
+    }
+
     /// External capture URLs are system-assigned IMG names. Rename only after the
     /// MOV, audio, and IMU have been committed; retain the original on any error.
     private func renameCompletedExternalMovie(_ job: PendingIMUJob) -> (bookmark: Data?, failed: Bool) {
@@ -3838,6 +3862,25 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return (oldBookmark, true)
             }
             defer { source.stopAccessingSecurityScopedResource() }
+            guard let folderBookmark = UserDefaults.standard.data(forKey: "ssdNamingFolderBookmark") else {
+                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
+                    "error": "SSD folder authorization missing"])
+                return (oldBookmark, true)
+            }
+            var folderStale = false
+            let folder = try URL(resolvingBookmarkData: folderBookmark, options: [], relativeTo: nil,
+                                 bookmarkDataIsStale: &folderStale)
+            guard !folderStale, folder.startAccessingSecurityScopedResource() else {
+                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
+                    "error": "Authorized SSD folder unavailable"])
+                return (oldBookmark, true)
+            }
+            defer { folder.stopAccessingSecurityScopedResource() }
+            guard source.standardizedFileURL.path.hasPrefix(folder.standardizedFileURL.path + "/") else {
+                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
+                    "error": "Authorized folder does not contain this movie"])
+                return (oldBookmark, true)
+            }
             let manager = FileManager.default
             var clip = max(1, UserDefaults.standard.integer(forKey: "slate.nextClip"))
             var target = source.deletingLastPathComponent().appendingPathComponent(slate.filename(date: date, clip: clip))
@@ -3845,7 +3888,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 clip += 1
                 target = source.deletingLastPathComponent().appendingPathComponent(slate.filename(date: date, clip: clip))
             }
-            try manager.moveItem(at: source, to: target)
+            try coordinatedSSDMove(from: source, to: target)
             do {
                 let newBookmark = try target.bookmarkData(options: .minimalBookmark,
                     includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -3866,7 +3909,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     "to": target.lastPathComponent])
                 return (newBookmark, false)
             } catch {
-                do { try manager.moveItem(at: target, to: source) }
+                do { try coordinatedSSDMove(from: target, to: source) }
                 catch {
                     logger.event("ssd_bmc_rename_rollback_failed", ["movie": target.lastPathComponent,
                         "error": String(describing: error)])

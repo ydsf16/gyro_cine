@@ -121,7 +121,8 @@ struct RecordingSlateView: View {
                     Text(filenameType == "BMC" ? slate.filename(date: Date(), clip: max(1, UserDefaults.standard.integer(forKey: "slate.nextClip"))) : "IMG_XXXX.mov")
                         .font(.footnote.monospaced()).textSelection(.enabled).accessibilityIdentifier("slateFilenamePreview")
                     if storageLocation == "外部 SSD" && filenameType == "BMC" {
-                        Text(t("SSD 先以系统文件名录制，保存完成后尝试改为 BMC 文件名。", "SSD capture starts with a system name and is renamed after saving when permitted."))
+                        Text(t("SSD 先以系统文件名录制；在设置中授权 DCIM 文件夹后，保存完成会改为 BMC 文件名。",
+                               "SSD capture starts with a system name. Authorize its DCIM folder in Settings for BMC naming after saving."))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Text(t("日期、时间和片段号自动生成。场记信息保存在视频中。", "Date, time and clip number are generated automatically. Slate metadata is embedded in the movie."))

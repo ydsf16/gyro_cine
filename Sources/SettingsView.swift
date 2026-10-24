@@ -19,6 +19,8 @@ struct SettingsView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var showingSSDSpeed = false
+    @State private var showingSSDNamingFolderPicker = false
+    @State private var ssdNamingFolderName = UserDefaults.standard.string(forKey: "ssdNamingFolderName")
     @State private var showingPro = false
     @State private var message: String?
     @State private var pendingLensID: String?
@@ -172,6 +174,16 @@ struct SettingsView: View {
                 Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
             } message: { Text(AppText.message(message ?? "")) }
             .sheet(isPresented: $showingSSDSpeed) { SSDSpeedTestView() }
+            .fileImporter(isPresented: $showingSSDNamingFolderPicker, allowedContentTypes: [.folder]) { result in
+                switch result {
+                case .success(let folder):
+                    do {
+                        try camera.authorizeSSDNamingFolder(folder)
+                        ssdNamingFolderName = folder.lastPathComponent
+                    } catch { message = error.localizedDescription }
+                case .failure(let error): message = error.localizedDescription
+                }
+            }
             .sheet(isPresented: $showingPro) { ProAccessView() }
             .onAppear {
                 refreshExternalDevices()
@@ -364,6 +376,20 @@ struct SettingsView: View {
                                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                             }.frame(minHeight: 44).contentShape(Rectangle())
                         }.tint(.primary).disabled(locked).accessibilityIdentifier("ssdSpeedTest")
+                        if filenameType == "BMC" {
+                            Button { showingSSDNamingFolderPicker = true } label: {
+                                HStack {
+                                    Label(t("授权 SSD 文件夹改名", "Allow SSD folder renaming"), systemImage: "folder.badge.plus")
+                                    Spacer()
+                                    if let ssdNamingFolderName { Text(ssdNamingFolderName).foregroundStyle(.secondary) }
+                                }.frame(minHeight: 44).contentShape(Rectangle())
+                            }
+                            .disabled(locked)
+                            .accessibilityIdentifier("ssdNamingFolderPicker")
+                            Text(t("请选择 SSD 的 DCIM 文件夹；授权后，BMC 文件名会在录像保存完成时生成。",
+                                   "Select the SSD's DCIM folder. BMC naming runs after recording is saved."))
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                     SettingsChoices(title: t("文件名类型", "Filename type")) {
                         Button(t("简洁", "Simple")) { filenameType = "simple" }
