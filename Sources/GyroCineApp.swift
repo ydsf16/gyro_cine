@@ -25,6 +25,11 @@ struct GyroCineApp: App {
                 .onAppear {
                     UIApplication.shared.isIdleTimerDisabled = true
                     RecordingLocation.shared.setActive(true)
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--imu-rate-probe") {
+                        DispatchQueue.global(qos: .userInitiated).async { IMURateProbe.run() }
+                    }
+                    #endif
                 }
                 .onChange(of: scenePhase) { _, phase in
                     UIApplication.shared.isIdleTimerDisabled = phase == .active

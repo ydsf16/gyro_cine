@@ -245,6 +245,8 @@ struct CameraView: View {
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
+    @State private var focusNotice: String?
+    @State private var focusNoticeID = UUID()
     @State private var lastControlSend = Date.distantPast
     @State private var lastCaptureShortcut = -Double.infinity
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
@@ -320,6 +322,19 @@ struct CameraView: View {
                 }
                 bottomBar
             }
+            if let focusNotice {
+                VStack {
+                    Text(focusNotice)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .accessibilityIdentifier("focusNotice")
+                        .padding(.horizontal, 15).padding(.vertical, 9)
+                        .background(.black.opacity(0.8), in: Capsule())
+                        .padding(.top, 125)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black)
@@ -377,6 +392,13 @@ struct CameraView: View {
         .onChange(of: camera.iso) { _, value in if camera.exposureAuto { isoValue = Double(value) } }
         .onChange(of: camera.whiteBalanceKelvin) { _, value in if camera.whiteBalanceAuto { wbValue = Double(value) } }
         .onChange(of: camera.lensPosition) { _, value in if camera.focusChoice != .manual { focusValue = Double(value) } }
+        .onChange(of: camera.focusChoice) { _, choice in
+            switch choice {
+            case .locked: showFocusNotice(t("对焦已锁定 · 轻点画面恢复自动", "Focus locked · Tap to return to auto"))
+            case .continuous, .single, .tap: showFocusNotice(t("自动对焦已开启", "Autofocus on"))
+            case .manual: break
+            }
+        }
         .onChange(of: camera.selectedLensID) { _, _ in
             if selected == .lens { dismissPanelAfterAdjustment() }
         }
@@ -384,6 +406,16 @@ struct CameraView: View {
 
     private func t(_ chinese: String, _ english: String) -> String {
         AppText.value(chinese, english, locale: locale)
+    }
+
+    private func showFocusNotice(_ message: String) {
+        let id = UUID()
+        focusNoticeID = id
+        focusNotice = message
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            if focusNoticeID == id { focusNotice = nil }
+        }
     }
 
     private func closePanel() {
@@ -426,6 +458,14 @@ struct CameraView: View {
                                         ? (camera.availableStorageBytes ?? 0) > 0 : nil) : true)
                 statusBadge(camera.telemetryEmbeddable ? "IMU" : "!IMU",
                             healthy: camera.imuAvailable && camera.telemetryEmbeddable)
+            }
+            if camera.focusChoice == .locked {
+                Label(t("对焦锁定", "FOCUS LOCK"), systemImage: "lock.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .accessibilityIdentifier("focusLockIndicator")
             }
             if camera.checkedStorageLocation == storageLocation,
                let bytes = camera.availableStorageBytes, bytes >= 0,

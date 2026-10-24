@@ -353,10 +353,14 @@ final class IMURecordingUITests: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.42)).press(forDuration: 0.8)
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "锁定"), object: focus)], timeout: 10) == .completed)
+        XCTAssertTrue(app.staticTexts["focusLockIndicator"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["focusNotice"].exists)
         controlScreenshot(app, "point-focus-held")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.72, dy: 0.58)).tap()
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "AF-C"), object: focus)], timeout: 10) == .completed)
+        XCTAssertFalse(app.staticTexts["focusLockIndicator"].exists)
+        XCTAssertTrue(app.staticTexts["focusNotice"].exists)
         XCTAssertFalse(app.alerts.firstMatch.exists)
         controlScreenshot(app, "point-focus-released")
     }

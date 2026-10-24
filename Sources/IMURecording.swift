@@ -113,6 +113,56 @@ final class IMURecorder {
     }
 }
 
+#if DEBUG
+/// Device-only cadence probe. It never changes the production recording rate.
+enum IMURateProbe {
+    static func run() {
+        let manager = CMMotionManager()
+        let queue = OperationQueue()
+        queue.name = "GyroCine.IMURateProbe"
+        queue.maxConcurrentOperationCount = 1
+        var results: [[String: Any]] = []
+        for requestedHz in [100.0, 200.0, 400.0] {
+            let lock = NSLock()
+            var gyro: [Double] = []
+            var accel: [Double] = []
+            manager.gyroUpdateInterval = 1 / requestedHz
+            manager.accelerometerUpdateInterval = 1 / requestedHz
+            manager.startGyroUpdates(to: queue) { sample, _ in
+                guard let sample else { return }
+                lock.lock(); gyro.append(sample.timestamp); lock.unlock()
+            }
+            manager.startAccelerometerUpdates(to: queue) { sample, _ in
+                guard let sample else { return }
+                lock.lock(); accel.append(sample.timestamp); lock.unlock()
+            }
+            Thread.sleep(forTimeInterval: 6)
+            manager.stopGyroUpdates()
+            manager.stopAccelerometerUpdates()
+            queue.waitUntilAllOperationsAreFinished()
+            func summary(_ values: [Double]) -> [String: Any] {
+                let gaps = zip(values, values.dropFirst()).map { $1 - $0 }.filter { $0 > 0 }.sorted()
+                guard let first = values.first, let last = values.last, last > first, !gaps.isEmpty else {
+                    return ["count": values.count]
+                }
+                return ["count": values.count, "observedHz": Double(values.count - 1) / (last - first),
+                    "medianGapMS": gaps[gaps.count / 2] * 1000,
+                    "p95GapMS": gaps[min(gaps.count - 1, Int(Double(gaps.count) * 0.95))] * 1000,
+                    "maxGapMS": (gaps.last ?? 0) * 1000]
+            }
+            results.append(["requestedHz": requestedHz,
+                "acceptedGyroInterval": manager.gyroUpdateInterval,
+                "acceptedAccelInterval": manager.accelerometerUpdateInterval,
+                "gyro": summary(gyro), "accel": summary(accel)])
+        }
+        let destination = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("imu-rate-probe.json")
+        try? JSONSerialization.data(withJSONObject: results, options: [.prettyPrinted, .sortedKeys])
+            .write(to: destination, options: .atomic)
+    }
+}
+#endif
+
 enum MovieIMUFinalizer {
     static let margin = 0.05
     static let maximumGap = 0.03
@@ -374,6 +424,8 @@ struct PendingIMUJob: Codable {
     let mode: String
     let retainDebug: Bool
     var externalMovieBookmark: Data? = nil
+    var bmcRenameSlate: RecordingSlate? = nil
+    var bmcRenameDate: Date? = nil
     var expectedVideoCodec: String? = nil
     var expectedFPS: Double? = nil
     var ready = false
