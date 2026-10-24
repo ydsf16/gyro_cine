@@ -424,8 +424,6 @@ struct PendingIMUJob: Codable {
     let mode: String
     let retainDebug: Bool
     var externalMovieBookmark: Data? = nil
-    var bmcRenameSlate: RecordingSlate? = nil
-    var bmcRenameDate: Date? = nil
     var expectedVideoCodec: String? = nil
     var expectedFPS: Double? = nil
     var ready = false

@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     var quickCapture = false
+    @StateObject private var choicePresenter = SettingsChoicePresenter()
     @EnvironmentObject private var camera: CameraManager
     @ObservedObject private var proStore = ProStore.shared
     @ObservedObject private var recordingLocation = RecordingLocation.shared
@@ -19,8 +20,6 @@ struct SettingsView: View {
     @AppStorage("exposureType") private var exposureType = "speed"
     @State private var externalDevices: [AVExternalStorageDevice] = []
     @State private var showingSSDSpeed = false
-    @State private var showingSSDNamingFolderPicker = false
-    @State private var ssdNamingFolderName = UserDefaults.standard.string(forKey: "ssdNamingFolderName")
     @State private var showingPro = false
     @State private var message: String?
     @State private var pendingLensID: String?
@@ -56,6 +55,14 @@ struct SettingsView: View {
     }
     private var currentFormat: FormatInfo? { camera.formats.first { $0.index == camera.selectedFormatIndex } }
     private var currentResolution: String { currentFormat.map { "\($0.width)×\($0.height)" } ?? "—" }
+    private func availableColorSpaces(for format: FormatInfo) -> [RecordingColorSpace] {
+        RecordingColorSpace.selectableCases(for: camera.selectedEncoding).filter { color in
+            compatibleFormats.contains {
+                $0.width == format.width && $0.height == format.height && $0.supports(camera.fps) &&
+                color.isAvailable(for: $0.format, encoding: camera.selectedEncoding)
+            }
+        }
+    }
     private var intrinsicFormatNotice: String? {
         guard let current = currentFormat else { return nil }
         if !current.supportsIntrinsics {
@@ -174,16 +181,6 @@ struct SettingsView: View {
                 Button(t("确定", "OK")) { message = nil; offerProVideoStorageSettings = false }
             } message: { Text(AppText.message(message ?? "")) }
             .sheet(isPresented: $showingSSDSpeed) { SSDSpeedTestView() }
-            .fileImporter(isPresented: $showingSSDNamingFolderPicker, allowedContentTypes: [.folder]) { result in
-                switch result {
-                case .success(let folder):
-                    do {
-                        try camera.authorizeSSDNamingFolder(folder)
-                        ssdNamingFolderName = folder.lastPathComponent
-                    } catch { message = error.localizedDescription }
-                case .failure(let error): message = error.localizedDescription
-                }
-            }
             .sheet(isPresented: $showingPro) { ProAccessView() }
             .onAppear {
                 refreshExternalDevices()
@@ -191,11 +188,47 @@ struct SettingsView: View {
                 if outputFormat == "Gyroflow Project" { outputFormat = "GyroflowProto" }
             }
         }
+        .environmentObject(choicePresenter)
+        .overlay {
+            if let selection = choicePresenter.selection {
+                GeometryReader { geometry in
+                    let menuWidth = min(300, geometry.size.width - 40)
+                    let menuHeight = min(CGFloat(max(1, selection.count)) * 49 + 10,
+                                         min(480, geometry.size.height - 40))
+                    let container = geometry.frame(in: .global)
+                    let anchor = selection.anchor.offsetBy(dx: -container.minX, dy: -container.minY)
+                    let menuTop: CGFloat = {
+                        if geometry.size.height - anchor.maxY >= menuHeight + 12 { return anchor.maxY + 6 }
+                        if anchor.minY >= menuHeight + 12 { return anchor.minY - menuHeight - 6 }
+                        return min(max(8, anchor.midY - menuHeight / 2), geometry.size.height - menuHeight - 8)
+                    }()
+                    let menuCenterX = min(max(menuWidth / 2 + 8, anchor.midX),
+                                          geometry.size.width - menuWidth / 2 - 8)
+                    ZStack(alignment: .topLeading) {
+                        Color.black.opacity(0.12)
+                            .ignoresSafeArea()
+                            .contentShape(Rectangle())
+                            .onTapGesture { choicePresenter.dismiss() }
+                        ScrollView {
+                            VStack(spacing: 0) { selection.options }
+                                .buttonStyle(SettingsChoiceOptionStyle { choicePresenter.dismiss() })
+                        }
+                        .scrollIndicators(.hidden)
+                        .frame(width: menuWidth, height: menuHeight)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.8), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.18), radius: 22, y: 9)
+                        .position(x: menuCenterX, y: menuTop + menuHeight / 2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
     }
 
     private var videoSection: some View {
         Section(t("视频", "VIDEO")) {
-            SettingsChoices(title: t("视频编码", "Codec")) {
+            SettingsChoices(title: t("视频编码", "Codec"), optionCount: codecOptions.count) {
                 ForEach(codecOptions) { encoding in
                     Button {
                         camera.chooseEncoding(encoding)
@@ -207,7 +240,7 @@ struct SettingsView: View {
             } label: { row(t("视频编码", "Codec"), camera.selectedEncoding.title) }
                 .tint(.primary).disabled(locked || codecOptions.isEmpty)
                 .accessibilityIdentifier("codecMenu")
-            SettingsChoices(title: t("分辨率", "Resolution")) {
+            SettingsChoices(title: t("分辨率", "Resolution"), optionCount: resolutions.count) {
                 ForEach(resolutions) { resolution in
                     Button {
                         let preferred = resolution.formats.first { $0.index == camera.selectedFormatIndex }
@@ -224,7 +257,7 @@ struct SettingsView: View {
             } label: { row(t("分辨率", "Resolution"), resolutions.first(where: { $0.id == currentResolution })?.label ?? currentResolution) }
                 .tint(.primary).disabled(locked || resolutions.isEmpty)
                 .accessibilityIdentifier("resolutionMenu")
-            SettingsChoices(title: t("帧率", "Frame rate")) {
+            SettingsChoices(title: t("帧率", "Frame rate"), optionCount: camera.availableFPS.count) {
                 ForEach(camera.availableFPS, id: \.self) { rate in
                     Button {
                         camera.chooseFPS(rate)
@@ -237,13 +270,8 @@ struct SettingsView: View {
                 .tint(.primary).disabled(locked || camera.availableFPS.isEmpty)
                 .accessibilityIdentifier("fpsMenu")
             if let format = currentFormat {
-                SettingsChoices(title: t("色彩空间", "Color space")) {
-                    ForEach(RecordingColorSpace.selectableCases(for: camera.selectedEncoding).filter {
-                        color in compatibleFormats.contains {
-                            $0.width == format.width && $0.height == format.height && $0.supports(camera.fps) &&
-                            color.isAvailable(for: $0.format, encoding: camera.selectedEncoding)
-                        }
-                    }) { colorSpace in
+                SettingsChoices(title: t("色彩空间", "Color space"), optionCount: availableColorSpaces(for: format).count) {
+                    ForEach(availableColorSpaces(for: format)) { colorSpace in
                         Button {
                             camera.chooseRecordingColorSpace(colorSpace)
                         } label: {
@@ -262,7 +290,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("colorSpaceMenu")
             }
             if camera.selectedEncoding == .hevc {
-                SettingsChoices(title: t("码率档位", "Bitrate")) {
+                SettingsChoices(title: t("码率档位", "Bitrate"), optionCount: HEVCBitratePreset.allCases.count) {
                     ForEach(HEVCBitratePreset.allCases) { preset in
                         Button {
                             camera.setHEVCBitratePreset(preset)
@@ -311,7 +339,7 @@ struct SettingsView: View {
     }
     private var storageSection: some View {
         Section {
-                    SettingsChoices(title: t("存储位置", "Storage")) {
+                    SettingsChoices(title: t("存储位置", "Storage"), optionCount: 3) {
                         Button(t("内部文件", "On My iPhone")) {
                             offerProVideoStorageSettings = false
                             storageLocation = "内部文件"
@@ -355,7 +383,7 @@ struct SettingsView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if storageLocation == "外部 SSD" {
-                        SettingsChoices(title: t("目标 SSD", "Destination SSD")) {
+                        SettingsChoices(title: t("目标 SSD", "Destination SSD"), optionCount: externalDevices.count + 1) {
                             ForEach(externalDevices, id: \.uuid) { device in
                                 Button(device.displayName ?? t("外部存储", "External storage")) {
                                     if let id = device.uuid?.uuidString {
@@ -376,26 +404,17 @@ struct SettingsView: View {
                                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                             }.frame(minHeight: 44).contentShape(Rectangle())
                         }.tint(.primary).disabled(locked).accessibilityIdentifier("ssdSpeedTest")
-                        if filenameType == "BMC" {
-                            Button { showingSSDNamingFolderPicker = true } label: {
-                                HStack {
-                                    Label(t("授权 SSD 文件夹改名", "Allow SSD folder renaming"), systemImage: "folder.badge.plus")
-                                    Spacer()
-                                    if let ssdNamingFolderName { Text(ssdNamingFolderName).foregroundStyle(.secondary) }
-                                }.frame(minHeight: 44).contentShape(Rectangle())
-                            }
-                            .disabled(locked)
-                            .accessibilityIdentifier("ssdNamingFolderPicker")
-                            Text(t("请选择 SSD 的 DCIM 文件夹；授权后，BMC 文件名会在录像保存完成时生成。",
-                                   "Select the SSD's DCIM folder. BMC naming runs after recording is saved."))
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
                     }
                     SettingsChoices(title: t("文件名类型", "Filename type")) {
                         Button(t("简洁", "Simple")) { filenameType = "simple" }
                         Button("BMC") { filenameType = "BMC" }
                     } label: { row(t("文件名类型", "Filename type"), filenameType == "BMC" ? "BMC" : t("简洁", "Simple")) }
                     .tint(.primary).disabled(locked).accessibilityIdentifier("filenameTypePicker")
+                    if storageLocation == "外部 SSD" {
+                        Text(t("SSD 文件名由系统生成；文件名类型适用于内部存储。",
+                               "The system names SSD clips; filename type applies to internal storage."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     SettingsChoices(title: t("存储格式", "Output format")) {
                         Button("Gyroflow") { outputFormat = "SonyMov" }
                         Button("GyroflowNightly") { outputFormat = "GyroflowProto" }
@@ -529,13 +548,52 @@ private struct ResolutionOption: Identifiable {
 }
 
 
-/// Native menus keep selection on this page; the whole row is the hit target.
+@MainActor private final class SettingsChoicePresenter: ObservableObject {
+    struct Selection {
+        let options: AnyView
+        let count: Int
+        let anchor: CGRect
+    }
+    @Published private(set) var selection: Selection?
+    func present<Options: View>(_ options: Options, count: Int, anchor: CGRect) {
+        selection = Selection(options: AnyView(options), count: count, anchor: anchor)
+    }
+    func dismiss() { selection = nil }
+}
+
+private struct SettingsChoiceOptionStyle: PrimitiveButtonStyle {
+    let dismiss: () -> Void
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            dismiss()
+            configuration.trigger()
+        } label: {
+            configuration.label
+                .frame(maxWidth: .infinity, minHeight: 49, alignment: .leading)
+                .padding(.horizontal, 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The overlay keeps the compact menu appearance while taking touches above the form.
 private struct SettingsChoices<Options: View, Row: View>: View {
+    @EnvironmentObject private var choicePresenter: SettingsChoicePresenter
+    @State private var anchorFrame: CGRect = .zero
     let title: String
+    let optionCount: Int
     @ViewBuilder var options: () -> Options
     @ViewBuilder var label: () -> Row
+    init(title: String, optionCount: Int = 2, @ViewBuilder options: @escaping () -> Options,
+         @ViewBuilder label: @escaping () -> Row) {
+        self.title = title
+        self.optionCount = optionCount
+        self.options = options
+        self.label = label
+    }
     var body: some View {
-        Menu { options() } label: {
+        Button { choicePresenter.present(options(), count: optionCount, anchor: anchorFrame) } label: {
             HStack(spacing: 10) {
                 label()
                 Image(systemName: "chevron.up.chevron.down")
@@ -544,9 +602,19 @@ private struct SettingsChoices<Options: View, Row: View>: View {
             .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuOrder(.fixed)
+        .buttonStyle(.plain)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: SettingsChoiceFrameKey.self, value: proxy.frame(in: .global))
+            }
+        }
+        .onPreferenceChange(SettingsChoiceFrameKey.self) { frame in anchorFrame = frame }
     }
+}
+
+private struct SettingsChoiceFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
 
 

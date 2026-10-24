@@ -12,6 +12,8 @@ struct MediaLibraryView: View {
     @State private var showingInformation = false
     @State private var selected: URL?
     @State private var pendingDelete: [URL] = []
+    @State private var showingBatchDelete = false
+    @State private var showingSingleDelete = false
     @State private var selecting = false
     @State private var selection = Set<URL>()
     @State private var deleting = false
@@ -80,9 +82,17 @@ struct MediaLibraryView: View {
                             Button { saveToPhotos(files.filter { selection.contains($0) }) } label: {
                                 mediaActionLabel(t("保存相册", "Save to Photos"), icon: "square.and.arrow.down")
                             }.accessibilityIdentifier("mediaSaveSelected")
-                            Button(role: .destructive) { pendingDelete = files.filter { selection.contains($0) } } label: {
+                            Button(role: .destructive) {
+                                pendingDelete = files.filter { selection.contains($0) }
+                                showingBatchDelete = !pendingDelete.isEmpty
+                            } label: {
                                 mediaActionLabel(t("删除", "Delete"), icon: "trash")
-                            }.accessibilityIdentifier("mediaDeleteSelected")
+                            }
+                            .accessibilityIdentifier("mediaDeleteSelected")
+                            .popover(isPresented: $showingBatchDelete, arrowEdge: .bottom) {
+                                deleteConfirmation(singleClip: false)
+                                    .presentationCompactAdaptation(.popover)
+                            }
                         }
                         .disabled(selection.isEmpty || deleting || camera.finalizing || camera.recording)
                     }.padding().background(.regularMaterial)
@@ -118,20 +128,19 @@ struct MediaLibraryView: View {
                                     .accessibilityLabel(t("存入相册", "Save to Photos"))
                                     .accessibilityIdentifier("mediaSave.\(url.lastPathComponent)")
                                 Spacer()
-                                Button(role: .destructive) { selected = nil; pendingDelete = [url] } label: { Image(systemName: "trash") }
+                                Button(role: .destructive) {
+                                    pendingDelete = [url]
+                                    showingSingleDelete = true
+                                } label: { Image(systemName: "trash") }
                                     .disabled(camera.recording || camera.finalizing)
+                                    .popover(isPresented: $showingSingleDelete, arrowEdge: .bottom) {
+                                        deleteConfirmation(singleClip: true)
+                                            .presentationCompactAdaptation(.popover)
+                                    }
                             }
                         }
                 }
             }
-            .confirmationDialog(t("删除素材？", "Delete recording?"), isPresented: Binding(
-                get: { !pendingDelete.isEmpty }, set: { if !$0 { pendingDelete = [] } }
-            ), titleVisibility: .visible) {
-                Button(t("删除文件", "Delete file"), role: .destructive) {
-                    delete(pendingDelete)
-                    pendingDelete = []
-                }
-            } message: { Text(t("将删除 \(pendingDelete.count) 个视频及其关联数据。", "Delete \(pendingDelete.count) videos and associated data.")) }
             .alert(t("素材", "Media"), isPresented: Binding(
                 get: { message != nil }, set: { if !$0 { message = nil } }
             )) { Button(t("确定", "OK")) { message = nil } } message: { Text(AppText.message(message ?? "")) }
@@ -152,6 +161,38 @@ struct MediaLibraryView: View {
                 scopedExternalFiles = []
             }
         }
+    }
+
+    private func deleteConfirmation(singleClip: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(t("删除素材？", "Delete recording?"))
+                .font(.headline)
+            Text(t("将删除 \(pendingDelete.count) 个视频及其关联数据。",
+                   "Delete \(pendingDelete.count) videos and associated data."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button(t("取消", "Cancel")) {
+                    pendingDelete = []
+                    if singleClip { showingSingleDelete = false } else { showingBatchDelete = false }
+                }
+                Spacer()
+                Button(t("删除文件", "Delete file"), role: .destructive) {
+                    let urls = pendingDelete
+                    pendingDelete = []
+                    if singleClip {
+                        showingSingleDelete = false
+                        selected = nil
+                    } else {
+                        showingBatchDelete = false
+                    }
+                    delete(urls)
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(18)
+        .frame(width: 290)
     }
 
     private func mediaActionLabel(_ title: String, icon: String) -> some View {

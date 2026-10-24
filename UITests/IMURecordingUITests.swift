@@ -349,18 +349,25 @@ final class IMURecordingUITests: XCTestCase {
         app.launch()
         let focus = app.buttons["parameter.Focus"]
         XCTAssertTrue(focus.waitForExistence(timeout: 30))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.42)).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["focusFrameIndicator"].waitForExistence(timeout: 1))
+        XCTAssertFalse(app.staticTexts["focusNotice"].exists)
         // Deliberately use two off-center locations to catch discarded points.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.28, dy: 0.42)).press(forDuration: 0.8)
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "锁定"), object: focus)], timeout: 10) == .completed)
-        XCTAssertTrue(app.staticTexts["focusLockIndicator"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["focusNotice"].exists)
+        let lockedHint = app.staticTexts["focusNotice"]
+        XCTAssertTrue(lockedHint.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any)["focusFrameIndicator"].exists)
+        XCTAssertLessThan(lockedHint.frame.midX, app.frame.width * 0.45)
         controlScreenshot(app, "point-focus-held")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.72, dy: 0.58)).tap()
         XCTAssertTrue(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label CONTAINS %@", "AF-C"), object: focus)], timeout: 10) == .completed)
-        XCTAssertFalse(app.staticTexts["focusLockIndicator"].exists)
-        XCTAssertTrue(app.staticTexts["focusNotice"].exists)
+        let autoHint = app.staticTexts["focusNotice"]
+        XCTAssertTrue(autoHint.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.descendants(matching: .any)["focusFrameIndicator"].exists)
+        XCTAssertGreaterThan(autoHint.frame.midX, app.frame.width * 0.55)
         XCTAssertFalse(app.alerts.firstMatch.exists)
         controlScreenshot(app, "point-focus-released")
     }

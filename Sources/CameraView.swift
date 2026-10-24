@@ -14,8 +14,7 @@ private struct Preview: UIViewRepresentable {
     let onAttached: () -> Void
     let onTap: (CGPoint) -> Void
     let onLongPress: (CGPoint) -> Void
-    let focusLockText: String
-    let focusAutoText: String
+    let onFocusInteraction: (CGPoint, Bool) -> Void
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.previewLayer.session = session
@@ -23,15 +22,14 @@ private struct Preview: UIViewRepresentable {
         view.installLUT(lut)
         view.onTap = onTap
         view.onLongPress = onLongPress
-        view.focusLockText = focusLockText
-        view.focusAutoText = focusAutoText
+        view.onFocusInteraction = onFocusInteraction
         view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         onAttached()
         return view
     }
     func updateUIView(_ view: PreviewUIView, context: Context) {
         view.onTap = onTap; view.onLongPress = onLongPress
-        view.focusLockText = focusLockText; view.focusAutoText = focusAutoText
+        view.onFocusInteraction = onFocusInteraction
         view.configureCaptureControls(enabled: captureEnabled, action: onCapture, log: captureLog)
         lut.setDisplayActive(lutEnabled)
         view.lutView?.setRefreshActive(lutEnabled)
@@ -70,6 +68,7 @@ private final class LUTMetalView: UIView {
 private final class PreviewUIView: UIView {
     var onTap: ((CGPoint) -> Void)?
     var onLongPress: ((CGPoint) -> Void)?
+    var onFocusInteraction: ((CGPoint, Bool) -> Void)?
     private var captureInteraction: AVCaptureEventInteraction?
     private var captureEnabled = false
     private var captureAction: (() -> Void)?
@@ -105,10 +104,6 @@ private final class PreviewUIView: UIView {
         updateCaptureInteraction()
     }
 
-    private let focusFrame = UIView()
-    private let focusHint = UILabel()
-    var focusLockText = "Focus locked"
-    var focusAutoText = "Autofocus on"
     var lutView: LUTMetalView?
     private var lutRenderer: LUTPreview?
     func installLUT(_ renderer: LUTPreview) {
@@ -124,7 +119,10 @@ private final class PreviewUIView: UIView {
         view.alpha = 0
         view.isUserInteractionEnabled = false
         (view.layer as? CAMetalLayer)?.colorspace = CGColorSpace(name: CGColorSpace.itur_709)
-        insertSubview(view, belowSubview: focusFrame)
+        // AVCaptureVideoPreviewLayer owns internal video layers. Keep the LUT
+        // surface above them so completed GPU frames are actually visible.
+        addSubview(view)
+        view.layer.zPosition = 1
         lutView = view
     }
     override func layoutSubviews() {
@@ -143,57 +141,20 @@ private final class PreviewUIView: UIView {
         hold.minimumPressDuration = 0.55
         tap.require(toFail: hold)
         addGestureRecognizer(tap); addGestureRecognizer(hold)
-        focusFrame.frame.size = CGSize(width: 72, height: 72)
-        focusFrame.layer.borderColor = UIColor.white.cgColor
-        focusFrame.layer.borderWidth = 3
-        focusFrame.alpha = 0
-        focusFrame.isUserInteractionEnabled = false
-        addSubview(focusFrame)
-        focusHint.font = .systemFont(ofSize: 13, weight: .semibold)
-        focusHint.textColor = .white
-        focusHint.textAlignment = .center
-        focusHint.backgroundColor = UIColor.black.withAlphaComponent(0.78)
-        focusHint.layer.cornerRadius = 9
-        focusHint.clipsToBounds = true
-        focusHint.alpha = 0
-        focusHint.isUserInteractionEnabled = false
-        focusHint.accessibilityIdentifier = "focusNotice"
-        addSubview(focusHint)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     @objc private func tapped(_ sender: UITapGestureRecognizer) {
         let location = sender.location(in: self)
+        onFocusInteraction?(CGPoint(x: location.x / max(bounds.width, 1),
+                                    y: location.y / max(bounds.height, 1)), false)
         onTap?(previewLayer.captureDevicePointConverted(fromLayerPoint: location))
-        showFocusFrame(at: location, locked: false)
-        showFocusHint(focusAutoText, at: location)
     }
     @objc private func held(_ sender: UILongPressGestureRecognizer) {
         guard sender.state == .began else { return }
         let location = sender.location(in: self)
+        onFocusInteraction?(CGPoint(x: location.x / max(bounds.width, 1),
+                                    y: location.y / max(bounds.height, 1)), true)
         onLongPress?(previewLayer.captureDevicePointConverted(fromLayerPoint: location))
-        showFocusFrame(at: location, locked: true)
-        showFocusHint(focusLockText, at: location)
-    }
-    private func showFocusFrame(at location: CGPoint, locked: Bool) {
-        focusFrame.center = location
-        focusFrame.layer.borderColor = locked ? UIColor.systemOrange.cgColor : UIColor.white.cgColor
-        focusFrame.alpha = 1
-        UIView.animate(withDuration: 0.3, delay: locked ? 2.5 : 1.2, options: [.beginFromCurrentState]) { self.focusFrame.alpha = 0 }
-    }
-    private func showFocusHint(_ message: String, at location: CGPoint) {
-        focusHint.layer.removeAllAnimations()
-        focusHint.text = message
-        let width = min(bounds.width - 20, focusHint.intrinsicContentSize.width + 24)
-        let height: CGFloat = 32
-        let x = min(max(location.x, width / 2 + 10), bounds.width - width / 2 - 10)
-        let above = location.y - 72
-        let y = above >= safeAreaInsets.top + height / 2 ? above : location.y + 72
-        focusHint.bounds = CGRect(x: 0, y: 0, width: width, height: height)
-        focusHint.center = CGPoint(x: x, y: min(max(y, height / 2 + 10), bounds.height - height / 2 - 10))
-        focusHint.alpha = 1
-        UIView.animate(withDuration: 0.25, delay: 2.4, options: [.beginFromCurrentState]) {
-            self.focusHint.alpha = 0
-        }
     }
 }
 
@@ -266,6 +227,7 @@ struct CameraView: View {
     @State private var showingCaptureSetup = false
     @State private var showingSlate = false
     @State private var lutCard: String?
+    @State private var lutCarouselUserDragging = false
     @State private var showingLUTCredits = false
     @State private var panelDismissID = UUID()
     @State private var showingSettings = false
@@ -280,6 +242,8 @@ struct CameraView: View {
     @State private var isoValue = 400.0
     @State private var wbValue = 5600.0
     @State private var focusValue = 0.5
+    @State private var focusIndicator: (text: String?, point: CGPoint, locked: Bool)?
+    @State private var focusIndicatorID = UUID()
     @State private var lastControlSend = Date.distantPast
     @State private var lastCaptureShortcut = -Double.infinity
     private let accent = Color(red: 0.08, green: 0.62, blue: 1)
@@ -322,8 +286,12 @@ struct CameraView: View {
             Preview(session: camera.session, lut: camera.lutPreview, lutEnabled: camera.lutEnabled && camera.lutSupported,
                     captureEnabled: captureControlsEnabled, onCapture: captureShortcut,
                     captureLog: camera.logger.event, onAttached: camera.startCapture, onTap: camera.tapFocus,
-                    onLongPress: camera.lockFocus, focusLockText: t("对焦已锁定", "Focus locked"),
-                    focusAutoText: t("自动对焦已开启", "Autofocus on"))
+                    onLongPress: camera.lockFocus, onFocusInteraction: { point, locked in
+                        let unlocking = !locked && camera.focusChoice == .locked
+                        showFocusIndicator(at: point, locked: locked,
+                            text: locked ? t("对焦已锁定", "Focus locked") :
+                                (unlocking ? t("自动对焦已开启", "Autofocus on") : nil))
+                    })
                 .ignoresSafeArea()
             if showCompositionGrid {
                 CompositionGrid().ignoresSafeArea().allowsHitTesting(false)
@@ -356,6 +324,33 @@ struct CameraView: View {
                             })
                 }
                 bottomBar
+            }
+            if let focusIndicator {
+                GeometryReader { geometry in
+                    let x = min(max(focusIndicator.point.x * geometry.size.width, 36), geometry.size.width - 36)
+                    let y = min(max(focusIndicator.point.y * geometry.size.height, 36), geometry.size.height - 36)
+                    ZStack {
+                        Rectangle()
+                            .strokeBorder(focusIndicator.locked ? Color.orange : Color.white, lineWidth: 3)
+                            .frame(width: 72, height: 72)
+                            .shadow(color: .black.opacity(0.8), radius: 3)
+                            .position(x: x, y: y)
+                            .accessibilityLabel("Focus frame")
+                            .accessibilityIdentifier("focusFrameIndicator")
+                        if let text = focusIndicator.text {
+                            Text(text)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 9))
+                                .accessibilityIdentifier("focusNotice")
+                                .position(x: min(max(x, 90), geometry.size.width - 90),
+                                          y: min(max(y - 70, 30), geometry.size.height - 40))
+                        }
+                    }
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -423,6 +418,16 @@ struct CameraView: View {
         AppText.value(chinese, english, locale: locale)
     }
 
+    private func showFocusIndicator(at point: CGPoint, locked: Bool, text: String?) {
+        let id = UUID()
+        focusIndicatorID = id
+        focusIndicator = (text, point, locked)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(locked || text != nil ? 2.5 : 1.5))
+            if focusIndicatorID == id { focusIndicator = nil }
+        }
+    }
+
 
     private func closePanel() {
         panelDismissID = UUID()
@@ -464,14 +469,6 @@ struct CameraView: View {
                                         ? (camera.availableStorageBytes ?? 0) > 0 : nil) : true)
                 statusBadge(camera.telemetryEmbeddable ? "IMU" : "!IMU",
                             healthy: camera.imuAvailable && camera.telemetryEmbeddable)
-            }
-            if camera.focusChoice == .locked {
-                Label(t("对焦锁定", "FOCUS LOCK"), systemImage: "lock.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(.black.opacity(0.45), in: Capsule())
-                    .accessibilityIdentifier("focusLockIndicator")
             }
             if camera.checkedStorageLocation == storageLocation,
                let bytes = camera.availableStorageBytes, bytes >= 0,
@@ -798,9 +795,17 @@ struct CameraView: View {
             .contentMargins(.horizontal, 90, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: $lutCard, anchor: .center)
-            .onAppear { lutCard = camera.lutEnabled && camera.lutSupported ? camera.selectedLUTID : "off" }
+            .simultaneousGesture(DragGesture(minimumDistance: 5).onChanged { _ in
+                lutCarouselUserDragging = true
+            })
+            .onAppear {
+                lutCarouselUserDragging = false
+                lutCard = camera.lutEnabled && camera.lutSupported ? camera.selectedLUTID : "off"
+            }
+            .onDisappear { lutCarouselUserDragging = false }
             .onChange(of: lutCard) { _, selected in
-                guard let selected, camera.lutSupported, !camera.lutControlsLocked else { return }
+                guard lutCarouselUserDragging, let selected, camera.lutSupported,
+                      !camera.lutControlsLocked else { return }
                 if let item = camera.importedLUTs.first(where: { $0.selectionID == selected }) { camera.selectImportedLUT(item) }
                 else if let look = PreviewLook(rawValue: selected) { camera.setLUTLook(look) }
                 else { camera.setLUTEnabled(false) }

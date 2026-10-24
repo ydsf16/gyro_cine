@@ -265,7 +265,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let items = PreviewLUTLibrary.load()
                 self.publish {
                     self.importedLUTs = items
-                    if self.importedLUTID == item.selectionID { self.setLUTLook(.rec709) }
+                    if self.importedLUTID == item.selectionID {
+                        self.setLUTEnabled(false)
+                        self.importedLUTID = nil
+                        UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
+                        self.lutLook = .rec709
+                        UserDefaults.standard.set(PreviewLook.rec709.rawValue, forKey: "previewLUTLook")
+                        self.lutPreview.setLook(.rec709)
+                    }
                 }
             } catch { self.publish { self.errorText = error.localizedDescription } }
         }
@@ -3724,10 +3731,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     ProcessInfo.processInfo.arguments.contains("--imu-sync-4k60-probe") ||
                     ProcessInfo.processInfo.arguments.contains("--first-buffer-probe"),
                 externalMovieBookmark: self.activeExternalMovieBookmark,
-                bmcRenameSlate: self.activeExternalMovieURL != nil &&
-                    UserDefaults.standard.string(forKey: "filenameType") != "simple" &&
-                    !fileURL.lastPathComponent.hasPrefix("UITEST_") ? self.recordingSlate : nil,
-                bmcRenameDate: self.activeExternalMovieURL != nil ? Date() : nil,
                 expectedVideoCodec: self.chosenCodec?.rawValue,
                 expectedFPS: self.chosenFPS,
                 intrinsicsUnavailableReason: self.intrinsicsUnavailableReason,
@@ -3822,109 +3825,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         backgroundLease = .invalid
     }
     private var canFinalizeNow: Bool { finalizationAllowed }
-    func authorizeSSDNamingFolder(_ folder: URL) throws {
-        guard folder.startAccessingSecurityScopedResource() else {
-            throw RecorderError.unavailable("无法访问所选 SSD 文件夹")
-        }
-        defer { folder.stopAccessingSecurityScopedResource() }
-        let bookmark = try folder.bookmarkData(options: .minimalBookmark,
-            includingResourceValuesForKeys: nil, relativeTo: nil)
-        UserDefaults.standard.set(bookmark, forKey: "ssdNamingFolderBookmark")
-        UserDefaults.standard.set(folder.lastPathComponent, forKey: "ssdNamingFolderName")
-        logger.event("ssd_naming_folder_authorized", ["folder": folder.lastPathComponent])
-    }
-
-    private func coordinatedSSDMove(from source: URL, to target: URL) throws {
-        var coordinationError: NSError?
-        var moveError: Error?
-        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: source, options: .forMoving,
-            writingItemAt: target, options: [], error: &coordinationError) { from, to in
-                do { try FileManager.default.moveItem(at: from, to: to) }
-                catch { moveError = error }
-            }
-        if let coordinationError { throw coordinationError }
-        if let moveError { throw moveError }
-    }
-
-    /// External capture URLs are system-assigned IMG names. Rename only after the
-    /// MOV, audio, and IMU have been committed; retain the original on any error.
-    private func renameCompletedExternalMovie(_ job: PendingIMUJob) -> (bookmark: Data?, failed: Bool) {
-        guard let oldBookmark = job.externalMovieBookmark,
-              let slate = job.bmcRenameSlate, let date = job.bmcRenameDate else {
-            return (job.externalMovieBookmark, false)
-        }
-        var stale = false
-        do {
-            let source = try URL(resolvingBookmarkData: oldBookmark, options: [], relativeTo: nil,
-                                 bookmarkDataIsStale: &stale)
-            guard !stale, source.startAccessingSecurityScopedResource() else {
-                logger.event("ssd_bmc_rename_skipped", ["reason": "bookmark unavailable"])
-                return (oldBookmark, true)
-            }
-            defer { source.stopAccessingSecurityScopedResource() }
-            guard let folderBookmark = UserDefaults.standard.data(forKey: "ssdNamingFolderBookmark") else {
-                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
-                    "error": "SSD folder authorization missing"])
-                return (oldBookmark, true)
-            }
-            var folderStale = false
-            let folder = try URL(resolvingBookmarkData: folderBookmark, options: [], relativeTo: nil,
-                                 bookmarkDataIsStale: &folderStale)
-            guard !folderStale, folder.startAccessingSecurityScopedResource() else {
-                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
-                    "error": "Authorized SSD folder unavailable"])
-                return (oldBookmark, true)
-            }
-            defer { folder.stopAccessingSecurityScopedResource() }
-            guard source.standardizedFileURL.path.hasPrefix(folder.standardizedFileURL.path + "/") else {
-                logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
-                    "error": "Authorized folder does not contain this movie"])
-                return (oldBookmark, true)
-            }
-            let manager = FileManager.default
-            var clip = max(1, UserDefaults.standard.integer(forKey: "slate.nextClip"))
-            var target = source.deletingLastPathComponent().appendingPathComponent(slate.filename(date: date, clip: clip))
-            while manager.fileExists(atPath: target.path) {
-                clip += 1
-                target = source.deletingLastPathComponent().appendingPathComponent(slate.filename(date: date, clip: clip))
-            }
-            try coordinatedSSDMove(from: source, to: target)
-            do {
-                let newBookmark = try target.bookmarkData(options: .minimalBookmark,
-                    includingResourceValuesForKeys: nil, relativeTo: nil)
-                guard manager.fileExists(atPath: target.path),
-                      job.intrinsicsUnavailableReason != nil || MOVTelemetryMuxer.hasTelemetry(target) else {
-                    throw RecorderError.unavailable("renamed MOV validation failed")
-                }
-                var newBookmarkStale = false
-                let reopened = try URL(resolvingBookmarkData: newBookmark, options: [], relativeTo: nil,
-                                       bookmarkDataIsStale: &newBookmarkStale)
-                guard !newBookmarkStale, reopened.startAccessingSecurityScopedResource() else {
-                    throw RecorderError.unavailable("renamed MOV bookmark unavailable")
-                }
-                reopened.stopAccessingSecurityScopedResource()
-                UserDefaults.standard.set(clip + 1, forKey: "slate.nextClip")
-                if currentFile == source { currentFile = target }
-                logger.event("ssd_bmc_renamed", ["from": source.lastPathComponent,
-                    "to": target.lastPathComponent])
-                return (newBookmark, false)
-            } catch {
-                do { try coordinatedSSDMove(from: target, to: source) }
-                catch {
-                    logger.event("ssd_bmc_rename_rollback_failed", ["movie": target.lastPathComponent,
-                        "error": String(describing: error)])
-                    if currentFile == source { currentFile = target }
-                    return ((try? target.bookmarkData(options: .minimalBookmark,
-                        includingResourceValuesForKeys: nil, relativeTo: nil)) ?? oldBookmark, true)
-                }
-                throw error
-            }
-        } catch {
-            logger.event("ssd_bmc_rename_failed", ["movie": job.movieName,
-                "error": String(describing: error)])
-            return (oldBookmark, true)
-        }
-    }
     private func resumePendingIMU() {
         guard captureConfigured, !recoveryInProgress, !captureFinishing, !recordingStarting, !output.isRecording, canFinalizeNow else { return }
         let directory = logger.sessionURL.deletingLastPathComponent()
@@ -3985,12 +3885,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 writeRAWSSDSmokeResult(job, directory: directory)
                 #endif
-                let rename = renameCompletedExternalMovie(job)
-                if let bookmark = rename.bookmark {
+                if let bookmark = job.externalMovieBookmark {
                     var bookmarks = UserDefaults.standard.array(forKey: "externalMediaBookmarks") as? [Data] ?? []
-                    if let old = job.externalMovieBookmark, old != bookmark {
-                        bookmarks.removeAll { $0 == old }
-                    }
                     if !bookmarks.contains(bookmark) { bookmarks.append(bookmark) }
                     UserDefaults.standard.set(bookmarks, forKey: "externalMediaBookmarks")
                 }
@@ -4005,9 +3901,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 #endif
                 publish {
                     self.finalizing = false
-                    self.status = rename.failed ? "已保存 · SSD 改名失败，原始 IMG 文件已保留" :
-                        (job.recordingWarning.map { "已保存 · " + $0 } ?? (
-                            job.intrinsicsUnavailableReason != nil ? "视频已保存 · 当前帧率无 K，IMU 未嵌入" : "Saved · IMU embedded"))
+                    self.status = job.recordingWarning.map { "已保存 · " + $0 } ?? (
+                        job.intrinsicsUnavailableReason != nil ? "视频已保存 · 当前帧率无 K，IMU 未嵌入" : "Saved · IMU embedded")
                     if let warning = job.recordingWarning, warning.contains("丢帧"), self.errorText == nil {
                         self.errorText = "视频与 IMU 已保存，但" + warning
                     }
