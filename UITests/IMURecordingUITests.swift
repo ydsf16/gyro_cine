@@ -545,8 +545,7 @@ final class IMURecordingUITests: XCTestCase {
             app.launch()
             XCTAssertTrue(app.navigationBars["GyroCine Pro"].waitForExistence(timeout: 15))
             XCTAssertTrue(app.buttons["restorePro"].exists)
-            XCTAssertTrue(app.buttons["redeemPro"].exists)
-            XCTAssertEqual(app.buttons["redeemPro"].label, language == "en" ? "Redeem Offer Code" : "兑换优惠码")
+            XCTAssertFalse(app.buttons["redeemPro"].exists)
             XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@",
                 language == "en" ? "2 minutes" : "2 分钟")).firstMatch.exists)
             controlScreenshot(app, "pro-\(language)")

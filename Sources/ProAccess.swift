@@ -179,29 +179,6 @@ final class ProStore: ObservableObject {
         } catch { message = error.localizedDescription }
     }
 
-    func completeRedemption(_ result: Result<Void, Error>) async {
-        // Closing a redemption sheet is not proof of purchase.
-        if case .failure(let error) = result {
-            if (error as? SKError)?.code != .paymentCancelled { message = error.localizedDescription }
-        }
-        await refreshEntitlements()
-    }
-
-    func acceptRedemption(_ result: Result<VerificationResult<StoreKit.Transaction>, Error>) async {
-        switch result {
-        case .success(.verified(let transaction)):
-            guard transaction.productID == Self.productID,
-                  transaction.productType == .nonConsumable,
-                  transaction.revocationDate == nil, !transaction.isUpgraded else { return }
-            purchased = true
-            publishAccess()
-            await transaction.finish()
-        case .success(.unverified):
-            message = AppText.value("无法验证兑换结果，请稍后恢复购买。", "Unable to verify redemption. Please try Restore Purchases later.", locale: .current)
-        case .failure(let error): await completeRedemption(.failure(error))
-        }
-    }
-
     func restore() async {
         guard !busy else { return }
         busy = true; message = nil
@@ -266,7 +243,6 @@ struct ProAccessView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @ObservedObject private var store = ProStore.shared
-    @State private var showingRedemption = false
     var limitReached = false
     private func t(_ zh: String, _ en: String) -> String { AppText.value(zh, en, locale: locale) }
 
@@ -310,16 +286,6 @@ struct ProAccessView: View {
                         }
                     }
                     if !store.purchased {
-                        Button {
-                            store.message = nil
-                            showingRedemption = true
-                        } label: {
-                            Label(t("兑换优惠码", "Redeem Offer Code"), systemImage: "gift")
-                        }.accessibilityIdentifier("redeemPro")
-                        Text(t("使用 GyroCine Pro 优惠码兑换永久使用权。", "Redeem a GyroCine Pro offer code for lifetime access."))
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    if !store.purchased {
                         Button(t("恢复购买", "Restore Purchases")) { Task { await store.restore() } }
                             .accessibilityIdentifier("restorePro")
                     }
@@ -336,26 +302,7 @@ struct ProAccessView: View {
             }
             .navigationTitle("GyroCine Pro").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(t("完成", "Done")) { dismiss() } } }
-            .modifier(ProRedemptionSheet(isPresented: $showingRedemption, store: store))
             .task { await store.prepare() }
-        }
-    }
-}
-#endif
-
-#if !TESTFLIGHT_FREE
-private struct ProRedemptionSheet: ViewModifier {
-    @Binding var isPresented: Bool
-    let store: ProStore
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 27.0, *) {
-            content.offerCodeRedemption(options: [], isPresented: $isPresented) { result in
-                Task { await store.acceptRedemption(result) }
-            }
-        } else {
-            content.offerCodeRedemption(isPresented: $isPresented) { result in
-                Task { await store.completeRedemption(result) }
-            }
         }
     }
 }
