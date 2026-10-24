@@ -934,8 +934,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard camera.isWhiteBalanceModeSupported(.locked) else {
                 throw RecorderError.unavailable("RAW 录制需要锁定白平衡，当前镜头不支持")
             }
-            camera.whiteBalanceMode = .locked
+            camera.setWhiteBalanceModeLocked(with: AVCaptureDevice.currentWhiteBalanceGains,
+                                             completionHandler: nil)
         }
+        autoLockWhiteBalanceActive = chosenWhiteBalance != .manual
         logger.event("raw_white_balance_locked", ["mode": camera.whiteBalanceMode.rawValue,
                                                    "restoreAuto": restoreAutoWhiteBalanceAfterRecording])
         publish { self.whiteBalanceAuto = false }
@@ -953,29 +955,26 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     private func prepareRAWRecordingPipeline() throws {
         guard chosenCodec?.rawValue == "aprn" || chosenCodec?.rawValue == "aprh",
-              let camera = device else { return }
-        try camera.lockForConfiguration()
-        restoreAutoWhiteBalanceAfterRecording = camera.whiteBalanceMode == .continuousAutoWhiteBalance
-        if camera.whiteBalanceMode != .locked {
-            guard camera.isWhiteBalanceModeSupported(.locked) else {
-                camera.unlockForConfiguration()
-                throw RecorderError.unavailable("RAW 录制需要锁定白平衡，当前镜头不支持")
-            }
-            camera.whiteBalanceMode = .locked
-        }
-        camera.unlockForConfiguration()
-        publish { self.whiteBalanceAuto = false }
+              device != nil else { return }
         logger.event("raw_pipeline_prepare_begin", ["format": chosenIndex ?? -1, "fps": chosenFPS])
-        logProVideoStorage("raw_before_stop")
-        session.stopRunning()
-        logProVideoStorage("raw_stopped")
-        session.startRunning()
-        logProVideoStorage("raw_started")
-        guard session.isRunning else { throw RecorderError.unavailable("RAW 相机会话重启失败") }
+        #if DEBUG
+        let forceRestart = ProcessInfo.processInfo.arguments.contains("--raw-force-session-restart")
+        #else
+        let forceRestart = false
+        #endif
+        if forceRestart {
+            logProVideoStorage("raw_before_stop")
+            session.stopRunning()
+            logProVideoStorage("raw_stopped")
+            session.startRunning()
+            logProVideoStorage("raw_started")
+        }
+        guard session.isRunning else { throw RecorderError.unavailable("RAW 相机会话未运行") }
         enableIntrinsicDelivery()
         rawPreparedSignature = currentRAWSignature
         rawPipelineReadyAt = ProcessInfo.processInfo.systemUptime + 0.5
-        logger.event("raw_pipeline_prepare_complete", ["format": chosenIndex ?? -1, "fps": chosenFPS])
+        logger.event("raw_pipeline_prepare_complete", ["format": chosenIndex ?? -1, "fps": chosenFPS,
+                                                         "restarted": forceRestart])
     }
     private var currentRAWSignature: String? {
         guard let codec = chosenCodec, ["aprn", "aprh"].contains(codec.rawValue),
@@ -1007,11 +1006,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         if chosenCodec?.rawValue == "aprn" || chosenCodec?.rawValue == "aprh" {
             restoreAutoWhiteBalanceAfterRecording = false
             autoLockWhiteBalanceActive = false
+            if chosenWhiteBalance != .manual { rawPreparedSignature = nil }
+            if #available(iOS 27.0, *), let preview = rawWriterPreview as? RAWWriterPreview {
+                preview.resetAfterRecording()
+            }
             if let camera = device {
                 do {
                     try camera.lockForConfiguration()
                     applyWhiteBalancePreferenceLocked(camera)
                     camera.unlockForConfiguration()
+                    logger.event("raw_white_balance_restored", ["mode": camera.whiteBalanceMode.rawValue,
+                                                                "choice": chosenWhiteBalance.rawValue])
                 } catch { logger.event("white_balance_restore_failed", ["error": error.localizedDescription]) }
             }
             return
@@ -1124,8 +1129,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                                                    "activeColorSpace": device.map { String(describing: $0.activeColorSpace) } ?? "none"])
         queue.asyncAfter(deadline: .now() + 4) { self.toggleRecording() }
         if matrix { return } // Stop relative to didStart, not the configuration request.
-        let stopDelay: Double = longHQ ? 244 :
-            (ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") ? 45 : 11)
+        let requestedDuration = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--raw-smoke-duration=") }
+            .flatMap { Double($0.dropFirst("--raw-smoke-duration=".count)) }
+        let stopDelay: Double = requestedDuration ?? (longHQ ? 244 :
+            (ProcessInfo.processInfo.arguments.contains("--raw-hotplug-smoke") ? 45 : 11))
         queue.asyncAfter(deadline: .now() + stopDelay) {
             if self.output.isRecording || self.realtimeLUTWriter != nil { self.toggleRecording() }
             else { self.logger.event("raw_smoke_failed", ["reason": "MovieFileOutput never entered recording state"]) }
@@ -2285,7 +2292,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     // admit a sensor frame before exposure has settled.
     private func configureProResWriterInputs(colorSpace: RecordingColorSpace) throws {
         if let settings = proResWriterVideoSettings {
-            intrinsicOutput.videoSettings = settings
+            // The saved 422 pixel format may be invalid for a RAW sensor format.
+            // RAW metadata/K capture lets AVFoundation choose its native format.
+            intrinsicOutput.videoSettings = chosenEncoding.isRAW ? [:] : settings
             proResWriterVideoSettings = nil
         }
         if session.outputs.contains(proResWriterAudioOutput) {
@@ -2366,6 +2375,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             camera.activeVideoMinFrameDuration = duration
             camera.activeVideoMaxFrameDuration = duration
             camera.unlockForConfiguration()
+            // AVFoundation may inspect RAW writer capabilities while outputs are
+            // reconfigured. Keep WB locked for that query, then restore the
+            // selected preview mode in resetCameraControls below.
+            if chosenEncoding.isRAW {
+                try camera.lockForConfiguration()
+                guard camera.isWhiteBalanceModeSupported(.locked) else {
+                    camera.unlockForConfiguration()
+                    throw RecorderError.unavailable("RAW 录制需要锁定白平衡，当前镜头不支持")
+                }
+                camera.setWhiteBalanceModeLocked(with: AVCaptureDevice.currentWhiteBalanceGains,
+                                                 completionHandler: nil)
+                camera.unlockForConfiguration()
+            }
             guard (usesProResDataWriter || output.availableVideoCodecTypes.contains(codec)), let connection = output.connection(with: .video) else {
                 throw CameraError.unavailableCodec(codec.rawValue, index)
             }
@@ -2412,8 +2434,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                       session.canAddOutput(proResWriterAudioOutput) {
                 session.addOutput(proResWriterAudioOutput)
             }
-            intrinsicOutput.videoSettings = previousIntrinsicSettings ?? [:]
-            proResWriterVideoSettings = previousProResWriterVideoSettings
             session.automaticallyConfiguresCaptureDeviceForWideColor = previousAutomaticWideColor
             do {
                 try camera.lockForConfiguration()
@@ -2423,8 +2443,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 camera.activeVideoMinFrameDuration = previousMin
                 camera.activeVideoMaxFrameDuration = previousMax
+                applyWhiteBalancePreferenceLocked(camera)
                 camera.unlockForConfiguration()
             } catch { logger.event("configuration_rollback_error", ["error": String(describing: error)]) }
+            intrinsicOutput.videoSettings = previousIntrinsicSettings ?? [:]
+            proResWriterVideoSettings = previousProResWriterVideoSettings
             logger.event("configuration_result", ["kind": reason, "success": false, "error": String(describing: error), "after": configurationSnapshot()])
             fail("Format configuration: \(error)")
             return false
@@ -2894,7 +2917,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private func applyWhiteBalancePreferenceLocked(_ camera: AVCaptureDevice) {
         let raw = chosenCodec?.rawValue == "aprn" || chosenCodec?.rawValue == "aprh"
-        if raw || chosenWhiteBalance == .manual || autoLockWhiteBalanceActive {
+        let choice = raw && chosenWhiteBalance == .auto ? WhiteBalanceChoice.autoLock : chosenWhiteBalance
+        if choice == .manual || autoLockWhiteBalanceActive {
             guard camera.isWhiteBalanceModeSupported(.locked) else { return }
             if let kelvin = manualWhiteBalanceKelvin, chosenWhiteBalance == .manual {
                 let gains = camera.deviceWhiteBalanceGains(for: .init(temperature: kelvin, tint: 0))
@@ -2906,14 +2930,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             camera.whiteBalanceMode = .continuousAutoWhiteBalance
         }
         let automatic = camera.whiteBalanceMode == .continuousAutoWhiteBalance
-        let choice = raw ? WhiteBalanceChoice.manual : chosenWhiteBalance
         publish { self.whiteBalanceAuto = automatic; self.whiteBalanceChoice = choice }
     }
     func setWhiteBalanceAuto(_ enabled: Bool) { setWhiteBalanceChoice(enabled ? .auto : .manual) }
     func setWhiteBalanceChoice(_ choice: WhiteBalanceChoice) {
         queue.async {
             guard let camera = self.device else { return }
-            if choice != .manual &&
+            if choice == .auto &&
                 (self.chosenCodec?.rawValue == "aprn" || self.chosenCodec?.rawValue == "aprh") {
                 self.fail("RAW 拍摄需要保持白平衡锁定"); return
             }
@@ -2922,11 +2945,16 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 defer { camera.unlockForConfiguration() }
                 self.chosenWhiteBalance = choice
                 self.restoreAutoWhiteBalanceAfterRecording = false
-                self.autoLockWhiteBalanceActive = choice == .autoLock && (self.output.isRecording || self.realtimeLUTWriter != nil)
+                self.autoLockWhiteBalanceActive = choice == .autoLock &&
+                    (self.output.isRecording || self.realtimeLUTWriter != nil || self.isRAWWriterActive)
                 if choice == .manual && self.manualWhiteBalanceKelvin == nil {
                     self.manualWhiteBalanceKelvin = min(max(self.whiteBalanceKelvin, 2500), 10000)
                 }
                 self.applyWhiteBalancePreferenceLocked(camera)
+                if #available(iOS 27.0, *), let preview = self.rawWriterPreview as? RAWWriterPreview,
+                   self.chosenEncoding.isRAW {
+                    preview.setLockOnRecord(choice == .autoLock)
+                }
                 self.savedControls.whiteBalance = choice.rawValue; self.savedControls.kelvin = self.manualWhiteBalanceKelvin
                 self.savedControls.save()
                 self.logger.event("white_balance_choice", ["choice": choice.rawValue, "state": self.configurationSnapshot()])
@@ -2977,6 +3005,10 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.chosenWhiteBalance = .manual
                 self.manualWhiteBalanceKelvin = temperature
                 self.autoLockWhiteBalanceActive = false
+                if #available(iOS 27.0, *), let preview = self.rawWriterPreview as? RAWWriterPreview,
+                   self.chosenEncoding.isRAW {
+                    preview.setLockOnRecord(false)
+                }
                 self.publish { self.whiteBalanceChoice = .manual }
                 self.savedControls.whiteBalance = WhiteBalanceChoice.manual.rawValue; self.savedControls.kelvin = temperature
                 self.savedControls.save()
@@ -3078,7 +3110,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private func prepareRAWWriterPreview() {
         guard usesRAWWriterExperiment, rawWriterPreview == nil, rawWriterExperiment == nil,
               let camera = device else { return }
-        let preview = RAWWriterPreview(camera: camera, queue: queue,
+        let lockOnRecord = chosenWhiteBalance != .manual
+        let preview = RAWWriterPreview(camera: camera, queue: queue, lockOnRecord: lockOnRecord,
             log: { [weak self] name, details in self?.logger.event(name, details) },
             completion: { [weak self] error in
                 guard let self else { return }
@@ -3121,6 +3154,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish { self.telemetryEmbeddable = supportsK; self.status = "正在准备 RAW 预览" }
         session.commitConfiguration()
         session.startRunning()
+        if lockOnRecord, session.isRunning {
+            publish { self.status = "Camera ready"; self.cameraReady = true }
+        }
     }
 
     #if DEBUG
@@ -3212,10 +3248,17 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                   !ProVideoStorageBridge.isBusy() else { failStorage("请先配置可用的专用视频存储"); return }
         }
         guard audioReady else { fail("录制需要麦克风权限"); return }
-        guard let preview = rawWriterPreview as? RAWWriterPreview, preview.ready else {
+        guard let preview = rawWriterPreview as? RAWWriterPreview else {
             rawWriterStartRequested = true; recordingStarting = true
             publish { self.status = "等待 RAW 预览就绪" }
             prepareRAWWriterPreview()
+            (rawWriterPreview as? RAWWriterPreview)?.requestRecordingLock()
+            return
+        }
+        guard preview.ready else {
+            rawWriterStartRequested = true; recordingStarting = true
+            publish { self.status = "等待 RAW 白平衡锁定" }
+            preview.requestRecordingLock()
             return
         }
         guard storagePreflight() else { return }
@@ -3361,13 +3404,19 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             guard self.session.isRunning else { self.fail("Camera session is not running"); return }
             guard self.audioReady else { self.fail("需要麦克风权限才能录制声音。请在系统设置中允许麦克风访问。"); return }
             guard let codec = self.chosenCodec, let index = self.chosenIndex,
-                  self.formatObjects[index].compatibleCodecs.contains(codec.rawValue),
-                  (self.usesProResDataWriter || self.output.availableVideoCodecTypes.contains(codec)) else {
+                  self.formatObjects[index].compatibleCodecs.contains(codec.rawValue) else {
                 self.fail("当前视频配置暂不可用，请在设置中重新选择编码、分辨率和帧率。"); return
             }
             if codec.rawValue != "aprn" && codec.rawValue != "aprh" {
                 do { try self.prepareRAWWhiteBalance() }
                 catch { self.fail("无法锁定白平衡，请重试。"); return }
+            } else if self.chosenWhiteBalance != .manual && !self.autoLockWhiteBalanceActive {
+                do { try self.prepareRAWWhiteBalance(); self.rawPreparedSignature = nil }
+                catch { self.restoreRAWWhiteBalance(); self.fail("无法锁定白平衡，请重试。"); return }
+            }
+            guard self.usesProResDataWriter || self.output.availableVideoCodecTypes.contains(codec) else {
+                self.restoreRAWWhiteBalance()
+                self.fail("当前视频配置暂不可用，请在设置中重新选择编码、分辨率和帧率。"); return
             }
             if self.currentRAWSignature != nil {
                 if self.rawPreparedSignature != self.currentRAWSignature {

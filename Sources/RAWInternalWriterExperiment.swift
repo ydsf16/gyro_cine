@@ -468,8 +468,8 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
     }
 }
 
-/// Native RAW outputs stay attached between recordings. White balance locks once
-/// after entering RAW preview, with actual frame/effective-time evidence.
+/// Native RAW outputs stay attached between recordings. Auto-L keeps preview
+/// white balance automatic and requests a verified lock when REC is pressed.
 @available(iOS 27.0, *)
 final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let dataOutput = AVCaptureVideoDataOutput()
@@ -479,6 +479,9 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private let log: (String, [String: Any]) -> Void
     private let completion: (Error?) -> Void
     private var requested = false
+    private var lockOnRecord: Bool
+    private var lockRequested: Bool
+    private var lockGeneration = 0
     private var lockAttempt = 0
     private var requestFrame = 0
     private var targetGains: AVCaptureDevice.WhiteBalanceGains?
@@ -488,9 +491,11 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
     private(set) var ready = false
     private var videoCount = 0
     private var audioCount = 0
-    init(camera: AVCaptureDevice, queue: DispatchQueue, log: @escaping (String, [String: Any]) -> Void,
+    init(camera: AVCaptureDevice, queue: DispatchQueue, lockOnRecord: Bool,
+         log: @escaping (String, [String: Any]) -> Void,
          completion: @escaping (Error?) -> Void) {
-        self.camera = camera; self.queue = queue; self.log = log; self.completion = completion
+        self.camera = camera; self.queue = queue; self.lockOnRecord = lockOnRecord
+        self.lockRequested = !lockOnRecord; self.log = log; self.completion = completion
         super.init()
         dataOutput.automaticallyConfiguresOutputBufferDimensions = false
         dataOutput.deliversPreviewSizedOutputBuffers = false
@@ -509,12 +514,47 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
             if c.isVideoStabilizationSupported { c.preferredVideoStabilizationMode = .off }
             if c.isCameraIntrinsicMatrixDeliverySupported { c.isCameraIntrinsicMatrixDeliveryEnabled = true }
         }
+        if lockRequested { scheduleLockTimeout() }
+    }
+    func requestRecordingLock() {
+        guard valid, lockOnRecord, !lockRequested else { return }
+        lockRequested = true
+        requested = false
+        lockAttempt = 0
+        stableLockedFrames = 0
+        scheduleLockTimeout()
+        log("raw_preview_record_lock_armed", ["video": videoCount])
+    }
+    func setLockOnRecord(_ value: Bool) {
+        guard lockOnRecord != value else { return }
+        lockOnRecord = value
+        resetLockState()
+        lockRequested = !value
+        if lockRequested { scheduleLockTimeout() }
+    }
+    func resetAfterRecording() {
+        guard lockOnRecord else { return }
+        resetLockState()
+        lockRequested = false
+    }
+    private func resetLockState() {
+        lockGeneration += 1
+        requested = false
+        ready = false
+        lockAttempt = 0
+        targetGains = nil
+        stableLockedFrames = 0
+        lastObservedPTS = .invalid
+    }
+    private func scheduleLockTimeout() {
+        let generation = lockGeneration
         queue.asyncAfter(deadline: .now() + 15) { [weak self] in
-            guard let self, self.valid, !self.ready else { return }
+            guard let self, self.valid, self.lockRequested,
+                  self.lockGeneration == generation, !self.ready else { return }
             self.valid = false
             self.log("raw_preview_timeout", ["video": self.videoCount, "audio": self.audioCount])
             self.completion(NSError(domain: "GyroCine.RAWPreview", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "RAW 预览白平衡尚未就绪"]))
+                userInfo: [NSLocalizedDescriptionKey: "RAW 白平衡锁定尚未就绪"]))
         }
     }
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -522,6 +562,7 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         if output === audioOutput { audioCount += 1; return }
         videoCount += 1
         guard !ready else { return }
+        guard lockRequested else { return }
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         if lockAttempt >= 3, videoCount - requestFrame >= 12, let target = targetGains {
             let actual = camera.deviceWhiteBalanceGains
@@ -547,6 +588,7 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         lockAttempt += 1
         requestFrame = videoCount
         let attempt = lockAttempt
+        let generation = lockGeneration
         do {
             try camera.lockForConfiguration()
             let gains = camera.deviceWhiteBalanceGains
@@ -560,7 +602,8 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
                         "latestAttempt": self.lockAttempt, "valid": self.valid, "effectivePTS": time.seconds])
                     // AVFoundation delivers lock callbacks FIFO. An earlier request's
                     // real completion still proves this unchanged preview is locked.
-                    guard self.valid, !self.ready else { return }
+                    guard self.valid, self.lockRequested, self.lockGeneration == generation,
+                          !self.ready else { return }
                     #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--wb-drop-all-completions") ||
                         (attempt == 1 && ProcessInfo.processInfo.arguments.contains("--wb-drop-first-completion")) {
@@ -575,7 +618,7 @@ final class RAWWriterPreview: NSObject, AVCaptureVideoDataOutputSampleBufferDele
         } catch { valid = false; completion(error) }
     }
     private func markReady(_ time: CMTime, source: String, attempt: Int) {
-        guard valid, !ready else { return }
+        guard valid, lockRequested, !ready else { return }
         ready = true
         log("raw_preview_ready", ["pts": time.seconds, "source": source, "video": videoCount,
             "audio": audioCount, "wbMode": camera.whiteBalanceMode.rawValue, "attempt": attempt])

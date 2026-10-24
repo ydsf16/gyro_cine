@@ -856,16 +856,10 @@ struct CameraView: View {
     }
 
     private func modePicker(_ parameter: Parameter) -> some View {
-        if parameter == .wb && (camera.selectedCodec?.rawValue == "aprn" || camera.selectedCodec?.rawValue == "aprh") {
-            return AnyView(Label(t("锁定", "Locked"), systemImage: "lock.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 12).frame(height: 31)
-                .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
-                .accessibilityIdentifier("wb.rawLocked"))
-        }
-        if parameter == .wb && camera.selectedCodec?.rawValue != "aprn" && camera.selectedCodec?.rawValue != "aprh" {
+        if parameter == .wb {
+            let raw = camera.selectedEncoding.isRAW
             return AnyView(HStack(spacing: 0) {
-                ForEach(WhiteBalanceChoice.allCases, id: \.self) { choice in
+                ForEach(WhiteBalanceChoice.allCases.filter { !raw || $0 != .auto }, id: \.self) { choice in
                     Button(choice == .autoLock ? "AL" : choice == .auto ? "A" : "M") {
                         camera.setWhiteBalanceChoice(choice)
                         dismissPanelAfterAdjustment()

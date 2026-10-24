@@ -1292,24 +1292,19 @@ final class IMURecordingUITests: XCTestCase {
         controlScreenshot(app, "startup-defaults")
     }
 
-    func testRAWWhiteBalanceAlwaysLocked() {
+    func testRAWWhiteBalanceAutoLockChoice() {
         let app = controlApp()
         for codec in ["ProRes RAW", "ProRes RAW HQ"] {
             selectControlCodec(codec, app: app)
             Thread.sleep(forTimeInterval: 2)
             app.buttons["parameter.WB"].tap()
-            XCTAssertTrue(app.otherElements["wb.rawLocked"].exists || app.staticTexts["wb.rawLocked"].exists)
+            XCTAssertTrue(app.buttons["wb.mode.Auto-L"].exists)
+            XCTAssertTrue(app.buttons["wb.mode.Manual"].exists)
             XCTAssertFalse(app.buttons["wb.mode.Auto"].exists)
-            XCTAssertFalse(app.buttons["A"].exists)
-            controlScreenshot(app, "raw-wb-locked-\(codec)")
-            app.buttons["parameter.Lens"].tap(); app.buttons["lens.0.5×"].tap()
-            Thread.sleep(forTimeInterval: 3)
-            app.buttons["parameter.Lens"].tap(); app.buttons["lens.1×"].tap()
-            Thread.sleep(forTimeInterval: 3)
+            app.buttons["wb.mode.Auto-L"].tap()
+            XCTAssertTrue(app.buttons["parameter.WB"].label.contains("A"))
+            controlScreenshot(app, "raw-wb-autol-\(codec)")
             XCTAssertFalse(app.alerts.firstMatch.exists)
-            app.buttons["parameter.WB"].tap()
-            XCTAssertFalse(app.buttons["A"].exists)
-            app.buttons["parameter.WB"].tap()
         }
         selectControlCodec("H.265", app: app)
         app.buttons["parameter.WB"].tap()

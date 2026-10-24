@@ -14,7 +14,7 @@ extension AppText {
         let chinese = (language ?? Bundle.main.preferredLocalizations.first ?? Locale.preferredLanguages.first ?? "en").lowercased().hasPrefix("zh")
         let rules: [([String], String, String)] = [
             (["视频与 IMU 已保存，但"], "视频和 IMU 已保存，但录制存在丢帧，请检查画面。", "Video and IMU were saved, but frames were dropped. Please check the clip."),
-            (["RAW 拍摄需要保持白平衡锁定"], "RAW 拍摄需要锁定白平衡，请选择手动模式或色温预设。", "RAW recording requires locked white balance. Choose Manual or a white balance preset."),
+            (["RAW 拍摄需要保持白平衡锁定"], "RAW 拍摄请选择 AL、手动模式或色温预设。", "For RAW, choose Auto-L, Manual, or a white balance preset."),
             (["ProRes RAW 需要专用视频存储", "ProRes RAW 请在设置中选择"], "ProRes RAW 需要专用视频存储或外部 SSD，请在设置中选择。", "ProRes RAW requires Pro Video Storage or an external SSD. Choose a storage location in Settings."),
             (["不支持专用视频存储", "does not support Pro Video Storage"], "此设备或系统不支持专用视频存储，请使用外部 SSD。", "Pro Video Storage is not supported on this device or OS. Use an external SSD."),
             (["专用视频存储未分配", "请先配置可用的专用视频存储"], "请先在系统设置中分配专用视频存储空间，或选择外部 SSD。", "Allocate Pro Video Storage in system Settings, or choose an external SSD."),
