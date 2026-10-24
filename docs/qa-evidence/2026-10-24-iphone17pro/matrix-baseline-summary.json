@@ -1,0 +1,23 @@
+{
+  "planned": 748,
+  "completed": 748,
+  "pass": 740,
+  "fail": 8,
+  "byEncoding": {
+    "hevc": 94,
+    "hevcHQ": 94,
+    "proRes422HQ": 140,
+    "proRes422": 140,
+    "proRes422LT": 140,
+    "proRes422Proxy": 140
+  },
+  "errors": {
+    "missing video frames": 8
+  },
+  "missingStandardTags": {
+    "com.apple.quicktime.make": 748,
+    "com.apple.quicktime.model": 748,
+    "com.apple.quicktime.software": 748,
+    "com.apple.quicktime.creationdate": 748
+  }
+}

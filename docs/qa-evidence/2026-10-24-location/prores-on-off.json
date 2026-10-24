@@ -1,0 +1,28 @@
+[
+  {
+    "file": "UITEST_IMG_2026-10-24-10-22-30.mov",
+    "locationEnabled": true,
+    "hasLocation": true,
+    "locationSyntaxValid": true,
+    "codec": "prores",
+    "duration": "4.167117",
+    "trackTypes": [
+      "apco",
+      "mp4a",
+      "rtmd"
+    ]
+  },
+  {
+    "file": "UITEST_IMG_2026-10-24-10-22-43.mov",
+    "locationEnabled": false,
+    "hasLocation": false,
+    "locationSyntaxValid": false,
+    "codec": "prores",
+    "duration": "4.208767",
+    "trackTypes": [
+      "apco",
+      "mp4a",
+      "rtmd"
+    ]
+  }
+]

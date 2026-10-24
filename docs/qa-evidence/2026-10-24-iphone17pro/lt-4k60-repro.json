@@ -1,0 +1,114 @@
+[
+  {
+    "data": {
+      "codec": "ProRes 422 LT",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 60,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.007015,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5800915331807779,
+          "y": 0.32032375625052967
+        },
+        "iso": 158.14471435546875,
+        "lensPosition": 0.5254901647567749,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 60,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 60,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.111572265625,
+          1,
+          2.05322265625
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 51499.76082554167,
+    "sessionID": "006455BF-C443-41FA-BA48-CEAB61E21B2D",
+    "wallTime": "2026-10-24T00:38:54Z"
+  },
+  {
+    "data": {
+      "path": "/var/mobile/Containers/Data/Application/363F25F8-E6BE-438B-993C-B198E62E9652/Documents/Media/UITEST_IMG_2026-10-24-08-38-54.mov",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 60,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.007015,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5800915331807779,
+          "y": 0.32032375625052967
+        },
+        "iso": 158.14471435546875,
+        "lensPosition": 0.5254901647567749,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 60,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 60,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.111572265625,
+          1,
+          2.05322265625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_before_start",
+    "monotonicSeconds": 51499.76779533333,
+    "sessionID": "006455BF-C443-41FA-BA48-CEAB61E21B2D",
+    "wallTime": "2026-10-24T00:38:54Z"
+  },
+  {
+    "data": {
+      "message": "Start recording: NSInvalidArgumentException: *** -[AVCaptureMovieFileOutput startRecordingToOutputFileURL:recordingDelegate:] Capturing 4k60 with ProRes codec on this device is supported only on external storage device."
+    },
+    "eventType": "error",
+    "monotonicSeconds": 51499.85449291667,
+    "sessionID": "006455BF-C443-41FA-BA48-CEAB61E21B2D",
+    "wallTime": "2026-10-24T00:38:55Z"
+  }
+]

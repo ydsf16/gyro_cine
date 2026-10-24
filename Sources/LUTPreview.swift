@@ -399,7 +399,10 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
     func offer(_ sample: CMSampleBuffer, audio: Bool = false) {
         admission.lock()
         guard accepting else { admission.unlock(); return }
-        if !audio && !encoderReady && videoCount > 0 { admission.unlock(); return }
+        // Audio initializes the writer. A video admitted before readiness can sit
+        // behind startWriting while later warmup frames are rejected, leaving
+        // a gap after the first recorded frame. Admit only post-ready samples.
+        if !audio && !encoderReady { admission.unlock(); return }
         guard audio ? audioCount < 32 : videoCount < 10 else {
             accepting = false; admission.unlock()
             queue.async { self.fail("LUT 实时处理或存储写入跟不上，缓冲已满，已停止录制并保留文件") }
@@ -441,8 +444,13 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
                 guard writer.canAdd(i) else { throw RecorderError.unavailable("LUT audio input unavailable") }
                 writer.add(i); audioInput = i
                 guard writer.startWriting() else { throw writer.error ?? RecorderError.unavailable("LUT encoder failed to start") }
-                // Discard only pre-session warmup frames. The next fresh capture
-                // establishes time zero, so encoder setup cannot create a start gap.
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--writer-startup-delay-probe") {
+                    Thread.sleep(forTimeInterval: 0.1) // Exercise admission during startup, before the recorded interval.
+                }
+                #endif
+                // The next post-ready capture establishes time zero. No real
+                // recorded timestamps are compressed or filled with synthetic frames.
                 let warmup = videoPending.count; videoPending.removeAll()
                 admission.lock(); videoCount -= warmup; encoderReady = true; admission.unlock()
             }

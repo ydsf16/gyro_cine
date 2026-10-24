@@ -1,0 +1,19 @@
+{
+  "audioTracks" : 1,
+  "averageFPS" : 30,
+  "bytes" : 116100351,
+  "codec" : "apcs",
+  "decodedFrames" : 243,
+  "decodeError" : "",
+  "decodeStatus" : "completed",
+  "duration" : 8.0999999999999996,
+  "estimatedMissingFrames" : 0,
+  "expectedFPS" : 30,
+  "frames" : 243,
+  "hasTelemetry" : true,
+  "height" : 2160,
+  "maximumFrameGapMS" : 33.333333333334103,
+  "movie" : "UITEST_IMG_2026-10-24-08-43-22.mov",
+  "path" : "\/var\/mobile\/Containers\/Data\/Application\/1DBF35E4-3849-4CC6-A01A-EEA733788F93\/Documents\/Media\/UITEST_IMG_2026-10-24-08-43-22.mov",
+  "width" : 3840
+}

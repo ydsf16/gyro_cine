@@ -1,0 +1,87 @@
+{
+  "accel_max_sample_gap_ms": 11.256999998295214,
+  "capture_first_frame_host_seconds": 50396.66823825,
+  "capture_minus_presentation_seconds": [],
+  "exposure_source": "AVCaptureDevice state sampled at camera callback; not frame-embedded exposure metadata",
+  "exposure_timing_measured": false,
+  "exposure_timing_model": "estimatedReadoutEnd",
+  "frame_readout_seconds": 0,
+  "frame_readout_source": "unknown; modeled as zero, not measured and not inferred from FPS",
+  "gyro_max_sample_gap_ms": 10.006416669057216,
+  "intrinsic_frame_count": 241,
+  "intrinsic_interpolated_frame_count": 0,
+  "intrinsic_max_nearest_time_error_ms": 0.18515633564675227,
+  "intrinsic_mean": [
+    2571.6566390041494,
+    0,
+    1922.062424022627,
+    0,
+    2571.6566390041494,
+    1070.999590735218,
+    0,
+    0,
+    1
+  ],
+  "intrinsic_nearest_fallback_frame_count": 0,
+  "intrinsic_source": "CameraIntrinsicMatrix",
+  "lens_profile": {
+    "calib_dimension": {
+      "h": 2160,
+      "w": 3840
+    },
+    "calibrated_by": "GyroCine",
+    "camera_brand": "Apple",
+    "camera_model": "iPhone18,1",
+    "distortion_model": "opencv_standard",
+    "fisheye_params": {
+      "camera_matrix": [
+        [
+          2571.6566390041494,
+          0,
+          1922.062424022627
+        ],
+        [
+          0,
+          2571.6566390041494,
+          1070.999590735218
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "distortion_coeffs": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "lens_model": "后置相机",
+    "official": false,
+    "orig_dimension": {
+      "h": 2160,
+      "w": 3840
+    },
+    "output_dimension": {
+      "h": 3840,
+      "w": 2160
+    }
+  },
+  "lens_profile_source": "Apple sampled K mean; distortion uncalibrated",
+  "post_roll_ms": 278,
+  "pre_roll_ms": 280,
+  "raw_presentation_regularized": false,
+  "rotation_degrees": 90,
+  "source_camera": "iPhone18,1",
+  "telemetry_packets_per_video_frame": true,
+  "timing": "Realtime LUT writer; original VideoDataOutput capture PTS preserved",
+  "transport": "SonyMov",
+  "video_estimated_missing_frames": 0,
+  "video_max_frame_gap_ms": 33.36666666666665
+}

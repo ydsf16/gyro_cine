@@ -1,0 +1,19 @@
+{
+  "audioTracks" : 1,
+  "averageFPS" : 60.00199784676515,
+  "bytes" : 255351742,
+  "codec" : "apcs",
+  "decodedFrames" : 901,
+  "decodeError" : "",
+  "decodeStatus" : "completed",
+  "duration" : 15.016166666666667,
+  "estimatedMissingFrames" : 0,
+  "expectedFPS" : 60,
+  "frames" : 901,
+  "hasTelemetry" : true,
+  "height" : 2160,
+  "maximumFrameGapMS" : 16.700000000000159,
+  "movie" : "UITEST_IMG_2026-10-24-08-47-20.mov",
+  "path" : "\/var\/mobile\/Containers\/Data\/Application\/AEF130E1-8594-4932-BAAB-CFCDBC150200\/Documents\/Media\/UITEST_IMG_2026-10-24-08-47-20.mov",
+  "width" : 3840
+}

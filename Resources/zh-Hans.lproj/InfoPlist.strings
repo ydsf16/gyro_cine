@@ -2,3 +2,5 @@
 "NSMicrophoneUsageDescription" = "GyroCine 为录制的视频采集声音。";
 "NSMotionUsageDescription" = "GyroCine 采集用于视频增稳的运动数据，并判断录制方向。";
 "NSPhotoLibraryAddUsageDescription" = "GyroCine 将你选择的素材保存到系统相册。";
+
+"NSLocationWhenInUseUsageDescription" = "开启“记录位置”后，将拍摄地点保存到视频文件中。";

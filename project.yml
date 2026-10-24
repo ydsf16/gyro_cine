@@ -34,6 +34,7 @@ targets:
       properties:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
+        NSLocationWhenInUseUsageDescription: 'Save your recording location in videos when Record location is enabled.'
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
     sources: [Sources, Resources]

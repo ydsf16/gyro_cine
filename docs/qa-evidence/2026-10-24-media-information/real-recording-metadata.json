@@ -1,0 +1,686 @@
+{
+  "summary": {
+    "planned": 6,
+    "completed": 6,
+    "pass": 6,
+    "fail": 0,
+    "byEncoding": {
+      "hevc": 1,
+      "hevcHQ": 1,
+      "proRes422HQ": 1,
+      "proRes422": 1,
+      "proRes422LT": 1,
+      "proRes422Proxy": 1
+    },
+    "errors": {},
+    "missingStandardTags": {}
+  },
+  "cases": [
+    {
+      "request": {
+        "codec": "hvc1",
+        "color": "rec709",
+        "encoding": "hevc",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 0,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "hvc1",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.008238,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 76.226318359375,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 18.779468536376953,
+        "whiteBalanceKelvin": 5193.8603515625,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "8",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"autoTake\":true,\"director\":\"GyroCine Director\",\"reel\":1,\"production\":\"UITEST Slate QA\",\"notes\":\"UITEST notes \\/ 测试备注\",\"environment\":\"\",\"cinematographer\":\"GyroCine Camera Operator\",\"scene\":12,\"camera\":\"A\",\"take\":3,\"timeOfDay\":\"\"}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:13+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"hvc1\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0082380000000000005,\"fps\":23.975999999999999,\"height\":1080,\"iso\":76.226318359375,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":18.779468536376953,\"whiteBalanceKelvin\":5193.8603515625,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 39303030 30303530 38343039 2c226361 70747572 655f6669 7273745f 6672616d 655f686f 73745f73 65636f6e 6473223a 35373135 382e3330 32313530 36363439 39372c22 63617074 7572655f 6d696e75 735f7072 6573656e 74617469 6f6e5f73 65636f6e 6473223a 5b5d2c22 6578706f 73757265 5f736f75 72636522 3a224156 43617074 75726544 65766963 65207374 61746520 73616d70 6c656420 61742063 616d6572 61206361 6c6c6261 636b3b20 6e6f7420 6672616d 652d656d 62656464 65642065 78706f73 75726520 6d657461 64617461 222c2265 78706f73 7572655f 74696d69 6e675f6d 65617375 72656422 3a66616c 73652c22 6578706f 73757265 5f74696d 696e675f 6d6f6465 6c223a22 65737469 6d617465 64526561 646f7574 456e6422 2c226672 616d655f 72656164 6f75745f 7365636f 6e647322 3a302c22 6672616d 655f7265 61646f75 745f736f 75726365 223a2275 6e6b6e6f 776e3b20 6d6f6465 6c656420 6173207a 65726f2c 206e6f74 206d6561 73757265 6420616e 64206e6f 7420696e 66657272 65642066 726f6d20 46505322 2c226779 726f5f6d 61785f73 616d706c 655f6761 705f6d73 223a3130 2e303039 30303030 30353038 3430392c 22696e74 72696e73 69635f66 72616d65 5f636f75 6e74223a 37342c22 696e7472 696e7369 635f696e 74657270 6f6c6174 65645f66 72616d65 5f636f75 6e74223a 302c2269 6e747269 6e736963 5f6d6178 5f6e6561 72657374 5f74696d 655f6572 726f725f 6d73223a 302e3235 34393135 37383730 38313639 3938322c 22696e74 72696e73 69635f6d 65616e22 3a5b3132 38302e37 33373131 39393332 34333235 2c302c39 35372e39 31303139 39393634 33363836 342c302c 31323830 2e373337 31313939 33323433 32352c35 33352e39 32343938 36393638 31363933 382c302c 302c315d 2c22696e 7472696e 7369635f 6e656172 6573745f 66616c6c 6261636b 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f73 6f757263 65223a22 43616d65 7261496e 7472696e 7369634d 61747269 78222c22 6c656e73 5f70726f 66696c65 223a7b22 63616c69 625f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226361 6c696272 61746564 5f627922 3a224779 726f4369 6e65222c 2263616d 6572615f 6272616e 64223a22 4170706c 65222c22 63616d65 72615f6d 6f64656c 223a2269 50686f6e 6531382c 31222c22 64697374 6f727469 6f6e5f6d 6f64656c 223a226f 70656e63 765f7374 616e6461 7264222c 22666973 68657965 5f706172 616d7322 3a7b2263 616d6572 615f6d61 74726978 223a5b5b 31323830 2e373337 31313939 33323433 32352c30 2c393537 2e393130 31393939 36343336 3836345d 2c5b302c 31323830 2e373337 31313939 33323433 32352c35 33352e39 32343938 36393638 31363933 385d2c5b 302c302c 315d5d2c 22646973 746f7274 696f6e5f 636f6566 6673223a 5b302c30 2c302c30 2c302c30 2c302c30 5d7d2c22 6c656e73 5f6d6f64 656c223a 22e5908e e7bdaee7 9bb8e69c ba222c22 6f666669 6369616c 223a6661 6c73652c 226f7269 675f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226f75 74707574 5f64696d 656e7369 6f6e223a 7b226822 3a313932 302c2277 223a3130 38307d7d 2c226c65 6e735f70 726f6669 6c655f73 6f757263 65223a22 4170706c 65207361 6d706c65 64204b20 6d65616e 3b206469 73746f72 74696f6e 20756e63 616c6962 72617465 64222c22 706f7374 5f726f6c 6c5f6d73 223a3236 382c2270 72655f72 6f6c6c5f 6d73223a 3134322c 22726177 5f707265 73656e74 6174696f 6e5f7265 67756c61 72697a65 64223a66 616c7365 2c22726f 74617469 6f6e5f64 65677265 6573223a 39302c22 736f7572 63655f63 616d6572 61223a22 6950686f 6e653138 2c31222c 2274656c 656d6574 72795f70 61636b65 74735f70 65725f76 6964656f 5f667261 6d65223a 74727565 2c227469 6d696e67 223a224d 4f562066 69727374 20667261 6d652050 5453206d 61707065 64206672 6f6d204d 6f766965 46696c65 4f757470 75742073 74617274 5054533b 206f7074 6963616c 2073796e 6320756e 76657269 66696564 222c2274 72616e73 706f7274 223a2253 6f6e794d 6f76222c 22766964 656f5f65 7374696d 61746564 5f6d6973 73696e67 5f667261 6d657322 3a302c22 76696465 6f5f6d61 785f6672 616d655f 6761705f 6d73223a 34312e37 30383337 35303431 37303836 35367d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    },
+    {
+      "request": {
+        "codec": "hvc1",
+        "color": "rec709",
+        "encoding": "hevcHQ",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 94,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "hvc1",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.003184,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 74.97692108154297,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 21.604904174804688,
+        "whiteBalanceKelvin": 5186.62255859375,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "8",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"autoTake\":true,\"environment\":\"\",\"cinematographer\":\"GyroCine Camera Operator\",\"scene\":12,\"reel\":1,\"notes\":\"UITEST notes \\/ 测试备注\",\"production\":\"UITEST Slate QA\",\"timeOfDay\":\"\",\"director\":\"GyroCine Director\",\"take\":3,\"camera\":\"A\"}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:17+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"hvc1\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0031840000000000002,\"fps\":23.975999999999999,\"height\":1080,\"iso\":74.976921081542969,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":21.604904174804688,\"whiteBalanceKelvin\":5186.62255859375,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 39303030 30303530 38343039 2c226361 70747572 655f6669 7273745f 6672616d 655f686f 73745f73 65636f6e 6473223a 35373136 322e3636 31353635 3230382c 22636170 74757265 5f6d696e 75735f70 72657365 6e746174 696f6e5f 7365636f 6e647322 3a5b5d2c 22657870 6f737572 655f736f 75726365 223a2241 56436170 74757265 44657669 63652073 74617465 2073616d 706c6564 20617420 63616d65 72612063 616c6c62 61636b3b 206e6f74 20667261 6d652d65 6d626564 64656420 6578706f 73757265 206d6574 61646174 61222c22 6578706f 73757265 5f74696d 696e675f 6d656173 75726564 223a6661 6c73652c 22657870 6f737572 655f7469 6d696e67 5f6d6f64 656c223a 22657374 696d6174 65645265 61646f75 74456e64 222c2266 72616d65 5f726561 646f7574 5f736563 6f6e6473 223a302c 22667261 6d655f72 6561646f 75745f73 6f757263 65223a22 756e6b6e 6f776e3b 206d6f64 656c6564 20617320 7a65726f 2c206e6f 74206d65 61737572 65642061 6e64206e 6f742069 6e666572 72656420 66726f6d 20465053 222c2267 79726f5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 39303030 30303530 38343039 2c22696e 7472696e 7369635f 6672616d 655f636f 756e7422 3a37352c 22696e74 72696e73 69635f69 6e746572 706f6c61 7465645f 6672616d 655f636f 756e7422 3a302c22 696e7472 696e7369 635f6d61 785f6e65 61726573 745f7469 6d655f65 72726f72 5f6d7322 3a302e32 35313431 37373930 34323331 34373338 2c22696e 7472696e 7369635f 6d65616e 223a5b31 3238302e 37333534 38353032 36303431 372c302c 3935372e 39333734 33383135 31303431 36352c30 2c313238 302e3733 35343835 30323630 3431372c 3533352e 39313839 36383039 38393538 33322c30 2c302c31 5d2c2269 6e747269 6e736963 5f6e6561 72657374 5f66616c 6c626163 6b5f6672 616d655f 636f756e 74223a30 2c22696e 7472696e 7369635f 736f7572 6365223a 2243616d 65726149 6e747269 6e736963 4d617472 6978222c 226c656e 735f7072 6f66696c 65223a7b 2263616c 69625f64 696d656e 73696f6e 223a7b22 68223a31 3038302c 2277223a 31393230 7d2c2263 616c6962 72617465 645f6279 223a2247 79726f43 696e6522 2c226361 6d657261 5f627261 6e64223a 22417070 6c65222c 2263616d 6572615f 6d6f6465 6c223a22 6950686f 6e653138 2c31222c 22646973 746f7274 696f6e5f 6d6f6465 6c223a22 6f70656e 63765f73 74616e64 61726422 2c226669 73686579 655f7061 72616d73 223a7b22 63616d65 72615f6d 61747269 78223a5b 5b313238 302e3733 35343835 30323630 3431372c 302c3935 372e3933 37343338 31353130 34313635 5d2c5b30 2c313238 302e3733 35343835 30323630 3431372c 3533352e 39313839 36383039 38393538 33325d2c 5b302c30 2c315d5d 2c226469 73746f72 74696f6e 5f636f65 66667322 3a5b302c 302c302c 302c302c 302c302c 305d7d2c 226c656e 735f6d6f 64656c22 3a22e590 8ee7bdae e79bb8e6 9cba222c 226f6666 69636961 6c223a66 616c7365 2c226f72 69675f64 696d656e 73696f6e 223a7b22 68223a31 3038302c 2277223a 31393230 7d2c226f 75747075 745f6469 6d656e73 696f6e22 3a7b2268 223a3139 32302c22 77223a31 3038307d 7d2c226c 656e735f 70726f66 696c655f 736f7572 6365223a 22417070 6c652073 616d706c 6564204b 206d6561 6e3b2064 6973746f 7274696f 6e20756e 63616c69 62726174 6564222c 22706f73 745f726f 6c6c5f6d 73223a32 37332c22 7072655f 726f6c6c 5f6d7322 3a323134 2c227261 775f7072 6573656e 74617469 6f6e5f72 6567756c 6172697a 6564223a 66616c73 652c2272 6f746174 696f6e5f 64656772 65657322 3a39302c 22736f75 7263655f 63616d65 7261223a 22695068 6f6e6531 382c3122 2c227465 6c656d65 7472795f 7061636b 6574735f 7065725f 76696465 6f5f6672 616d6522 3a747275 652c2274 696d696e 67223a22 4d4f5620 66697273 74206672 616d6520 50545320 6d617070 65642066 726f6d20 4d6f7669 6546696c 654f7574 70757420 73746172 74505453 3b206f70 74696361 6c207379 6e632075 6e766572 69666965 64222c22 7472616e 73706f72 74223a22 536f6e79 4d6f7622 2c227669 64656f5f 65737469 6d617465 645f6d69 7373696e 675f6672 616d6573 223a302c 22766964 656f5f6d 61785f66 72616d65 5f676170 5f6d7322 3a34312e 37303833 37353034 31373038 3635367d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    },
+    {
+      "request": {
+        "codec": "apch",
+        "color": "rec709",
+        "encoding": "proRes422HQ",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 188,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "apch",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.00321,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 74.97692108154297,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 21.827035903930664,
+        "whiteBalanceKelvin": 5166.42822265625,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "12",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"timeOfDay\":\"\",\"cinematographer\":\"GyroCine Camera Operator\",\"reel\":1,\"notes\":\"UITEST notes \\/ 测试备注\",\"production\":\"UITEST Slate QA\",\"scene\":12,\"director\":\"GyroCine Director\",\"autoTake\":true,\"camera\":\"A\",\"take\":3,\"environment\":\"\"}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:22+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"apch\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0032100000000000002,\"fps\":23.975999999999999,\"height\":1080,\"iso\":74.976921081542969,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":21.827035903930664,\"whiteBalanceKelvin\":5166.42822265625,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 39303030 30303530 38343039 2c226361 70747572 655f6669 7273745f 6672616d 655f686f 73745f73 65636f6e 6473223a 35373136 372e3132 32333533 34313630 30322c22 63617074 7572655f 6d696e75 735f7072 6573656e 74617469 6f6e5f73 65636f6e 6473223a 5b5d2c22 6578706f 73757265 5f736f75 72636522 3a224156 43617074 75726544 65766963 65207374 61746520 73616d70 6c656420 61742063 616d6572 61206361 6c6c6261 636b3b20 6e6f7420 6672616d 652d656d 62656464 65642065 78706f73 75726520 6d657461 64617461 222c2265 78706f73 7572655f 74696d69 6e675f6d 65617375 72656422 3a66616c 73652c22 6578706f 73757265 5f74696d 696e675f 6d6f6465 6c223a22 65737469 6d617465 64526561 646f7574 456e6422 2c226672 616d655f 72656164 6f75745f 7365636f 6e647322 3a302c22 6672616d 655f7265 61646f75 745f736f 75726365 223a2275 6e6b6e6f 776e3b20 6d6f6465 6c656420 6173207a 65726f2c 206e6f74 206d6561 73757265 6420616e 64206e6f 7420696e 66657272 65642066 726f6d20 46505322 2c226779 726f5f6d 61785f73 616d706c 655f6761 705f6d73 223a3130 2e303039 30303030 30353038 3430392c 22696e74 72696e73 69635f66 72616d65 5f636f75 6e74223a 37352c22 696e7472 696e7369 635f696e 74657270 6f6c6174 65645f66 72616d65 5f636f75 6e74223a 302c2269 6e747269 6e736963 5f6d6178 5f6e6561 72657374 5f74696d 655f6572 726f725f 6d73223a 302e3130 38343531 30303034 31343738 3837322c 22696e74 72696e73 69635f6d 65616e22 3a5b3132 38302e36 38313136 38363139 37393136 2c302c39 35372e39 38303334 30313639 32373037 392c302c 31323830 2e363831 31363836 31393739 31362c35 33352e39 31383534 30383532 38363435 372c302c 302c315d 2c22696e 7472696e 7369635f 6e656172 6573745f 66616c6c 6261636b 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f73 6f757263 65223a22 43616d65 7261496e 7472696e 7369634d 61747269 78222c22 6c656e73 5f70726f 66696c65 223a7b22 63616c69 625f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226361 6c696272 61746564 5f627922 3a224779 726f4369 6e65222c 2263616d 6572615f 6272616e 64223a22 4170706c 65222c22 63616d65 72615f6d 6f64656c 223a2269 50686f6e 6531382c 31222c22 64697374 6f727469 6f6e5f6d 6f64656c 223a226f 70656e63 765f7374 616e6461 7264222c 22666973 68657965 5f706172 616d7322 3a7b2263 616d6572 615f6d61 74726978 223a5b5b 31323830 2e363831 31363836 31393739 31362c30 2c393537 2e393830 33343031 36393237 3037395d 2c5b302c 31323830 2e363831 31363836 31393739 31362c35 33352e39 31383534 30383532 38363435 375d2c5b 302c302c 315d5d2c 22646973 746f7274 696f6e5f 636f6566 6673223a 5b302c30 2c302c30 2c302c30 2c302c30 5d7d2c22 6c656e73 5f6d6f64 656c223a 22e5908e e7bdaee7 9bb8e69c ba222c22 6f666669 6369616c 223a6661 6c73652c 226f7269 675f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226f75 74707574 5f64696d 656e7369 6f6e223a 7b226822 3a313932 302c2277 223a3130 38307d7d 2c226c65 6e735f70 726f6669 6c655f73 6f757263 65223a22 4170706c 65207361 6d706c65 64204b20 6d65616e 3b206469 73746f72 74696f6e 20756e63 616c6962 72617465 64222c22 706f7374 5f726f6c 6c5f6d73 223a3430 302c2270 72655f72 6f6c6c5f 6d73223a 3237382c 22726177 5f707265 73656e74 6174696f 6e5f7265 67756c61 72697a65 64223a66 616c7365 2c22726f 74617469 6f6e5f64 65677265 6573223a 39302c22 736f7572 63655f63 616d6572 61223a22 6950686f 6e653138 2c31222c 2274656c 656d6574 72795f70 61636b65 74735f70 65725f76 6964656f 5f667261 6d65223a 74727565 2c227469 6d696e67 223a2250 726f5265 73207772 69746572 3b206f72 6967696e 616c2056 6964656f 44617461 4f757470 75742063 61707475 72652050 54532070 72657365 72766564 222c2274 72616e73 706f7274 223a2253 6f6e794d 6f76222c 22766964 656f5f65 7374696d 61746564 5f6d6973 73696e67 5f667261 6d657322 3a302c22 76696465 6f5f6d61 785f6672 616d655f 6761705f 6d73223a 34312e37 30303030 30303030 30303030 31377d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 328,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "apcn",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.003236,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 74.76923370361328,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 20.36505889892578,
+        "whiteBalanceKelvin": 5161.17529296875,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "12",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"scene\":12,\"camera\":\"A\",\"production\":\"UITEST Slate QA\",\"environment\":\"\",\"timeOfDay\":\"\",\"director\":\"GyroCine Director\",\"cinematographer\":\"GyroCine Camera Operator\",\"reel\":1,\"notes\":\"UITEST notes \\/ 测试备注\",\"autoTake\":true,\"take\":3}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:26+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"apcn\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0032360000000000002,\"fps\":23.975999999999999,\"height\":1080,\"iso\":74.769233703613281,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":20.365058898925781,\"whiteBalanceKelvin\":5161.17529296875,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 38343136 36363937 33343238 382c2263 61707475 72655f66 69727374 5f667261 6d655f68 6f73745f 7365636f 6e647322 3a353731 37312e37 32393337 32333333 2c226361 70747572 655f6d69 6e75735f 70726573 656e7461 74696f6e 5f736563 6f6e6473 223a5b5d 2c226578 706f7375 72655f73 6f757263 65223a22 41564361 70747572 65446576 69636520 73746174 65207361 6d706c65 64206174 2063616d 65726120 63616c6c 6261636b 3b206e6f 74206672 616d652d 656d6265 64646564 20657870 6f737572 65206d65 74616461 7461222c 22657870 6f737572 655f7469 6d696e67 5f6d6561 73757265 64223a66 616c7365 2c226578 706f7375 72655f74 696d696e 675f6d6f 64656c22 3a226573 74696d61 74656452 6561646f 7574456e 64222c22 6672616d 655f7265 61646f75 745f7365 636f6e64 73223a30 2c226672 616d655f 72656164 6f75745f 736f7572 6365223a 22756e6b 6e6f776e 3b206d6f 64656c65 64206173 207a6572 6f2c206e 6f74206d 65617375 72656420 616e6420 6e6f7420 696e6665 72726564 2066726f 6d204650 53222c22 6779726f 5f6d6178 5f73616d 706c655f 6761705f 6d73223a 31302e30 30383431 36363639 37333432 38382c22 696e7472 696e7369 635f6672 616d655f 636f756e 74223a37 332c2269 6e747269 6e736963 5f696e74 6572706f 6c617465 645f6672 616d655f 636f756e 74223a30 2c22696e 7472696e 7369635f 6d61785f 6e656172 6573745f 74696d65 5f657272 6f725f6d 73223a30 2e303934 38373533 33363739 39333034 3933322c 22696e74 72696e73 69635f6d 65616e22 3a5b3132 38302e36 37323038 35363936 37303338 2c302c39 35382e30 32383139 39303738 32383535 322c302c 31323830 2e363732 30383536 39363730 33382c35 33352e39 30303235 39333537 36303931 322c302c 302c315d 2c22696e 7472696e 7369635f 6e656172 6573745f 66616c6c 6261636b 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f73 6f757263 65223a22 43616d65 7261496e 7472696e 7369634d 61747269 78222c22 6c656e73 5f70726f 66696c65 223a7b22 63616c69 625f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226361 6c696272 61746564 5f627922 3a224779 726f4369 6e65222c 2263616d 6572615f 6272616e 64223a22 4170706c 65222c22 63616d65 72615f6d 6f64656c 223a2269 50686f6e 6531382c 31222c22 64697374 6f727469 6f6e5f6d 6f64656c 223a226f 70656e63 765f7374 616e6461 7264222c 22666973 68657965 5f706172 616d7322 3a7b2263 616d6572 615f6d61 74726978 223a5b5b 31323830 2e363732 30383536 39363730 33382c30 2c393538 2e303238 31393930 37383238 3535325d 2c5b302c 31323830 2e363732 30383536 39363730 33382c35 33352e39 30303235 39333537 36303931 325d2c5b 302c302c 315d5d2c 22646973 746f7274 696f6e5f 636f6566 6673223a 5b302c30 2c302c30 2c302c30 2c302c30 5d7d2c22 6c656e73 5f6d6f64 656c223a 22e5908e e7bdaee7 9bb8e69c ba222c22 6f666669 6369616c 223a6661 6c73652c 226f7269 675f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226f75 74707574 5f64696d 656e7369 6f6e223a 7b226822 3a313932 302c2277 223a3130 38307d7d 2c226c65 6e735f70 726f6669 6c655f73 6f757263 65223a22 4170706c 65207361 6d706c65 64204b20 6d65616e 3b206469 73746f72 74696f6e 20756e63 616c6962 72617465 64222c22 706f7374 5f726f6c 6c5f6d73 223a3339 372c2270 72655f72 6f6c6c5f 6d73223a 3239342c 22726177 5f707265 73656e74 6174696f 6e5f7265 67756c61 72697a65 64223a66 616c7365 2c22726f 74617469 6f6e5f64 65677265 6573223a 39302c22 736f7572 63655f63 616d6572 61223a22 6950686f 6e653138 2c31222c 2274656c 656d6574 72795f70 61636b65 74735f70 65725f76 6964656f 5f667261 6d65223a 74727565 2c227469 6d696e67 223a2250 726f5265 73207772 69746572 3b206f72 6967696e 616c2056 6964656f 44617461 4f757470 75742063 61707475 72652050 54532070 72657365 72766564 222c2274 72616e73 706f7274 223a2253 6f6e794d 6f76222c 22766964 656f5f65 7374696d 61746564 5f6d6973 73696e67 5f667261 6d657322 3a302c22 76696465 6f5f6d61 785f6672 616d655f 6761705f 6d73223a 34312e36 38333333 33333333 33333335 31357d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    },
+    {
+      "request": {
+        "codec": "apcs",
+        "color": "rec709",
+        "encoding": "proRes422LT",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 468,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "apcs",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.003275,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 74.56153869628906,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 20.36505889892578,
+        "whiteBalanceKelvin": 5161.17529296875,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "12",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"camera\":\"A\",\"director\":\"GyroCine Director\",\"timeOfDay\":\"\",\"environment\":\"\",\"reel\":1,\"production\":\"UITEST Slate QA\",\"scene\":12,\"take\":3,\"notes\":\"UITEST notes \\/ 测试备注\",\"autoTake\":true,\"cinematographer\":\"GyroCine Camera Operator\"}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:31+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"apcs\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0032750000000000001,\"fps\":23.975999999999999,\"height\":1080,\"iso\":74.561538696289062,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":20.365058898925781,\"whiteBalanceKelvin\":5161.17529296875,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 38343136 36363937 33343238 382c2263 61707475 72655f66 69727374 5f667261 6d655f68 6f73745f 7365636f 6e647322 3a353731 37362e32 37323935 36393136 3939372c 22636170 74757265 5f6d696e 75735f70 72657365 6e746174 696f6e5f 7365636f 6e647322 3a5b5d2c 22657870 6f737572 655f736f 75726365 223a2241 56436170 74757265 44657669 63652073 74617465 2073616d 706c6564 20617420 63616d65 72612063 616c6c62 61636b3b 206e6f74 20667261 6d652d65 6d626564 64656420 6578706f 73757265 206d6574 61646174 61222c22 6578706f 73757265 5f74696d 696e675f 6d656173 75726564 223a6661 6c73652c 22657870 6f737572 655f7469 6d696e67 5f6d6f64 656c223a 22657374 696d6174 65645265 61646f75 74456e64 222c2266 72616d65 5f726561 646f7574 5f736563 6f6e6473 223a302c 22667261 6d655f72 6561646f 75745f73 6f757263 65223a22 756e6b6e 6f776e3b 206d6f64 656c6564 20617320 7a65726f 2c206e6f 74206d65 61737572 65642061 6e64206e 6f742069 6e666572 72656420 66726f6d 20465053 222c2267 79726f5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 38303030 30303437 34353535 342c2269 6e747269 6e736963 5f667261 6d655f63 6f756e74 223a3734 2c22696e 7472696e 7369635f 696e7465 72706f6c 61746564 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f6d 61785f6e 65617265 73745f74 696d655f 6572726f 725f6d73 223a302e 31303030 38343939 35323130 36333634 312c2269 6e747269 6e736963 5f6d6561 6e223a5b 31323830 2e313336 34373632 35383937 33372c30 2c393538 2e303235 39373534 30373738 3038332c 302c3132 38302e31 33363437 36323538 39373337 2c353335 2e393134 36343937 35373137 3930362c 302c302c 315d2c22 696e7472 696e7369 635f6e65 61726573 745f6661 6c6c6261 636b5f66 72616d65 5f636f75 6e74223a 302c2269 6e747269 6e736963 5f736f75 72636522 3a224361 6d657261 496e7472 696e7369 634d6174 72697822 2c226c65 6e735f70 726f6669 6c65223a 7b226361 6c69625f 64696d65 6e73696f 6e223a7b 2268223a 31303830 2c227722 3a313932 307d2c22 63616c69 62726174 65645f62 79223a22 4779726f 43696e65 222c2263 616d6572 615f6272 616e6422 3a224170 706c6522 2c226361 6d657261 5f6d6f64 656c223a 22695068 6f6e6531 382c3122 2c226469 73746f72 74696f6e 5f6d6f64 656c223a 226f7065 6e63765f 7374616e 64617264 222c2266 69736865 79655f70 6172616d 73223a7b 2263616d 6572615f 6d617472 6978223a 5b5b3132 38302e31 33363437 36323538 39373337 2c302c39 35382e30 32353937 35343037 37383038 335d2c5b 302c3132 38302e31 33363437 36323538 39373337 2c353335 2e393134 36343937 35373137 3930365d 2c5b302c 302c315d 5d2c2264 6973746f 7274696f 6e5f636f 65666673 223a5b30 2c302c30 2c302c30 2c302c30 2c305d7d 2c226c65 6e735f6d 6f64656c 223a22e5 908ee7bd aee79bb8 e69cba22 2c226f66 66696369 616c223a 66616c73 652c226f 7269675f 64696d65 6e73696f 6e223a7b 2268223a 31303830 2c227722 3a313932 307d2c22 6f757470 75745f64 696d656e 73696f6e 223a7b22 68223a31 3932302c 2277223a 31303830 7d7d2c22 6c656e73 5f70726f 66696c65 5f736f75 72636522 3a224170 706c6520 73616d70 6c656420 4b206d65 616e3b20 64697374 6f727469 6f6e2075 6e63616c 69627261 74656422 2c22706f 73745f72 6f6c6c5f 6d73223a 3336302c 22707265 5f726f6c 6c5f6d73 223a3239 362c2272 61775f70 72657365 6e746174 696f6e5f 72656775 6c617269 7a656422 3a66616c 73652c22 726f7461 74696f6e 5f646567 72656573 223a3930 2c22736f 75726365 5f63616d 65726122 3a226950 686f6e65 31382c31 222c2274 656c656d 65747279 5f706163 6b657473 5f706572 5f766964 656f5f66 72616d65 223a7472 75652c22 74696d69 6e67223a 2250726f 52657320 77726974 65723b20 6f726967 696e616c 20566964 656f4461 74614f75 74707574 20636170 74757265 20505453 20707265 73657276 6564222c 22747261 6e73706f 7274223a 22536f6e 794d6f76 222c2276 6964656f 5f657374 696d6174 65645f6d 69737369 6e675f66 72616d65 73223a30 2c227669 64656f5f 6d61785f 6672616d 655f6761 705f6d73 223a3431 2e363833 33333333 33333333 33353135 7d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    },
+    {
+      "request": {
+        "codec": "apco",
+        "color": "rec709",
+        "encoding": "proRes422Proxy",
+        "fps": 23.976,
+        "height": 1080,
+        "originalIndex": 608,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": [],
+      "snapshot": {
+        "aperture": 1.7799999713897705,
+        "codec": "apco",
+        "colorSpace": "Rec.709",
+        "exposureSeconds": 0.003197,
+        "fps": 23.976,
+        "height": 1080,
+        "iso": 74.97692108154297,
+        "lensName": "后置相机",
+        "lensType": "AVCaptureDeviceTypeBuiltInWideAngleCamera",
+        "lutBurned": false,
+        "model": "iPhone18,1",
+        "position": "back",
+        "schema": 1,
+        "scope": "recordingStart",
+        "tint": 20.36505889892578,
+        "whiteBalanceKelvin": 5161.17529296875,
+        "width": 1920,
+        "zoom": 1
+      },
+      "audio": {
+        "mSampleRate": "48000.000000",
+        "mChannelsPerFrame": "2"
+      },
+      "color": {
+        "BitsPerComponent": "12",
+        "CVImageBufferColorPrimaries": "ITU_R_709_2",
+        "CVImageBufferTransferFunction": "ITU_R_709_2",
+        "CVImageBufferYCbCrMatrix": "ITU_R_709_2"
+      },
+      "missingStandardTags": [],
+      "metadata": [
+        {
+          "id": "mdta/com.apple.quicktime.camera.identifier",
+          "value": "A"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.description",
+          "value": "UITEST notes / 测试备注"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.director",
+          "value": "GyroCine Director"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.reel",
+          "value": "1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.scene",
+          "value": "12"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.take",
+          "value": "3"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.title",
+          "value": "UITEST Slate QA"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.cinematographer",
+          "value": "GyroCine Camera Operator"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.slate",
+          "value": "{\"timeOfDay\":\"\",\"camera\":\"A\",\"scene\":12,\"production\":\"UITEST Slate QA\",\"take\":3,\"reel\":1,\"autoTake\":true,\"environment\":\"\",\"cinematographer\":\"GyroCine Camera Operator\",\"notes\":\"UITEST notes \\/ 测试备注\",\"director\":\"GyroCine Director\"}"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.creationdate",
+          "value": "2026-10-24T10:13:35+08:00"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.make",
+          "value": "Apple"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.model",
+          "value": "iPhone18,1"
+        },
+        {
+          "id": "mdta/com.apple.quicktime.software",
+          "value": "GyroCine 1.1 (20261020.2)"
+        },
+        {
+          "id": "mdta/com.tinygrape.gyrocine.capture",
+          "value": "{\"aperture\":1.7799999713897705,\"codec\":\"apco\",\"colorSpace\":\"Rec.709\",\"exposureSeconds\":0.0031970000000000002,\"fps\":23.975999999999999,\"height\":1080,\"iso\":74.976921081542969,\"lensName\":\"后置相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInWideAngleCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":20.365058898925781,\"whiteBalanceKelvin\":5161.17529296875,\"width\":1920,\"zoom\":1}"
+        },
+        {
+          "id": "udta/rmin",
+          "value": "Optional(<7b226163 63656c5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 38353030 30303132 37363834 332c2263 61707475 72655f66 69727374 5f667261 6d655f68 6f73745f 7365636f 6e647322 3a353731 38302e38 31373738 39303030 3939372c 22636170 74757265 5f6d696e 75735f70 72657365 6e746174 696f6e5f 7365636f 6e647322 3a5b5d2c 22657870 6f737572 655f736f 75726365 223a2241 56436170 74757265 44657669 63652073 74617465 2073616d 706c6564 20617420 63616d65 72612063 616c6c62 61636b3b 206e6f74 20667261 6d652d65 6d626564 64656420 6578706f 73757265 206d6574 61646174 61222c22 6578706f 73757265 5f74696d 696e675f 6d656173 75726564 223a6661 6c73652c 22657870 6f737572 655f7469 6d696e67 5f6d6f64 656c223a 22657374 696d6174 65645265 61646f75 74456e64 222c2266 72616d65 5f726561 646f7574 5f736563 6f6e6473 223a302c 22667261 6d655f72 6561646f 75745f73 6f757263 65223a22 756e6b6e 6f776e3b 206d6f64 656c6564 20617320 7a65726f 2c206e6f 74206d65 61737572 65642061 6e64206e 6f742069 6e666572 72656420 66726f6d 20465053 222c2267 79726f5f 6d61785f 73616d70 6c655f67 61705f6d 73223a31 302e3030 38353030 30303132 37363834 332c2269 6e747269 6e736963 5f667261 6d655f63 6f756e74 223a3735 2c22696e 7472696e 7369635f 696e7465 72706f6c 61746564 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f6d 61785f6e 65617265 73745f74 696d655f 6572726f 725f6d73 223a302e 31303133 33343332 38303634 3639352c 22696e74 72696e73 69635f6d 65616e22 3a5b3132 38302e31 35333236 30303931 31343537 2c302c39 35382e30 34373031 31373138 37353030 312c302c 31323830 2e313533 32363030 39313134 35372c35 33352e39 30393530 35323038 33333333 372c302c 302c315d 2c22696e 7472696e 7369635f 6e656172 6573745f 66616c6c 6261636b 5f667261 6d655f63 6f756e74 223a302c 22696e74 72696e73 69635f73 6f757263 65223a22 43616d65 7261496e 7472696e 7369634d 61747269 78222c22 6c656e73 5f70726f 66696c65 223a7b22 63616c69 625f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226361 6c696272 61746564 5f627922 3a224779 726f4369 6e65222c 2263616d 6572615f 6272616e 64223a22 4170706c 65222c22 63616d65 72615f6d 6f64656c 223a2269 50686f6e 6531382c 31222c22 64697374 6f727469 6f6e5f6d 6f64656c 223a226f 70656e63 765f7374 616e6461 7264222c 22666973 68657965 5f706172 616d7322 3a7b2263 616d6572 615f6d61 74726978 223a5b5b 31323830 2e313533 32363030 39313134 35372c30 2c393538 2e303437 30313137 31383735 3030315d 2c5b302c 31323830 2e313533 32363030 39313134 35372c35 33352e39 30393530 35323038 33333333 375d2c5b 302c302c 315d5d2c 22646973 746f7274 696f6e5f 636f6566 6673223a 5b302c30 2c302c30 2c302c30 2c302c30 5d7d2c22 6c656e73 5f6d6f64 656c223a 22e5908e e7bdaee7 9bb8e69c ba222c22 6f666669 6369616c 223a6661 6c73652c 226f7269 675f6469 6d656e73 696f6e22 3a7b2268 223a3130 38302c22 77223a31 3932307d 2c226f75 74707574 5f64696d 656e7369 6f6e223a 7b226822 3a313932 302c2277 223a3130 38307d7d 2c226c65 6e735f70 726f6669 6c655f73 6f757263 65223a22 4170706c 65207361 6d706c65 64204b20 6d65616e 3b206469 73746f72 74696f6e 20756e63 616c6962 72617465 64222c22 706f7374 5f726f6c 6c5f6d73 223a3339 392c2270 72655f72 6f6c6c5f 6d73223a 3239392c 22726177 5f707265 73656e74 6174696f 6e5f7265 67756c61 72697a65 64223a66 616c7365 2c22726f 74617469 6f6e5f64 65677265 6573223a 39302c22 736f7572 63655f63 616d6572 61223a22 6950686f 6e653138 2c31222c 2274656c 656d6574 72795f70 61636b65 74735f70 65725f76 6964656f 5f667261 6d65223a 74727565 2c227469 6d696e67 223a2250 726f5265 73207772 69746572 3b206f72 6967696e 616c2056 6964656f 44617461 4f757470 75742063 61707475 72652050 54532070 72657365 72766564 222c2274 72616e73 706f7274 223a2253 6f6e794d 6f76222c 22766964 656f5f65 7374696d 61746564 5f6d6973 73696e67 5f667261 6d657322 3a302c22 76696465 6f5f6d61 785f6672 616d655f 6761705f 6d73223a 34312e37 30303030 30303030 30303030 31377d>)"
+        },
+        {
+          "id": "udta/xml%20",
+          "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+        }
+      ]
+    }
+  ]
+}

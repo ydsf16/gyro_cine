@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BFF81E94AF0A45D4B9AE1201 /* RecordingLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF81E94AF0A45D4B9AE1202 /* RecordingLocation.swift */; };
 		64B6DF72599649018B55C72E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4A47AF846272410E9ECA6DC4 /* PrivacyInfo.xcprivacy */; };
 		EF57EFE91EDC4746B9E92515 /* GyroCine.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */; };
 		2D60835C5D444224BEEF41B2 /* ProAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AB4A890E08447AB6723572 /* ProAccessTests.swift */; };
@@ -73,6 +74,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		BFF81E94AF0A45D4B9AE1202 /* RecordingLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingLocation.swift; sourceTree = "<group>"; };
 		4A47AF846272410E9ECA6DC4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2B27D7F0FB6E47C0A4315780 /* GyroCine.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fixtures/GyroCine.storekit; sourceTree = "<group>"; };
 		87AB4A890E08447AB6723572 /* ProAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProAccessTests.swift; sourceTree = "<group>"; };
@@ -184,6 +186,7 @@
 				DC02D9C569C6C89D1CEF1C36 /* RecordingRateEstimator.swift */,
 				814D5630955C4DB69E61499E /* ProAccess.swift */,
 				5E69E57621FCFFB1DD4CFFAD /* RecordingSlate.swift */,
+				BFF81E94AF0A45D4B9AE1202 /* RecordingLocation.swift */,
 				DDC4FDCF8FDB0A0744024FE0 /* RecordingState.swift */,
 				2817BCD3637009EF27D48531 /* SettingsView.swift */,
 				2AC4D0B1EA68438745FDAC03 /* SSDSpeedTest.swift */,
@@ -391,6 +394,7 @@
 				BF9CB8F121E995A1F8219C7D /* RecordingRateEstimator.swift in Sources */,
 				028D77F479594AAAAA35359B /* ProAccess.swift in Sources */,
 				065A5CB761B0F44A8CCA697F /* RecordingSlate.swift in Sources */,
+				BFF81E94AF0A45D4B9AE1201 /* RecordingLocation.swift in Sources */,
 				23CC8ACDBA7C6BF710D2B242 /* RecordingState.swift in Sources */,
 				36FF3D630C1B353466E458B6 /* SSDSpeedTest.swift in Sources */,
 				4DFDD03468808149361F3ACD /* SettingsView.swift in Sources */,

@@ -1,0 +1,46 @@
+{
+  "events": [
+    {
+      "data": {
+        "error": "unavailable(\"没有与 MOV 像素尺寸一致的有效 K 数据\")",
+        "job": "UITEST_IMG_2026-10-24-10-00-20.mov.pending-imu.json"
+      },
+      "eventType": "imu_pending_retry_failed",
+      "monotonicSeconds": 56389.357241875005,
+      "sessionID": "60076D93-E59A-4174-9383-1A1EA32A870C",
+      "wallTime": "2026-10-24T02:00:24Z"
+    },
+    {
+      "data": {
+        "job": "UITEST_IMG_2026-10-24-10-00-20.mov.pending-imu.json",
+        "reason": "unavailable(\"没有与 MOV 像素尺寸一致的有效 K 数据\")"
+      },
+      "eventType": "imu_pending_retired",
+      "monotonicSeconds": 56389.36499,
+      "sessionID": "60076D93-E59A-4174-9383-1A1EA32A870C",
+      "wallTime": "2026-10-24T02:00:24Z"
+    }
+  ],
+  "firstCapturedFrame": {
+    "iso": 71.86154,
+    "height": 1080,
+    "exposure": 0.003477,
+    "width": 1920,
+    "matrix": [
+      1280.6866455078125,
+      0,
+      958.1149291992188,
+      0,
+      1280.6866455078125,
+      536.1533813476562,
+      0,
+      0,
+      1
+    ],
+    "hostTime": 56385.652134416
+  },
+  "requestedVideoSize": [
+    3840,
+    2160
+  ]
+}

@@ -1,0 +1,1898 @@
+{
+  "allCodecs" : [
+    "hvc1",
+    "avc1",
+    "jpeg",
+    "apch",
+    "apcn",
+    "apcs",
+    "apco",
+    "aprh",
+    "aprn"
+  ],
+  "cameraID" : "com.apple.avfoundation.avcapturedevice.built-in_video:0",
+  "cameraName" : "后置相机",
+  "focusCapabilities" : {
+    "continuous" : true,
+    "focusPoint" : true,
+    "locked" : true,
+    "manualLensPosition" : true,
+    "single" : true
+  },
+  "formats" : [
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 144,
+      "index" : 0,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 192
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 144,
+      "index" : 1,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 192
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 64.9322509765625,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 288,
+      "index" : 2,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 352
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 64.9322509765625,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 288,
+      "index" : 3,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 352
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 360,
+      "index" : 4,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 480
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 360,
+      "index" : 5,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 480
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 480,
+      "index" : 6,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 640
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 480,
+      "index" : 7,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 640
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 480,
+      "index" : 8,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 640
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 480,
+      "index" : 9,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 640
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 540,
+      "index" : 10,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 960
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 540,
+      "index" : 11,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 960
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 768,
+      "index" : 12,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1024
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 768,
+      "index" : 13,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1024
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 14,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 15,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 16,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 17,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 18,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 19,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 20,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 21,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 240,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 22,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : false,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 240,
+          "min" : 1
+        }
+      ],
+      "height" : 720,
+      "index" : 23,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : false,
+      "width" : 1280
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 24,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1440
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 69.527442932128906,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 25,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1440
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 26,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 27,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 28,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 29,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 30,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 31,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 32,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 33,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 34,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 35,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 36,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 37,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 38,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 39,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 240,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 40,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : false,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 240,
+          "min" : 1
+        }
+      ],
+      "height" : 1080,
+      "index" : 41,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : false,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 42,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 43,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 44,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 45,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 46,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 47,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 1440,
+      "index" : 48,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 1920
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1944,
+      "index" : 49,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 2592
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 1944,
+      "index" : 50,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 2592
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2448,
+      "index" : 51,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 3264
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2448,
+      "index" : 52,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 3264
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 53,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 54,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "avc1",
+        "hvc1",
+        "jpeg"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 55,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 56,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 57,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 58,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 59,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 60,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 61,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 62,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec2020HDR"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 63,
+      "pixelFormat" : "x420",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "rec2020HDR",
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 2160,
+      "index" : 64,
+      "pixelFormat" : "x422",
+      "supportsIntrinsics" : true,
+      "width" : 3840
+    },
+    {
+      "autoFocusSystem" : "Contrast",
+      "colorSpaces" : [
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "aprh",
+        "aprn"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 2240,
+      "index" : 65,
+      "pixelFormat" : "btp2",
+      "supportsIntrinsics" : true,
+      "width" : 4224
+    },
+    {
+      "autoFocusSystem" : "Contrast",
+      "colorSpaces" : [
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "aprn"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 120,
+          "min" : 1
+        }
+      ],
+      "height" : 2240,
+      "index" : 66,
+      "pixelFormat" : "btp2",
+      "supportsIntrinsics" : true,
+      "width" : 4224
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 3024,
+      "index" : 67,
+      "pixelFormat" : "420v",
+      "supportsIntrinsics" : true,
+      "width" : 4032
+    },
+    {
+      "autoFocusSystem" : "Phase Detection",
+      "colorSpaces" : [
+        "rec709",
+        "p3D65"
+      ],
+      "compatibleCodecs" : [
+        "apch",
+        "apcn",
+        "apco",
+        "apcs",
+        "hvc1"
+      ],
+      "fieldOfViewDegrees" : 72.044113159179688,
+      "fpsRanges" : [
+        {
+          "max" : 30,
+          "min" : 1
+        }
+      ],
+      "height" : 3024,
+      "index" : 68,
+      "pixelFormat" : "420f",
+      "supportsIntrinsics" : true,
+      "width" : 4032
+    },
+    {
+      "autoFocusSystem" : "Contrast",
+      "colorSpaces" : [
+        "appleLog"
+      ],
+      "compatibleCodecs" : [
+        "aprh",
+        "aprn"
+      ],
+      "fieldOfViewDegrees" : 74.597122192382812,
+      "fpsRanges" : [
+        {
+          "max" : 60,
+          "min" : 1
+        }
+      ],
+      "height" : 3024,
+      "index" : 69,
+      "pixelFormat" : "btp2",
+      "supportsIntrinsics" : true,
+      "width" : 4224
+    }
+  ],
+  "iOS" : "26.0.1",
+  "model" : "iPhone18,1",
+  "sessionID" : "F3E3012D-63BE-45DB-998F-51E2A8291D08"
+}

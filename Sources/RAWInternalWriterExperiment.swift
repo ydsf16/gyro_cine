@@ -315,7 +315,7 @@ final class RAWInternalWriterExperiment: NSObject, AVCaptureVideoDataOutputSampl
                 var settings: [String: Any]?
                 if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                     settings = self.dataOutput.recommendedVideoSettings(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov)
-                    w.metadata = (self.dataOutput.recommendedMovieMetadata(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov) ?? []) + self.slateMetadata
+                    w.metadata = RecordingMetadata.merging(self.dataOutput.recommendedMovieMetadata(forVideoCodecType: self.codec, assetWriterOutputFileType: .mov) ?? [], with: self.slateMetadata)
                 }) { throw failure(exception) }
                 guard let settings, let hint = CMSampleBufferGetFormatDescription(sample) else { throw failure("缺少 RAW 编码配置") }
                 let i = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: hint)

@@ -14,15 +14,22 @@ struct GyroCineApp: App {
                     RecordingSlateView()
                 } else if ProcessInfo.processInfo.arguments.contains("--settings-ui-preview") {
                     SettingsView()
+                } else if ProcessInfo.processInfo.arguments.contains("--media-ui-preview") {
+                    MediaLibraryView()
                 } else { CameraView() }
                 #else
                 CameraView()
                 #endif
             }.environmentObject(camera)
                 .task { await ProStore.shared.prepare() }
-                .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+                .onAppear {
+                    UIApplication.shared.isIdleTimerDisabled = true
+                    RecordingLocation.shared.setActive(true)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     UIApplication.shared.isIdleTimerDisabled = phase == .active
+                    if phase == .active { RecordingLocation.shared.setActive(true) }
+                    else if phase == .background { RecordingLocation.shared.setActive(false) }
                     if phase == .active { Task { await ProStore.shared.prepare() } }
                 }
         }

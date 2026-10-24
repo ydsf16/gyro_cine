@@ -1,0 +1,403 @@
+{
+  "summary": {
+    "planned": 27,
+    "completed": 27,
+    "pass": 25,
+    "fail": 2,
+    "byEncoding": {
+      "hevc": 3,
+      "proRes422HQ": 3,
+      "proRes422": 15,
+      "proRes422LT": 3,
+      "proRes422Proxy": 3
+    },
+    "errors": {
+      "Case watchdog timeout": 2
+    },
+    "missingStandardTags": {}
+  },
+  "cases": [
+    {
+      "request": {
+        "codec": "hvc1",
+        "color": "p3D65",
+        "encoding": "hevc",
+        "fps": 119.88,
+        "height": 2160,
+        "originalIndex": 82,
+        "repetition": 1,
+        "width": 3840
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apch",
+        "color": "p3D65",
+        "encoding": "proRes422HQ",
+        "fps": 60,
+        "height": 2160,
+        "originalIndex": 301,
+        "repetition": 1,
+        "width": 3840
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 336,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 337,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 366,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 367,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog2",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 376,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcs",
+        "color": "appleLog2",
+        "encoding": "proRes422LT",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 517,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apco",
+        "color": "appleLog",
+        "encoding": "proRes422Proxy",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 646,
+        "repetition": 1,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "hvc1",
+        "color": "p3D65",
+        "encoding": "hevc",
+        "fps": 119.88,
+        "height": 2160,
+        "originalIndex": 82,
+        "repetition": 2,
+        "width": 3840
+      },
+      "pass": false,
+      "errors": [
+        "Case watchdog timeout"
+      ]
+    },
+    {
+      "request": {
+        "codec": "apch",
+        "color": "p3D65",
+        "encoding": "proRes422HQ",
+        "fps": 60,
+        "height": 2160,
+        "originalIndex": 301,
+        "repetition": 2,
+        "width": 3840
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 336,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 337,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 366,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 367,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog2",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 376,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcs",
+        "color": "appleLog2",
+        "encoding": "proRes422LT",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 517,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apco",
+        "color": "appleLog",
+        "encoding": "proRes422Proxy",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 646,
+        "repetition": 2,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "hvc1",
+        "color": "p3D65",
+        "encoding": "hevc",
+        "fps": 119.88,
+        "height": 2160,
+        "originalIndex": 82,
+        "repetition": 3,
+        "width": 3840
+      },
+      "pass": false,
+      "errors": [
+        "Case watchdog timeout"
+      ]
+    },
+    {
+      "request": {
+        "codec": "apch",
+        "color": "p3D65",
+        "encoding": "proRes422HQ",
+        "fps": 60,
+        "height": 2160,
+        "originalIndex": 301,
+        "repetition": 3,
+        "width": 3840
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 336,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "rec709",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 337,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 366,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog",
+        "encoding": "proRes422",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 367,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcn",
+        "color": "appleLog2",
+        "encoding": "proRes422",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 376,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apcs",
+        "color": "appleLog2",
+        "encoding": "proRes422LT",
+        "fps": 120,
+        "height": 1080,
+        "originalIndex": 517,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    },
+    {
+      "request": {
+        "codec": "apco",
+        "color": "appleLog",
+        "encoding": "proRes422Proxy",
+        "fps": 119.88,
+        "height": 1080,
+        "originalIndex": 646,
+        "repetition": 3,
+        "width": 1920
+      },
+      "pass": true,
+      "errors": []
+    }
+  ]
+}

@@ -78,7 +78,7 @@ enum RecordingColorSpace: String, CaseIterable, Identifiable {
         case .p3D65: .P3_D65
         case .appleLog: .appleLog
         case .appleLog2:
-            if #available(iOS 27.0, *) { .appleLog2 } else { nil }
+            if #available(iOS 26.0, *) { .appleLog2 } else { nil }
         }
     }
 

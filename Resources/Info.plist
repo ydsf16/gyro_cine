@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Save your recording location in videos when Record location is enabled.</string>
     <key>GyroCineTestFlightProBypass</key>
     <string>$(GYROCINE_TESTFLIGHT_PRO_BYPASS)</string>
     <key>GyroCineTestFlightFreeBuild</key>

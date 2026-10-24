@@ -1,0 +1,108 @@
+{
+  "audioTracks": 1,
+  "averageFPS": 30,
+  "bytes": 427539710,
+  "codec": "aprh",
+  "decodedFrames": 93,
+  "decodeError": "",
+  "decodeStatus": "completed",
+  "duration": 3.1,
+  "estimatedMissingFrames": 0,
+  "expectedFPS": 30,
+  "frames": 93,
+  "hasTelemetry": true,
+  "height": 2240,
+  "maximumFrameGapMS": 33.333333333333655,
+  "metadata": [
+    {
+      "id": "mdta/com.apple.quicktime.camera.identifier",
+      "value": "A"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.reel",
+      "value": "1"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.scene",
+      "value": "1"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.take",
+      "value": "839"
+    },
+    {
+      "id": "mdta/com.tinygrape.gyrocine.slate",
+      "value": "{\"take\":839,\"timeOfDay\":\"\",\"reel\":1,\"director\":\"\",\"autoTake\":true,\"environment\":\"\",\"scene\":1,\"production\":\"\",\"cinematographer\":\"\",\"camera\":\"A\"}"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.creationdate",
+      "value": "2026-10-24T11:09:16+08:00"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.make",
+      "value": "Apple"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.model",
+      "value": "iPhone18,1"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.software",
+      "value": "GyroCine 1.1 (20261020.2)"
+    },
+    {
+      "id": "mdta/com.tinygrape.gyrocine.capture",
+      "value": "{\"aperture\":2.2000000476837158,\"codec\":\"aprh\",\"colorSpace\":\"RAW\",\"exposureSeconds\":0.016667998999999999,\"fps\":30,\"height\":2240,\"iso\":118.54529571533203,\"lensName\":\"后置超广角相机\",\"lensType\":\"AVCaptureDeviceTypeBuiltInUltraWideCamera\",\"lutBurned\":false,\"model\":\"iPhone18,1\",\"position\":\"back\",\"schema\":1,\"scope\":\"recordingStart\",\"tint\":14.905287742614746,\"whiteBalanceKelvin\":5080.9345703125,\"width\":4224,\"zoom\":1}"
+    },
+    {
+      "id": "mdta/org.smpte.rdd18.camera.isosensitivity",
+      "value": "125"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.make",
+      "value": "Apple"
+    },
+    {
+      "id": "mdta/com.apple.quicktime.model",
+      "value": "iPhone 17 Pro"
+    },
+    {
+      "id": "mdta/com.apple.proresraw.whitebalance.bycct.colormatrices",
+      "value": "Optional(<00040001 000007d0 3f082aba 3d8730c9 3eb48082 3def29b1 3f4d05cc 3da8a7f3 be0a420c bf3dbb25 3ffb8c12 00000af0 3f082aba 3d8730c9 3eb48082 3def29b1 3f4d05cc 3da8a7f3 be0a420c bf3dbb25 3ffb8c12 00001964 3f079491 3e7e9e7a 3e305392 3e30b675 3f6dcfcb bdcfeb3e bbc4b854 becbb1fb 3fbf1776 00003a98 3f079491 3e7e9e7a 3e305392 3e30b675 3f6dcfcb bdcfeb3e bbc4b854 becbb1fb 3fbf1776>)"
+    },
+    {
+      "id": "mdta/com.apple.proresraw.whitebalance.bycct.whitebalancefactors",
+      "value": "Optional(<000f0001 000007d0 3edc401e 3ffe9519 00000834 3ee940dd 3ff46cb7 00000898 3ef62090 3fea6d13 0000092e 3f049fdf 3fdc79b1 000009c4 3f0a3662 3fd4d7e5 00001388 3f6b990f 3f7aea1b 00001644 3f847886 3f5ba1e1 00001964 3f8a53df 3f4ffe54 00001d4c 3f92816b 3f41c98a 000021fc 3f99fe59 3f361240 00002710 3fa04a9f 3f2d4a7d 00002bf2 3fa4c921 3f27298a 000030d4 3fa858d9 3f228561 000035b6 3fab2e32 3f1ee9f5 00003a98 3fad8423 3f1c08a8>)"
+    },
+    {
+      "id": "mdta/com.apple.proresraw.lscdata",
+      "value": "<binary metadata present; omitted from summary>"
+    },
+    {
+      "id": "mdta/org.smpte.rdd18.camera.shutterspeed_angle",
+      "value": "179.99deg"
+    },
+    {
+      "id": "mdta/org.smpte.rdd18.camera.shutterspeed_time",
+      "value": "0.016668"
+    },
+    {
+      "id": "mdta/org.smpte.rdd18.camera.whitebalance",
+      "value": "5052K"
+    },
+    {
+      "id": "mdta/com.apple.proresraw.whitebalance.byccttint.colormatrices",
+      "value": "Optional(<00040001 000007d0 3fa5f571 bf0c4d93 be898f5e bed46ee3 3fb8b7e3 3d3e7351 b9a6d865 3e1b4623 3f1b0e70 00000af0 3fa5f571 bf0c4d93 be898f5e bed46ee3 3fb8b7e3 3d3e7351 b9a6d865 3e1b4623 3f1b0e70 00001964 3f716d41 be9db063 be04d540 becedd62 3f9f4c67 3e06621c bd7bf91c 3e50ec86 3ee03b0f 00003a98 3f716d41 be9db063 be04d540 becedd62 3f9f4c67 3e06621c bd7bf91c 3e50ec86 3ee03b0f>)"
+    },
+    {
+      "id": "udta/rmin",
+      "value": "<binary metadata present; omitted from summary>"
+    },
+    {
+      "id": "udta/xml%20",
+      "value": "Optional(<3c436f6d 70617469 62696c69 7479206d 616e7566 61637475 7265723d 22536f6e 7922206d 6f64656c 4e616d65 3d224779 726f4369 6e652069 50686f6e 6531382c 3120636f 6d706174 6962696c 69747922 3e3c4c65 6e73206d 6f64656c 4e616d65 3d224170 706c6520 7065722d 6672616d 65204b22 2f3e3c2f 436f6d70 61746962 696c6974 793e>)"
+    }
+  ],
+  "movie": "IMG_0037.mov",
+  "width": 4224
+}

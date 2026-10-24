@@ -1,0 +1,1130 @@
+[
+  {
+    "data": {
+      "codec": "ProRes 422 Proxy",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.002923,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 76.22307586669922,
+        "lensPosition": 0.7647058963775635,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apco",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apco",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 Proxy",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.430908203125,
+          1,
+          1.957275390625
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 50302.39758279167,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:18:57Z"
+  },
+  {
+    "data": {
+      "firstHost": 50302.635748457,
+      "outputIsRecording": true,
+      "startPTS": 50302.635745746,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.008238,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 67.763671875,
+        "lensPosition": 0.7764706015586853,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apco",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apco",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 Proxy",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.419921875,
+          1,
+          1.9501953125
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_start",
+    "monotonicSeconds": 50302.66438845834,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:18:57Z"
+  },
+  {
+    "data": {
+      "error": "",
+      "fileBytes": 38018405,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.007196,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 83.9076919555664,
+        "lensPosition": 0.7529411911964417,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apco",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apco",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 Proxy",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.419921875,
+          1,
+          1.9501953125
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_finish",
+    "monotonicSeconds": 50310.79637800001,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:19:05Z"
+  },
+  {
+    "data": {
+      "dataOutputDroppedReasons": {},
+      "expectedIntervalSeconds": 0.03333333333333333,
+      "failedFrames": 0,
+      "file": "UITEST_IMG_2026-10-24-08-18-57.mov",
+      "firstGapExamples": [],
+      "longGapCount": 0,
+      "maxCallbackLatencySeconds": 0.11824662500293925,
+      "maxProcessingSeconds": 0.0011758749969885685,
+      "maxPTSGapSeconds": 0.033347001000947785,
+      "maxWriteSeconds": 0.0008938749961089343,
+      "meanProcessingSeconds": 0.0005642591679304587,
+      "receivedFrames": 256
+    },
+    "eventType": "intrinsics_capture_health",
+    "monotonicSeconds": 50310.92180854167,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:19:06Z"
+  },
+  {
+    "data": {
+      "movie": "UITEST_IMG_2026-10-24-08-18-57.mov",
+      "seconds": 0.14345670833426993
+    },
+    "eventType": "imu_finalize_total",
+    "monotonicSeconds": 50311.08183779167,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:19:06Z"
+  },
+  {
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 30,
+      "bytes": 38095799,
+      "codec": "apco",
+      "decodedFrames": 242,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.066666666666666,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 242,
+      "hasTelemetry": true,
+      "height": 2160,
+      "maximumFrameGapMS": 33.3333333333341,
+      "movie": "UITEST_IMG_2026-10-24-08-18-57.mov",
+      "width": 3840
+    },
+    "eventType": "raw_smoke_result",
+    "monotonicSeconds": 50312.60844845833,
+    "sessionID": "288A43B5-24AB-4223-AB76-F3358E7B578F",
+    "wallTime": "2026-10-24T00:19:07Z"
+  },
+  {
+    "data": {
+      "codec": "ProRes 422 LT",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 54,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.016679,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 86.953125,
+        "lensPosition": 0.8117647171020508,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 54,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.08203125,
+          1,
+          1.8994140625
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 50425.48467291667,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:21:00Z"
+  },
+  {
+    "data": {
+      "firstHost": 50425.7146235,
+      "outputIsRecording": true,
+      "startPTS": 50425.714629042,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 54,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.016679,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 152.54319763183594,
+        "lensPosition": 0.8039215803146362,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 54,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.08203125,
+          1,
+          1.8994140625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_start",
+    "monotonicSeconds": 50425.76046770834,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:21:00Z"
+  },
+  {
+    "data": {
+      "codec": "apcs",
+      "seconds": 120
+    },
+    "eventType": "raw_free_limit_reached",
+    "monotonicSeconds": 50545.72871895834,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:23:00Z"
+  },
+  {
+    "data": {
+      "error": "",
+      "fileBytes": 3403972315,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 54,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.016679,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 130.89393615722656,
+        "lensPosition": 0.8274509906768799,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 54,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.08203125,
+          1,
+          1.8994140625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_finish",
+    "monotonicSeconds": 50545.88669000001,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:23:01Z"
+  },
+  {
+    "data": {
+      "dataOutputDroppedReasons": {},
+      "expectedIntervalSeconds": 0.03333333333333333,
+      "failedFrames": 0,
+      "file": "UITEST_IMG_2026-10-24-08-21-00.mov",
+      "firstGapExamples": [],
+      "longGapCount": 0,
+      "maxCallbackLatencySeconds": 0.12247295700217364,
+      "maxProcessingSeconds": 0.006275207997532561,
+      "maxPTSGapSeconds": 0.03335433999745874,
+      "maxWriteSeconds": 0.006120457997894846,
+      "meanProcessingSeconds": 0.000561261575510605,
+      "receivedFrames": 3616
+    },
+    "eventType": "intrinsics_capture_health",
+    "monotonicSeconds": 50546.01279879167,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:23:01Z"
+  },
+  {
+    "data": {
+      "movie": "UITEST_IMG_2026-10-24-08-21-00.mov",
+      "seconds": 1.265640916666598
+    },
+    "eventType": "imu_finalize_total",
+    "monotonicSeconds": 50547.29428770833,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:23:02Z"
+  },
+  {
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 29.999583454825675,
+      "bytes": 3405021081,
+      "codec": "apcs",
+      "decodedFrames": 3601,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 120.035,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 3601,
+      "hasTelemetry": true,
+      "height": 2160,
+      "maximumFrameGapMS": 35.000000000003695,
+      "movie": "UITEST_IMG_2026-10-24-08-21-00.mov",
+      "width": 3840
+    },
+    "eventType": "raw_smoke_result",
+    "monotonicSeconds": 50569.13516791667,
+    "sessionID": "537F6038-3C07-4C2E-8F66-683957CEC050",
+    "wallTime": "2026-10-24T00:23:24Z"
+  },
+  {
+    "data": {
+      "codec": "ProRes 422",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.002923,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 76.52082061767578,
+        "lensPosition": 0.7490196228027344,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcn",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcn",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.4384765625,
+          1,
+          1.93310546875
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 50396.32636329167,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:31Z"
+  },
+  {
+    "data": {
+      "firstHost": 50396.66823825,
+      "outputIsRecording": false,
+      "startPTS": 50396.66825625,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.008238,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 68.69422912597656,
+        "lensPosition": 0.7607843279838562,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcn",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcn",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.44677734375,
+          1,
+          1.951904296875
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_start",
+    "monotonicSeconds": 50396.69773508333,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:31Z"
+  },
+  {
+    "data": {
+      "audioPackets": 347,
+      "error": "",
+      "frames": 241,
+      "maxGPUms": 37.037250003777444,
+      "meanGPUms": 6.352561203201583,
+      "peakBuffered": 2,
+      "stopToWriterSeconds": 0.007529916663770564
+    },
+    "eventType": "lut_realtime_finished",
+    "monotonicSeconds": 50404.860958083336,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:40Z"
+  },
+  {
+    "data": {
+      "error": "",
+      "fileBytes": 24975253,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.012419,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 108,
+        "lensPosition": 0.5568627119064331,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcn",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcn",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.468017578125,
+          1,
+          1.975341796875
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_finish",
+    "monotonicSeconds": 50404.861893458336,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:40Z"
+  },
+  {
+    "data": {
+      "dataOutputDroppedReasons": {},
+      "expectedIntervalSeconds": 0.03333333333333333,
+      "failedFrames": 0,
+      "file": "UITEST_IMG_2026-10-24-08-20-31.mov",
+      "firstGapExamples": [
+        {
+          "callbackLatencySeconds": 0.027953832999628503,
+          "gapSeconds": 0.13333404200238874,
+          "hostTime": 50396.66823825
+        },
+        {
+          "callbackLatencySeconds": 0.03452398999797879,
+          "gapSeconds": 0.13333554199925857,
+          "hostTime": 50404.834937635
+        }
+      ],
+      "longGapCount": 2,
+      "maxCallbackLatencySeconds": 0.0350690420018509,
+      "maxProcessingSeconds": 0.0035162499989382923,
+      "maxPTSGapSeconds": 0.13333554199925857,
+      "maxWriteSeconds": 0.00028945800295332447,
+      "meanProcessingSeconds": 0.0005019345395368642,
+      "receivedFrames": 252
+    },
+    "eventType": "intrinsics_capture_health",
+    "monotonicSeconds": 50404.98465754167,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:40Z"
+  },
+  {
+    "data": {
+      "movie": "UITEST_IMG_2026-10-24-08-20-31.mov",
+      "seconds": 0.11021429166430607
+    },
+    "eventType": "imu_finalize_total",
+    "monotonicSeconds": 50405.11001616667,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:40Z"
+  },
+  {
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 29.999190893191678,
+      "bytes": 25051150,
+      "codec": "apcn",
+      "decodedFrames": 241,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.03355,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 241,
+      "hasTelemetry": true,
+      "height": 2160,
+      "maximumFrameGapMS": 33.36666666666665,
+      "movie": "UITEST_IMG_2026-10-24-08-20-31.mov",
+      "width": 3840
+    },
+    "eventType": "raw_smoke_result",
+    "monotonicSeconds": 50406.49287670833,
+    "sessionID": "2B67CBA4-8D1F-46F0-B68B-B8943B9DE10B",
+    "wallTime": "2026-10-24T00:20:41Z"
+  },
+  {
+    "data": {
+      "codec": "ProRes 422 HQ",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.002975,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 76.015380859375,
+        "lensPosition": 0.7647058963775635,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apch",
+          "AVVideoCompressionPropertiesKey": {
+            "AverageBitRate": 760000000,
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "PrioritizeEncodingSpeedOverQuality": false,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apch",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 HQ",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.4267578125,
+          1,
+          1.943115234375
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 50336.47827608333,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:31Z"
+  },
+  {
+    "data": {
+      "firstHost": 50336.691770082,
+      "outputIsRecording": true,
+      "startPTS": 50336.691764623,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.008238,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 68.70072174072266,
+        "lensPosition": 0.772549033164978,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apch",
+          "AVVideoCompressionPropertiesKey": {
+            "AverageBitRate": 760000000,
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "PrioritizeEncodingSpeedOverQuality": false,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apch",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 HQ",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.42138671875,
+          1,
+          1.939453125
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_start",
+    "monotonicSeconds": 50336.716513875006,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:31Z"
+  },
+  {
+    "data": {
+      "error": "",
+      "fileBytes": 505978237,
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 56,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.007339,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 83.07691955566406,
+        "lensPosition": 0.7568627595901489,
+        "maxFrameDurationSeconds": 0.03333333333333333,
+        "minFrameDurationSeconds": 0.03333333333333333,
+        "outputSettings": {
+          "AVVideoCodecKey": "apch",
+          "AVVideoCompressionPropertiesKey": {
+            "AverageBitRate": 760000000,
+            "ExpectedFrameRate": 30,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "PrioritizeEncodingSpeedOverQuality": false,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apch",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 HQ",
+        "selectedFormat": 56,
+        "selectedFPS": 30,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.42138671875,
+          1,
+          1.939453125
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_finish",
+    "monotonicSeconds": 50344.93029891667,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:40Z"
+  },
+  {
+    "data": {
+      "dataOutputDroppedReasons": {},
+      "expectedIntervalSeconds": 0.03333333333333333,
+      "failedFrames": 0,
+      "file": "UITEST_IMG_2026-10-24-08-19-31.mov",
+      "firstGapExamples": [],
+      "longGapCount": 0,
+      "maxCallbackLatencySeconds": 0.028804249996028375,
+      "maxProcessingSeconds": 0.006013958001858555,
+      "maxPTSGapSeconds": 0.033350752004480455,
+      "maxWriteSeconds": 0.005812957999296486,
+      "meanProcessingSeconds": 0.0005139499262158936,
+      "receivedFrames": 258
+    },
+    "eventType": "intrinsics_capture_health",
+    "monotonicSeconds": 50345.058766333335,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:40Z"
+  },
+  {
+    "data": {
+      "movie": "UITEST_IMG_2026-10-24-08-19-31.mov",
+      "seconds": 0.12660200000391342
+    },
+    "eventType": "imu_finalize_total",
+    "monotonicSeconds": 50345.190611000005,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:40Z"
+  },
+  {
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 30,
+      "bytes": 506056213,
+      "codec": "apch",
+      "decodedFrames": 244,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 8.133333333333333,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 30,
+      "frames": 244,
+      "hasTelemetry": true,
+      "height": 2160,
+      "maximumFrameGapMS": 33.3333333333341,
+      "movie": "UITEST_IMG_2026-10-24-08-19-31.mov",
+      "width": 3840
+    },
+    "eventType": "raw_smoke_result",
+    "monotonicSeconds": 50346.695178125,
+    "sessionID": "4037E36E-A3B8-4EED-AA57-B734D4DBA57F",
+    "wallTime": "2026-10-24T00:19:41Z"
+  },
+  {
+    "data": {
+      "firstHost": 50612.679801458,
+      "outputIsRecording": true,
+      "startPTS": 50612.679799375,
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 55,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.008340999,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 254.08953857421875,
+        "lensPosition": 0.8274509906768799,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "rec709",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 55,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.0341796875,
+          1,
+          1.875244140625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_start",
+    "monotonicSeconds": 50612.71706433334,
+    "sessionID": "1277DE86-A563-4A42-90FE-91BA246DAF7E",
+    "wallTime": "2026-10-24T00:24:07Z"
+  },
+  {
+    "data": {
+      "error": "",
+      "fileBytes": 133890209,
+      "state": {
+        "activeColorSpace": 0,
+        "actualFormat": 55,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.008340999,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 290.32415771484375,
+        "lensPosition": 0.8235294222831726,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "hvc1",
+          "AVVideoCompressionPropertiesKey": {
+            "AllowFrameReordering": true,
+            "AllowOpenGOP": true,
+            "AverageBitRate": 49766400,
+            "BaseLayerFrameRate": 30,
+            "ExpectedFrameRate": 60,
+            "MaxAllowedFrameQP": 41,
+            "MaximumRealTimeFrameRate": 60,
+            "MaxKeyFrameIntervalDuration": 1,
+            "MinAllowedFrameQP": 15,
+            "MinimizeMemoryUsage": true,
+            "Priority": 80,
+            "ProfileLevel": "HEVC_Main_AutoLevel",
+            "RealTime": true,
+            "RelaxAverageBitRateTarget": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "hvc1",
+        "selectedColorSpace": "rec709",
+        "selectedEncoding": "H.265",
+        "selectedFormat": 55,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.0341796875,
+          1,
+          1.875244140625
+        ],
+        "whiteBalanceMode": 0
+      }
+    },
+    "eventType": "record_delegate_finish",
+    "monotonicSeconds": 50632.972153208335,
+    "sessionID": "1277DE86-A563-4A42-90FE-91BA246DAF7E",
+    "wallTime": "2026-10-24T00:24:28Z"
+  },
+  {
+    "data": {
+      "dataOutputDroppedReasons": {},
+      "expectedIntervalSeconds": 0.016666666666666666,
+      "failedFrames": 0,
+      "file": "UITEST_IMG_2026-10-24-08-24-07.mov",
+      "firstGapExamples": [],
+      "longGapCount": 0,
+      "maxCallbackLatencySeconds": 0.03636530000221683,
+      "maxProcessingSeconds": 0.006802249998145271,
+      "maxPTSGapSeconds": 0.01669133199902717,
+      "maxWriteSeconds": 0.0063879169974825345,
+      "meanProcessingSeconds": 0.0003948955669036349,
+      "receivedFrames": 1240
+    },
+    "eventType": "intrinsics_capture_health",
+    "monotonicSeconds": 50633.10263104167,
+    "sessionID": "1277DE86-A563-4A42-90FE-91BA246DAF7E",
+    "wallTime": "2026-10-24T00:24:28Z"
+  },
+  {
+    "data": {
+      "movie": "UITEST_IMG_2026-10-24-08-24-07.mov",
+      "seconds": 0.36804491667135153
+    },
+    "eventType": "imu_finalize_total",
+    "monotonicSeconds": 50633.491133166666,
+    "sessionID": "1277DE86-A563-4A42-90FE-91BA246DAF7E",
+    "wallTime": "2026-10-24T00:24:28Z"
+  },
+  {
+    "data": {
+      "audioTracks": 1,
+      "averageFPS": 59.97513468711148,
+      "bytes": 134221860,
+      "codec": "hvc1",
+      "decodedFrames": 1206,
+      "decodeError": "",
+      "decodeStatus": "completed",
+      "duration": 20.108333333333334,
+      "estimatedMissingFrames": 0,
+      "expectedFPS": 60,
+      "frames": 1206,
+      "hasTelemetry": true,
+      "height": 2160,
+      "maximumFrameGapMS": 18.333333333334423,
+      "movie": "UITEST_IMG_2026-10-24-08-24-07.mov",
+      "width": 3840
+    },
+    "eventType": "raw_smoke_result",
+    "monotonicSeconds": 50640.024786875,
+    "sessionID": "1277DE86-A563-4A42-90FE-91BA246DAF7E",
+    "wallTime": "2026-10-24T00:24:35Z"
+  },
+  {
+    "data": {
+      "codec": "ProRes 422 LT",
+      "color": "appleLog",
+      "state": {
+        "activeColorSpace": 3,
+        "actualFormat": 60,
+        "adjustingFocus": false,
+        "exposureBias": 0,
+        "exposureMode": 2,
+        "exposureSeconds": 0.002908,
+        "focusMode": "continuousAutoFocus",
+        "focusPoint": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "iso": 76.43077087402344,
+        "lensPosition": 0.7686274647712708,
+        "maxFrameDurationSeconds": 0.016666666666666666,
+        "minFrameDurationSeconds": 0.016666666666666666,
+        "outputSettings": {
+          "AVVideoCodecKey": "apcs",
+          "AVVideoCompressionPropertiesKey": {
+            "ExpectedFrameRate": 60,
+            "PrepareEncodedSampleBuffersForPaddedWrites": true,
+            "RealTime": true
+          },
+          "AVVideoHeightKey": 2160,
+          "AVVideoWidthKey": 3840
+        },
+        "requestedExposureSeconds": null,
+        "requestedISO": null,
+        "selectedCodec": "apcs",
+        "selectedColorSpace": "appleLog",
+        "selectedEncoding": "ProRes 422 LT",
+        "selectedFormat": 60,
+        "selectedFPS": 60,
+        "shutterAngle": null,
+        "whiteBalanceChoice": "Auto-L",
+        "whiteBalanceGains": [
+          2.437744140625,
+          1,
+          1.948486328125
+        ],
+        "whiteBalanceMode": 2
+      }
+    },
+    "eventType": "prores422_smoke_ready",
+    "monotonicSeconds": 50362.362735500006,
+    "sessionID": "50F17DF7-2E53-4232-A283-1C58A6531CCD",
+    "wallTime": "2026-10-24T00:19:57Z"
+  },
+  {
+    "data": {
+      "message": "Start recording: NSInvalidArgumentException: *** -[AVCaptureMovieFileOutput startRecordingToOutputFileURL:recordingDelegate:] Capturing 4k60 with ProRes codec on this device is supported only on external storage device."
+    },
+    "eventType": "error",
+    "monotonicSeconds": 50362.453678833335,
+    "sessionID": "50F17DF7-2E53-4232-A283-1C58A6531CCD",
+    "wallTime": "2026-10-24T00:19:57Z"
+  }
+]

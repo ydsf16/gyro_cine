@@ -2,3 +2,5 @@
 "NSMicrophoneUsageDescription" = "GyroCine records sound with your videos.";
 "NSMotionUsageDescription" = "GyroCine records motion data for video stabilization and determines recording orientation.";
 "NSPhotoLibraryAddUsageDescription" = "GyroCine saves the clips you select to your photo library.";
+
+"NSLocationWhenInUseUsageDescription" = "Save your recording location in videos when Record location is enabled.";

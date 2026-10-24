@@ -1,0 +1,18 @@
+{
+  "audioTracks": 1,
+  "averageFPS": 30,
+  "bytes": 436796952,
+  "codec": "aprh",
+  "decodedFrames": 94,
+  "decodeError": "",
+  "decodeStatus": "completed",
+  "duration": 3.1333333333333333,
+  "estimatedMissingFrames": 0,
+  "expectedFPS": 30,
+  "frames": 94,
+  "hasTelemetry": true,
+  "height": 2240,
+  "maximumFrameGapMS": 33.333333333333655,
+  "movie": "IMG_0035.mov",
+  "width": 4224
+}

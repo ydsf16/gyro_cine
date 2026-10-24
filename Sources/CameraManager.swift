@@ -398,6 +398,18 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var telemetryReadoutTick = 0
     #if DEBUG
     private let verificationQueue = DispatchQueue(label: "GyroCine.testVerification", qos: .utility)
+    private var matrixCases: [[String: Any]] = []
+    private var matrixIndex = 0
+    private var matrixLimit = Int.max
+    private var matrixActive = false
+    private var matrixToken = UUID()
+    private var matrixActual: [String: Any] = [:]
+    private var matrixError = ""
+    private var matrixDirectory: URL {
+        let suffix = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--matrix-run=") }
+            .map { String($0.dropFirst("--matrix-run=".count).filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }.prefix(48)) } ?? ""
+        return RecordingStoragePaths.diagnosticDirectory.appendingPathComponent(suffix.isEmpty ? "format-matrix" : "format-matrix-" + suffix, isDirectory: true)
+    }
     private var rawSmokeMovieName: String?
     private var rawWriterSmokeCompleted = 0
     private var exposureSmokeLensSwitchAttempted = false
@@ -542,6 +554,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     }
     private func fail(_ message: String) {
         logger.event("error", ["message": message])
+        #if DEBUG
+        if matrixActive { matrixError = message }
+        #endif
         publish { self.errorText = message; self.status = message }
     }
     private func failStorage(_ message: String, retryOnReconnect: Bool = false) {
@@ -785,13 +800,23 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     private var recordingSlate = RecordingSlate()
 
+    private func movieMetadata(burnedLUT: Bool = false) -> [AVMetadataItem] {
+        guard let device else { return recordingSlate.metadata }
+        return recordingSlate.metadata + RecordingLocation.shared.snapshot() + RecordingMetadata.capture(device: device,
+            model: Self.hardwareModel(), color: chosenEncoding.isRAW ? "RAW" :
+                (burnedLUT ? "Rec.709" : chosenRecordingColorSpace.title(locale: Locale(identifier: "en"))),
+            codec: chosenEncoding.codec.rawValue, fps: chosenFPS, burnedLUT: burnedLUT)
+    }
+
+
     private func movieDestination(localDirectory: URL, baseName: String) throws -> (URL, Bool) {
         recordingSlate = RecordingSlate.load()
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--slate-smoke") {
+        if ProcessInfo.processInfo.arguments.contains("--slate-smoke") || ProcessInfo.processInfo.arguments.contains("--matrix-metadata-probe") {
             recordingSlate.production = "UITEST Slate QA"
             recordingSlate.director = "GyroCine Director"
             recordingSlate.cinematographer = "GyroCine Camera Operator"
+            recordingSlate.notes = "UITEST notes / 测试备注"
             recordingSlate.scene = 12; recordingSlate.take = 3
         }
         #endif
@@ -1099,6 +1124,146 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             logProVideoStorage("probe_raw_codec_only_settings")
         }
         publish { self.cameraReady = false; self.status = "Storage probe complete; relaunch app" }
+    }
+
+    // DEBUG-only exhaustive matrix; never runs without an explicit launch flag.
+    // Each successful case is decoded before its test-owned movie is removed.
+    private func beginFormatMatrix() {
+        guard !matrixActive else { return }
+        try? FileManager.default.createDirectory(at: matrixDirectory, withIntermediateDirectories: true)
+        for encoding in VideoEncoding.allCases where !encoding.isRAW {
+            let compatible = formatObjects.filter { $0.compatibleCodecs.contains(encoding.codec.rawValue) }
+            let gate = compatible.filter { $0.width >= 3000 && Double($0.width) / Double($0.height) < 1.65 }
+                .max { Int64($0.width) * Int64($0.height) < Int64($1.width) * Int64($1.height) }
+            var sizes: [(Int32, Int32)] = [(1920, 1080), (1920, 1440), (3840, 2160)]
+            if let gate { sizes.append((gate.width, gate.height)) }
+            for (width, height) in sizes {
+                for color in RecordingColorSpace.selectableCases {
+                    let formats = compatible.filter { $0.width == width && $0.height == height && color.isAvailable(for: $0.format, encoding: encoding) }
+                    let rates = Set(formats.flatMap { CaptureFrameRatePolicy.available(for: $0) })
+                        .filter { !(encoding.isProRes422 && width >= 3840 && $0 > 60.01) }.sorted()
+                    for fps in rates {
+                        matrixCases.append(["encoding": encoding.rawValue, "codec": encoding.codec.rawValue,
+                            "width": Int(width), "height": Int(height), "color": color.rawValue, "fps": fps])
+                    }
+                }
+            }
+        }
+        if let selected = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--matrix-indices=") }) {
+            let indices = selected.dropFirst("--matrix-indices=".count).split(separator: ",").compactMap { Int($0) }
+            matrixCases = indices.filter { matrixCases.indices.contains($0) }.map { index in
+                var spec = matrixCases[index]; spec["originalIndex"] = index; return spec
+            }
+        }
+        let repeats = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--matrix-repeat=") }
+            .flatMap { Int($0.dropFirst("--matrix-repeat=".count)) }.map { min(5, max(1, $0)) } ?? 1
+        let selectedCases = matrixCases
+        matrixCases = (0..<repeats).flatMap { repetition in selectedCases.map { original in
+            var spec = original; spec["repetition"] = repetition + 1; return spec
+        } }
+        matrixIndex = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--matrix-start-index=") }
+            .flatMap { Int($0.dropFirst("--matrix-start-index=".count)) } ?? 0
+        matrixLimit = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--matrix-limit=") }
+            .flatMap { Int($0.dropFirst("--matrix-limit=".count)) }.map { matrixIndex + $0 } ?? Int.max
+        matrixWrite(["camera": device?.uniqueID ?? "", "cases": matrixCases], to: "plan.json")
+        matrixActive = true
+        runNextMatrixCase()
+    }
+
+    private func matrixWrite(_ value: [String: Any], to name: String) {
+        if let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: matrixDirectory.appendingPathComponent(name), options: .atomic)
+        }
+    }
+
+    private func runNextMatrixCase() {
+        guard matrixActive else { return }
+        guard matrixIndex < min(matrixCases.count, matrixLimit) else {
+            matrixActive = false
+            matrixWrite(["phase": "completed", "nextIndex": matrixIndex, "total": matrixCases.count], to: "progress.json")
+            return
+        }
+        guard !captureFinishing, !recordingStarting, !recoveryInProgress, !output.isRecording, realtimeLUTWriter == nil else {
+            queue.asyncAfter(deadline: .now() + 0.5) { self.runNextMatrixCase() }; return
+        }
+        if ProcessInfo.processInfo.thermalState == .critical || ProcessInfo.processInfo.thermalState == .serious {
+            // A high-FPS preview keeps producing heat even between test cases.
+            // Pause capture while cooling; the next case restarts the session.
+            if session.isRunning { session.stopRunning() }
+            matrixWrite(["phase": "cooling", "nextIndex": matrixIndex, "total": matrixCases.count], to: "progress.json")
+            queue.asyncAfter(deadline: .now() + 10) { self.runNextMatrixCase() }; return
+        }
+        let spec = matrixCases[matrixIndex]
+        let encoding = VideoEncoding(rawValue: spec["encoding"] as! String)!
+        let color = RecordingColorSpace(rawValue: spec["color"] as! String)!
+        let fps = spec["fps"] as! Double
+        matrixError = ""; matrixActual = [:]; matrixToken = UUID()
+        matrixWrite(["phase": "recording", "index": matrixIndex, "total": matrixCases.count, "request": spec], to: "progress.json")
+        publish { self.errorText = nil }
+        let candidates = formatObjects.filter {
+            Int($0.width) == spec["width"] as! Int && Int($0.height) == spec["height"] as! Int &&
+            $0.supports(fps) && $0.compatibleCodecs.contains(encoding.codec.rawValue) && color.isAvailable(for: $0.format, encoding: encoding)
+        }
+        guard let target = candidates.max(by: {
+            ($0.supportsIntrinsics ? 1 : 0, $0.format.autoFocusSystem == .none ? 0 : 1, -$0.index) <
+            ($1.supportsIntrinsics ? 1 : 0, $1.format.autoFocusSystem == .none ? 0 : 1, -$1.index)
+        }) else { finishMatrixCase(["error": "No exact format"]); return }
+        chosenEncoding = encoding; chosenCodec = encoding.codec; chosenFPS = fps
+        chosenRecordingColorSpace = color
+        session.stopRunning()
+        let applied = applyFormat(target.index, reason: "format_matrix")
+        session.startRunning()
+        matrixActual = configurationSnapshot()
+        guard applied, chosenEncoding == encoding, abs(chosenFPS - fps) < 0.001,
+              let active = device, active.activeColorSpace == color.captureColorSpace else {
+            finishMatrixCase(["error": matrixError.isEmpty ? "Configuration mismatch" : matrixError]); return
+        }
+        let token = matrixToken
+        queue.asyncAfter(deadline: .now() + 35) {
+            guard self.matrixActive, self.matrixToken == token else { return }
+            // Preserve failed media and stop the batch for safe host-side recovery.
+            let result: [String: Any] = ["index": self.matrixIndex, "request": spec, "actual": self.matrixActual,
+                "error": self.matrixError.isEmpty ? "Case watchdog timeout" : self.matrixError]
+            self.matrixWrite(result, to: String(format: "%04d.json", self.matrixIndex))
+            self.matrixWrite(["phase": "halted", "nextIndex": self.matrixIndex + 1, "total": self.matrixCases.count], to: "progress.json")
+            self.matrixActive = false
+            if self.output.isRecording || self.realtimeLUTWriter != nil { self.toggleRecording() }
+        }
+        startSmokeRecordingWhenReady(deadline: ProcessInfo.processInfo.systemUptime + 20)
+    }
+
+    private func finishMatrixCase(_ inspection: [String: Any]) {
+        guard matrixActive else { return }
+        var result = inspection
+        result["index"] = matrixIndex; result["request"] = matrixCases[matrixIndex]; result["actual"] = matrixActual
+        if !matrixError.isEmpty { result["captureError"] = matrixError }
+        matrixWrite(result, to: String(format: "%04d.json", matrixIndex))
+        matrixToken = UUID(); matrixIndex += 1
+        queue.asyncAfter(deadline: .now() + 0.15) { self.runNextMatrixCase() }
+    }
+
+    private func exportMatrixMovieHeader(_ movie: URL, name: String) throws {
+        let handle = try FileHandle(forReadingFrom: movie); defer { try? handle.close() }
+        let total = try handle.seekToEnd(); try handle.seek(toOffset: 0)
+        while try handle.offset() + 8 <= total {
+            let start = try handle.offset()
+            guard let header = try handle.read(upToCount: 8), header.count == 8 else { break }
+            var size = header.prefix(4).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+            let kind = String(data: header.suffix(4), encoding: .ascii)
+            if size == 1 {
+                guard let extended = try handle.read(upToCount: 8), extended.count == 8 else { break }
+                size = extended.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+            }
+            if size == 0 { size = total - start }
+            guard size >= 8, size <= total - start else { break }
+            if kind == "moov" {
+                try handle.seek(toOffset: start)
+                if let data = try handle.read(upToCount: Int(size)) {
+                    try data.write(to: matrixDirectory.appendingPathComponent(name + ".moov"), options: .atomic)
+                }
+            }
+            try handle.seek(toOffset: start + size)
+        }
     }
 
     private func runProRes422Smoke() {
@@ -1455,7 +1620,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     decodeError = reader.error?.localizedDescription ?? ""
                 } catch { decodeStatus = "failed"; decodeError = error.localizedDescription }
             }
-            let result: [String: Any] = ["movie": movie.lastPathComponent,
+            var result: [String: Any] = ["movie": movie.lastPathComponent,
                 "path": movie.path, "expectedFPS": expectedFPS ?? 0,
                 "decodedFrames": decodedFrames, "decodeStatus": decodeStatus, "decodeError": decodeError,
                 "maximumFrameGapMS": cadence.maximumGap * 1000,
@@ -1466,6 +1631,27 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 "duration": info.duration, "frames": info.frames.count,
                 "audioTracks": asset.tracks(withMediaType: .audio).count,
                 "hasTelemetry": MOVTelemetryMuxer.hasTelemetry(movie)]
+            result["metadata"] = asset.metadata.map { ["id": $0.identifier?.rawValue ?? String(describing: $0.key),
+                "value": $0.stringValue ?? String(describing: $0.value)] }
+            result["tracks"] = asset.tracks.map { track in
+                ["mediaType": track.mediaType.rawValue, "fps": track.nominalFrameRate,
+                 "timeScale": track.naturalTimeScale, "transform": NSCoder.string(for: track.preferredTransform),
+                 "metadata": track.metadata.map { ["id": $0.identifier?.rawValue ?? "", "value": $0.stringValue ?? ""] },
+                 "formats": track.formatDescriptions.map { String(describing: $0) }] as [String: Any]
+            }
+            if ProcessInfo.processInfo.arguments.contains("--format-matrix") {
+                try exportMatrixMovieHeader(movie, name: movie.lastPathComponent)
+                let inspected = result
+                queue.async {
+                    guard self.matrixActive, self.rawSmokeMovieName == movie.lastPathComponent else { return }
+                    if movie.lastPathComponent.hasPrefix("UITEST_IMG_"), decodeStatus == "completed", decodedFrames == info.frames.count, cadence.missingFrames == 0,
+                       !ProcessInfo.processInfo.arguments.contains("--matrix-keep-movies") {
+                        // Only this explicitly generated test movie; retain diagnostics and moov evidence.
+                        try? FileManager.default.removeItem(at: movie)
+                    }
+                    self.finishMatrixCase(inspected)
+                }
+            }
             let data = try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: directory.appendingPathComponent("raw-ssd-smoke-result.json"), options: .atomic)
             logger.event("raw_smoke_result", result)
@@ -1661,6 +1847,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                         directory: self.logger.sessionURL.deletingLastPathComponent())
                 }
             }
+            if ProcessInfo.processInfo.arguments.contains("--format-matrix") { beginFormatMatrix() }
             if ProcessInfo.processInfo.arguments.contains("--raw-writer-integrated-auto") { runRAWWriterIntegratedSmoke() }
             if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") }) {
                 runProRes422Smoke()
@@ -2104,7 +2291,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 throw CameraError.unavailableCodec(codec.rawValue, index)
             }
             enableIntrinsicDelivery()
-            let settings = usesProResDataWriter ? [AVVideoCodecKey: AVVideoCodecType.hevc.rawValue] :
+            let settings = usesProResDataWriter && !output.availableVideoCodecTypes.contains(codec)
+                ? [AVVideoCodecKey: AVVideoCodecType.hevc.rawValue] :
                 try encodingSettings(for: info, fps: targetFPS, connection: connection)
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.setOutputSettings(settings, for: connection)
@@ -2982,7 +3170,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         publish { self.status = "准备 RAW 录制" }
         let recordingClock = session.synchronizationClock
         let experiment = RAWInternalWriterExperiment(camera: camera, codec: codec, url: url, queue: queue,
-            preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: recordingSlate.metadata,
+            preview: preview, dedicatedStorage: dedicatedStorage, slateMetadata: movieMetadata(),
             prepareRecovery: { [weak self] in
                 guard let self, self.activeExternalMovieURL != nil else { return }
                 let start = ProcessInfo.processInfo.systemUptime
@@ -3072,7 +3260,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             if (self.chosenEncoding.isRAW ||
-                (self.chosenEncoding.isProRes422 && ProVideoStorageBridge.isOutputSupported(self.output))),
+                (self.chosenEncoding.isProRes422 && !self.usesProResDataWriter && ProVideoStorageBridge.isOutputSupported(self.output))),
                (UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件") == "内部文件" {
                 self.failStorage("ProRes 录制需要专用视频存储或外部 SSD。请在设置中选择存储位置。")
                 return
@@ -3134,7 +3322,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
             let arguments = ProcessInfo.processInfo.arguments
-            let isTest = arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
+            let isTest = arguments.contains("--format-matrix") || arguments.contains("--ui-testing") || arguments.contains("--raw-ssd-smoke") ||
                 arguments.contains("--hevc-4k60-smoke") || arguments.contains("--imu-sync-4k60-probe") ||
                 arguments.contains("--first-buffer-probe") ||
                 arguments.contains("--hevc-1080p120-smoke") ||
@@ -3144,7 +3332,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let baseName = isTest && !arguments.contains("--slate-smoke") ? "UITEST_IMG_\(formatter.string(from: Date()))" : ""
             let storageLocation = UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件"
             if (self.chosenEncoding.isRAW ||
-                (self.chosenEncoding.isProRes422 && ProVideoStorageBridge.isOutputSupported(self.output))),
+                (self.chosenEncoding.isProRes422 && !self.usesProResDataWriter && ProVideoStorageBridge.isOutputSupported(self.output))),
                storageLocation != "外部 SSD", storageLocation != "专用视频存储" {
                 self.restoreRAWWhiteBalance()
                 self.failStorage("ProRes 请在设置中选择专用视频存储或外部 SSD")
@@ -3194,7 +3382,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             #if DEBUG
-            if arguments.contains("--raw-ssd-smoke") || arguments.contains("--raw-hq-ssd-smoke") ||
+            if arguments.contains("--format-matrix") || arguments.contains("--raw-ssd-smoke") || arguments.contains("--raw-hq-ssd-smoke") ||
                arguments.contains("--raw-long-hq-ssd-smoke") ||
                arguments.contains("--raw-hotplug-smoke") ||
                arguments.contains("--hevc-4k60-smoke") || arguments.contains("--imu-sync-4k60-probe") ||
@@ -3259,9 +3447,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
-    /// Older devices can have a ProRes encoder without MovieFileOutput exposing it.
+    /// Internal ProRes capture uses sample buffers: MovieFileOutput can advertise
+    /// the codec but reject 4K60 when its destination is internal storage.
+    /// Keep the existing external/dedicated routes and older-device fallback.
     private var usesProResDataWriter: Bool {
-        chosenEncoding.isProRes422 && !output.availableVideoCodecTypes.contains(chosenEncoding.codec)
+        chosenEncoding.isProRes422 &&
+            ((UserDefaults.standard.string(forKey: "storageLocation") ?? "内部文件") == "内部文件" ||
+             !output.availableVideoCodecTypes.contains(chosenEncoding.codec))
     }
 
     private func startRealtimeLUTRecording(url: URL, recipe: LUTBurnRecipe?) {
@@ -3286,7 +3478,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             let writer = try RealtimeLUTWriter(url: url, recipe: recipe, settings: settings,
                 width: Int(format.width), height: Int(format.height), fps: chosenFPS, orientation: recordingOrientation,
                 dedicated: UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储",
-                metadata: recordingSlate.metadata, started: { [weak self] pts in
+                metadata: movieMetadata(burnedLUT: recipe != nil), started: { [weak self] pts in
                     guard let self else { return }
                     self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
                 }, finished: { [weak self] error, details in
@@ -3311,7 +3503,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.commitConfiguration()
                 throw RecorderError.unavailable("LUT audio capture unavailable")
             }
-            if recipe?.highBitDepth == true {
+            if recipe?.highBitDepth == true || chosenEncoding.isProRes422 {
                 let pixelFormat = [kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
                                    kCVPixelFormatType_420YpCbCr10BiPlanarFullRange]
                     .first { intrinsicOutput.availableVideoPixelFormatTypes.contains($0) }
@@ -3320,7 +3512,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let needsTenBitSource = !chosenEncoding.isProRes422 ||
                     [.rec2020HDR, .appleLog, .appleLog2].contains(chosenRecordingColorSpace)
                 if let pixelFormat {
-                    realtimeLUTVideoSettings = intrinsicOutput.videoSettings
+                    // The getter includes resolved dimensions for the current format.
+                    // Restoring those as explicit constraints pins K capture to the
+                    // old resolution when the next recording changes format.
+                    var restoreSettings = intrinsicOutput.videoSettings ?? [:]
+                    restoreSettings.removeValue(forKey: kCVPixelBufferWidthKey as String)
+                    restoreSettings.removeValue(forKey: kCVPixelBufferHeightKey as String)
+                    realtimeLUTVideoSettings = restoreSettings
                     intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
                 } else if needsTenBitSource {
                     session.commitConfiguration()
@@ -3364,7 +3562,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
-                self.output.metadata = self.recordingSlate.metadata
+                self.output.metadata = self.movieMetadata()
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") {
                     self.captureStartProbe.arm()

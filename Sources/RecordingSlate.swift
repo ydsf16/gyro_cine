@@ -10,6 +10,7 @@ struct RecordingSlate: Codable, Equatable {
     var reel = 1
     var scene = 1
     var take = 1
+    var notes: String? = nil
     var autoTake = true
     var environment = ""
     var timeOfDay = ""
@@ -54,6 +55,7 @@ struct RecordingSlate: Codable, Equatable {
     var metadata: [AVMetadataItem] {
         let fields = ["com.apple.quicktime.title": production,
                       "com.apple.quicktime.director": director,
+                      "com.apple.quicktime.description": notes ?? "",
                       "com.apple.quicktime.camera.identifier": cameraID,
                       "com.apple.quicktime.reel": String(reel),
                       "com.apple.quicktime.scene": String(scene),
@@ -106,6 +108,10 @@ struct RecordingSlateView: View {
                         Text(t("夜晚", "Night")).tag("Night")
                     }
                 }
+                Section(t("备注", "NOTES")) {
+                    TextField(t("拍摄备注", "Recording notes"), text: Binding(get: { slate.notes ?? "" }, set: { slate.notes = $0 }), axis: .vertical)
+                        .lineLimit(2...5).accessibilityIdentifier("slateNotes")
+                }
                 Section(t("下一条文件名", "NEXT FILENAME")) {
                     Text(filenameType == "BMC" && storageLocation != "外部 SSD" ? slate.filename(date: Date(), clip: max(1, UserDefaults.standard.integer(forKey: "slate.nextClip"))) : "IMG_XXXX.mov")
                         .font(.footnote.monospaced()).textSelection(.enabled).accessibilityIdentifier("slateFilenamePreview")
@@ -140,5 +146,61 @@ struct RecordingSlateView: View {
                 .keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 65)
             Stepper(title, value: value, in: 1...999999).labelsHidden().fixedSize()
         }
+    }
+}
+
+
+/// A start-of-recording snapshot, not a claim that automatic exposure stays constant.
+enum RecordingMetadata {
+    static let snapshotKey = "com.tinygrape.gyrocine.capture"
+
+    static func items(_ fields: [String: String]) -> [AVMetadataItem] {
+        fields.filter { !$0.value.isEmpty }.sorted { $0.key < $1.key }.map { key, value in
+            let item = AVMutableMetadataItem()
+            item.keySpace = .quickTimeMetadata
+            item.key = key as NSString
+            item.value = value as NSString
+            item.dataType = kCMMetadataBaseDataType_UTF8 as String
+            return item
+        }
+    }
+
+    /// Keep system RAW metadata (including its color matrices) and replace only matching keys.
+    static func merging(_ system: [AVMetadataItem], with custom: [AVMetadataItem]) -> [AVMetadataItem] {
+        func identity(_ item: AVMetadataItem) -> String {
+            "\(item.keySpace?.rawValue ?? "")/\(item.key as? String ?? item.identifier?.rawValue ?? "")"
+        }
+        let cameraKeys: Set<String> = ["com.apple.quicktime.make", "com.apple.quicktime.model"]
+        let systemCameraKeys = Set(system.compactMap { $0.key as? String }).intersection(cameraKeys)
+        let additions = custom.filter { !systemCameraKeys.contains($0.key as? String ?? "") }
+        let replaced = Set(additions.map(identity))
+        return system.filter { !replaced.contains(identity($0)) } + additions
+    }
+
+    static func capture(device: AVCaptureDevice, model: String, color: String, codec: String,
+                        fps: Double, burnedLUT: Bool, date: Date = Date()) -> [AVMetadataItem] {
+        let wb = device.temperatureAndTintValues(for: device.deviceWhiteBalanceGains)
+        let duration = CMTimeGetSeconds(device.exposureDuration)
+        let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+        let snapshot: [String: Any] = [
+            "schema": 1, "scope": "recordingStart", "model": model,
+            "lensName": device.localizedName, "lensType": device.deviceType.rawValue,
+            "position": device.position == .front ? "front" : "back",
+            "zoom": Double(device.videoZoomFactor), "aperture": Double(device.lensAperture),
+            "iso": Double(device.iso), "exposureSeconds": duration.isFinite ? duration : 0,
+            "whiteBalanceKelvin": Double(wb.temperature), "tint": Double(wb.tint),
+            "colorSpace": color, "codec": codec, "fps": fps,
+            "width": Int(size.width), "height": Int(size.height), "lutBurned": burnedLUT
+        ]
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = .current
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        var fields = ["com.apple.quicktime.make": "Apple", "com.apple.quicktime.model": model,
+                      "com.apple.quicktime.software": "GyroCine \(version) (\(build))",
+                      "com.apple.quicktime.creationdate": formatter.string(from: date)]
+        if let data = try? JSONSerialization.data(withJSONObject: snapshot, options: [.sortedKeys]),
+           let text = String(data: data, encoding: .utf8) { fields[snapshotKey] = text }
+        return items(fields)
     }
 }

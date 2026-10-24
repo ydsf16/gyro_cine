@@ -9,6 +9,7 @@ struct MediaLibraryView: View {
     @Environment(\.locale) private var locale
     @State private var files: [URL] = []
     @State private var scopedExternalFiles: [URL] = []
+    @State private var showingInformation = false
     @State private var selected: URL?
     @State private var pendingDelete: [URL] = []
     @State private var selecting = false
@@ -92,12 +93,25 @@ struct MediaLibraryView: View {
                 NavigationStack {
                     StableMoviePlayer(url: url)
                         .id(url)
+                        .task {
+                            #if DEBUG
+                            if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--media-info-file=") }) {
+                                try? await Task.sleep(for: .milliseconds(700))
+                                showingInformation = true
+                            }
+                            #endif
+                        }
                         .overlay(alignment: .topTrailing) { IMUBadge(url: url).padding(20).allowsHitTesting(false) }
+                        .sheet(isPresented: $showingInformation) { MovieInformationView(url: url) }
                         .navigationTitle(url.deletingPathExtension().lastPathComponent)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) { Button { selected = nil } label: { Text(t("完成", "Done")).frame(minWidth: 60, minHeight: 44).contentShape(Rectangle()) }.accessibilityIdentifier("mediaPlayerDone") }
                             ToolbarItemGroup(placement: .bottomBar) {
+                                Button { showingInformation = true } label: { Image(systemName: "info.circle") }
+                                    .accessibilityLabel(t("视频信息", "Video information"))
+                                    .accessibilityIdentifier("mediaInfo")
+                                Spacer()
                                 ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
                                 Spacer()
                                 Button { selected = nil; saveToPhotos([url]) } label: { Image(systemName: "square.and.arrow.down") }
@@ -121,7 +135,15 @@ struct MediaLibraryView: View {
             .alert(t("素材", "Media"), isPresented: Binding(
                 get: { message != nil }, set: { if !$0 { message = nil } }
             )) { Button(t("确定", "OK")) { message = nil } } message: { Text(AppText.message(message ?? "")) }
-            .onAppear { reload() }
+            .onAppear {
+                reload()
+                #if DEBUG
+                if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--media-info-file=") }),
+                   let file = files.first(where: { $0.lastPathComponent == String(argument.dropFirst("--media-info-file=".count)) }) {
+                    selected = file
+                }
+                #endif
+            }
             .onChange(of: camera.externalStorageConnected) { _, _ in reload() }
             .onChange(of: camera.finalizing) { _, saving in if !saving { reload() } }
             .refreshable { reload() }
@@ -342,5 +364,184 @@ private actor MediaThumbnailLoader {
         let n = seconds.isFinite ? max(0, Int(seconds)) : 0
         let label = n >= 3600 ? String(format: "%d:%02d:%02d", n / 3600, n / 60 % 60, n % 60) : String(format: "%02d:%02d", n / 60, n % 60)
         return (frame.map(UIImage.init(cgImage:)), raw, label)
+    }
+}
+
+private struct MovieInformationView: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+    @State private var details: MovieInformation?
+    @State private var failure: String?
+    private func t(_ zh: String, _ en: String) -> String { AppText.value(zh, en, locale: locale) }
+    var body: some View {
+        NavigationStack {
+            ScrollViewReader { proxy in
+            List {
+                if let details {
+                    Section(t("原始视频", "Original video")) {
+                        row("文件名", "Filename", url.lastPathComponent)
+                        row("编码", "Codec", details.codec)
+                        row("分辨率", "Resolution", details.resolution)
+                        row("帧率", "Frame rate", details.fps)
+                        row("时长", "Duration", details.duration)
+                        row("文件大小", "File size", details.size)
+                        row("拍摄日期", "Recorded", details.date.map { $0.formatted(date: .abbreviated, time: .standard) } ?? "—")
+                        if let location = details.slate[RecordingLocation.metadataKey] {
+                            row("拍摄位置", "Recording location", location)
+                        }
+                        row("色彩空间", "Color space", details.color)
+                        row("音频", "Audio", details.audio)
+                        row("IMU", "IMU", details.imu ? t("已嵌入", "Embedded") : t("未检测到", "Not detected"))
+                    }
+                    Section {
+                        row("快门", "Shutter", details.shutter).id("settings")
+                        row("光圈", "Aperture", details.aperture)
+                        row("ISO", "ISO", details.iso)
+                        row("白平衡", "White balance", details.whiteBalance)
+                        row("色调", "Tint", details.tint)
+                    } header: { Text(t("录制开始时的参数", "Settings at recording start")) }
+                    footer: { Text(t("自动参数可能在录制过程中变化。旧素材未保存的字段显示为 —。", "Automatic settings may change during recording. Fields absent from older files appear as —.")) }
+                    Section(t("相机与场记", "Camera and slate")) {
+                        row("机型", "Camera", details.model).id("camera")
+                        row("镜头", "Lens", lensLabel(details))
+                        row("变焦倍率", "Zoom", details.zoom)
+                        row("制作名称", "Production", details.slate["com.apple.quicktime.title"] ?? "—")
+                        row("机位", "Camera ID", details.slate["com.apple.quicktime.camera.identifier"] ?? "—")
+                        row("卷号", "Reel", details.slate["com.apple.quicktime.reel"] ?? "—")
+                        row("场景", "Scene", details.slate["com.apple.quicktime.scene"] ?? "—")
+                        row("镜次", "Take", details.slate["com.apple.quicktime.take"] ?? "—")
+                        row("导演", "Director", details.slate["com.apple.quicktime.director"] ?? "—")
+                        row("摄影师", "Cinematographer", details.slate["com.tinygrape.gyrocine.cinematographer"] ?? "—")
+                        row("备注", "Notes", details.slate["com.apple.quicktime.description"] ?? "—")
+                    }
+                } else if failure != nil {
+                    Text(t("无法读取视频信息", "Could not read video information"))
+                } else { ProgressView() }
+            }
+            .accessibilityIdentifier("mediaInformation")
+            .navigationTitle(t("视频信息", "Video information"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                Button(t("完成", "Done")) { dismiss() }.accessibilityIdentifier("mediaInformationDone")
+            } }
+            .task(id: url) {
+                do {
+                    details = try await MovieInformationLoader.shared.load(url)
+                    #if DEBUG
+                    if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--media-info-section=") }) {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        proxy.scrollTo(String(argument.dropFirst("--media-info-section=".count)), anchor: .top)
+                    }
+                    #endif
+                }
+                catch { failure = error.localizedDescription }
+            }
+            }
+        }
+    }
+    private func lensLabel(_ info: MovieInformation) -> String {
+        let names: [String: String] = [
+            AVCaptureDevice.DeviceType.builtInWideAngleCamera.rawValue: t("广角", "Wide"),
+            AVCaptureDevice.DeviceType.builtInUltraWideCamera.rawValue: t("超广角", "Ultra Wide"),
+            AVCaptureDevice.DeviceType.builtInTelephotoCamera.rawValue: t("长焦", "Telephoto")]
+        guard let kind = names[info.lensType] else { return info.lens }
+        return (info.position == "front" ? t("前置", "Front") : t("后置", "Back")) + " · " + kind
+    }
+    private func row(_ zh: String, _ en: String, _ value: String) -> some View {
+        LabeledContent { Text(value).multilineTextAlignment(.trailing).textSelection(.enabled) }
+            label: { Text(t(zh, en)) }
+    }
+}
+
+struct MovieInformation {
+    var codec = "—", resolution = "—", fps = "—", duration = "—", size = "—", color = "—", audio = "—"
+    var shutter = "—", aperture = "—", iso = "—", whiteBalance = "—", tint = "—"
+    var model = "—", lens = "—", zoom = "—", lensType = "", position = ""
+    var date: Date?
+    var imu = false
+    var slate: [String: String] = [:]
+}
+
+/// Parse only headers on a background actor; never decode video to show information.
+actor MovieInformationLoader {
+    static let shared = MovieInformationLoader()
+    func load(_ url: URL) async throws -> MovieInformation {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let asset = AVURLAsset(url: url)
+        let tracks = try await asset.load(.tracks)
+        var result = MovieInformation()
+        // AVFoundation may omit the Sony rtmd track from its public track list.
+        // Use the same MOV-header inspection as the media grid badge.
+        result.imu = MOVTelemetryMuxer.hasTelemetry(url)
+        let metadata = try await asset.load(.metadata)
+        for item in metadata {
+            if let key = item.key as? String, let value = item.stringValue ?? item.numberValue?.stringValue { result.slate[key] = value }
+        }
+        let raw = result.slate[RecordingMetadata.snapshotKey]?.data(using: .utf8)
+        let snapshot = raw.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        func number(_ key: String, _ format: String) -> String {
+            guard let value = snapshot[key] as? NSNumber, value.doubleValue.isFinite else { return "—" }
+            return String(format: format, value.doubleValue)
+        }
+        result.model = result.slate["com.apple.quicktime.model"] ?? snapshot["model"] as? String ?? "—"
+        result.lens = snapshot["lensName"] as? String ?? "—"
+        result.lensType = snapshot["lensType"] as? String ?? ""
+        result.position = snapshot["position"] as? String ?? ""
+        if result.lens.isEmpty { result.lens = "—" }
+        result.zoom = number("zoom", "%.2f×")
+        result.aperture = number("aperture", "f/%.1f")
+        result.iso = number("iso", "%.0f")
+        result.whiteBalance = number("whiteBalanceKelvin", "%.0f K")
+        result.tint = number("tint", "%.1f")
+        if let seconds = snapshot["exposureSeconds"] as? Double, seconds > 0 {
+            result.shutter = seconds < 1 ? String(format: "1/%.0f s", 1 / seconds) : String(format: "%.3f s", seconds)
+        }
+        if result.iso == "—" { result.iso = result.slate["org.smpte.rdd18.camera.isosensitivity"] ?? "—" }
+        if result.whiteBalance == "—" { result.whiteBalance = result.slate["org.smpte.rdd18.camera.whitebalance"] ?? "—" }
+        if result.shutter == "—", let text = result.slate["org.smpte.rdd18.camera.shutterspeed_time"],
+           let seconds = Double(text), seconds.isFinite, seconds > 0 {
+            result.shutter = seconds < 1 ? String(format: "1/%.0f s", 1 / seconds) : String(format: "%.3f s", seconds)
+        }
+        if let text = result.slate["com.apple.quicktime.creationdate"] { result.date = ISO8601DateFormatter().date(from: text) }
+        if result.date == nil { result.date = try await asset.load(.creationDate)?.dateValue }
+        let duration = CMTimeGetSeconds(try await asset.load(.duration))
+        if duration.isFinite { result.duration = String(format: "%.2f s", duration) }
+        let bytes = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        result.size = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        func fourCC(_ value: FourCharCode) -> String {
+            String(bytes: [24,16,8,0].map { UInt8((value >> $0) & 255) }, encoding: .ascii) ?? "—"
+        }
+        for track in tracks {
+            let descriptions = try await track.load(.formatDescriptions)
+            for description in descriptions {
+                let code = fourCC(CMFormatDescriptionGetMediaSubType(description))
+                if ["rtmd", "gyrf"].contains(code) { result.imu = true }
+                if track.mediaType == .video {
+                    let names = ["hvc1":"H.265", "hev1":"H.265", "avc1":"H.264", "apch":"ProRes 422 HQ", "apcn":"ProRes 422", "apcs":"ProRes 422 LT", "apco":"ProRes 422 Proxy", "aprn":"ProRes RAW", "aprh":"ProRes RAW HQ"]
+                    result.codec = names[code] ?? code
+                    let dimensions = CMVideoFormatDescriptionGetDimensions(description)
+                    let transform = try await track.load(.preferredTransform)
+                    let size = CGSize(width: Int(dimensions.width), height: Int(dimensions.height)).applying(transform)
+                    result.resolution = "\(Int(abs(size.width))) × \(Int(abs(size.height)))"
+                    result.fps = String(format: "%.3f fps", try await track.load(.nominalFrameRate))
+                    let ext = (CMFormatDescriptionGetExtensions(description) as NSDictionary?) ?? [:]
+                    let log = ext["LogTransferFunction"] as? String ?? ""
+                    let primaries = ext[kCVImageBufferColorPrimariesKey] as? String ?? ""
+                    let transfer = ext[kCVImageBufferTransferFunctionKey] as? String ?? ""
+                    if ["aprn", "aprh"].contains(code) { result.color = "RAW" }
+                    else if log.contains("apple-wide-gamut") { result.color = "Apple Log 2" }
+                    else if log.contains("apple-log") { result.color = "Apple Log" }
+                    else if transfer.contains("HLG") { result.color = "Rec.2020 · HDR (HLG)" }
+                    else if primaries.contains("P3") { result.color = "P3 D65" }
+                    else if primaries.contains("709") { result.color = "Rec.709" }
+                    else { result.color = snapshot["colorSpace"] as? String ?? "—" }
+                } else if track.mediaType == .audio, let audio = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee {
+                    result.audio = "\(code.trimmingCharacters(in: .whitespaces)) · \(Int(audio.mSampleRate)) Hz · \(audio.mChannelsPerFrame) ch"
+                }
+            }
+        }
+        return result
     }
 }

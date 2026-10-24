@@ -1,6 +1,155 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testLocationSettingBothLanguages() {
+        addUIInterruptionMonitor(withDescription: "Location permission") { alert in
+            for name in ["Allow While Using App", "使用 App 时允许", "使用App时允许", "使用期间允许"] {
+                if alert.buttons[name].exists { alert.buttons[name].tap(); return true }
+            }
+            return false
+        }
+        for language in ["en", "zh-Hans"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-testing", "--settings-ui-preview", "-AppleLanguages", "(\(language))"]
+            app.launch()
+            let toggle = app.switches["recordLocationToggle"]
+            for _ in 0..<10 {
+                if toggle.exists && toggle.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            if (toggle.value as? String) == "1" { toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() // Handle a possible permission sheet.
+            XCTAssertEqual(toggle.value as? String, "1")
+            controlScreenshot(app, "location-setting-\(language)")
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            XCTAssertEqual(toggle.value as? String, "0")
+            app.terminate()
+        }
+    }
+
+    func testLocationRecordingOnThenOff() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launch()
+        let record = app.buttons["recordToggle"]
+        XCTAssertTrue(record.waitForExistence(timeout: 25))
+        for enabled in [true, false] {
+            app.buttons["settingsOpen"].tap()
+            let toggle = app.switches["recordLocationToggle"]
+            for _ in 0..<10 {
+                if toggle.exists && toggle.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(toggle.exists)
+            if ((toggle.value as? String) == "1") != enabled { toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+            if enabled {
+                XCTAssertTrue(app.staticTexts["The recording location will be shared with the video."].waitForExistence(timeout: 20), "A real location fix is required for this recording test")
+            }
+            app.buttons["captureSettingsClose"].tap()
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "label == 'Stop recording'"), object: record)], timeout: 15), .completed)
+            Thread.sleep(forTimeInterval: 3)
+            record.tap()
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "enabled == true AND label == 'Record'"), object: record)], timeout: 20), .completed)
+            XCTAssertFalse(app.alerts.firstMatch.exists)
+        }
+    }
+
+    /// Supply real, finalized SSD clips; this test never creates or deletes user media.
+    func testSSDRAWInformationBothLanguages() throws {
+        guard let fixtures = ProcessInfo.processInfo.environment["GYROCINE_RAW_METADATA_FILES"],
+              let data = fixtures.data(using: .utf8),
+              let clips = try JSONSerialization.jsonObject(with: data) as? [[String: String]], !clips.isEmpty else {
+            throw XCTSkip("Provide GYROCINE_RAW_METADATA_FILES with file and codec fields")
+        }
+        for language in ["en", "zh-Hans"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-testing", "-AppleLanguages", "(\(language))", "-storageLocation", "外部 SSD"]
+            app.launch()
+            XCTAssertTrue(app.buttons["mediaOpen"].waitForExistence(timeout: 30))
+            app.buttons["mediaOpen"].tap()
+            for clip in clips {
+                let file = try XCTUnwrap(clip["file"])
+                let codec = try XCTUnwrap(clip["codec"])
+                let row = app.buttons["mediaRow.\(file)"]
+                XCTAssertTrue(row.waitForExistence(timeout: 15))
+                row.tap()
+                XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 15))
+                app.buttons["mediaInfo"].tap()
+                XCTAssertTrue(app.staticTexts[codec].waitForExistence(timeout: 15))
+                XCTAssertTrue(app.staticTexts["Embedded"].exists || app.staticTexts["已嵌入"].exists)
+                XCTAssertTrue(app.staticTexts["2240 × 4224"].exists || app.staticTexts["4224 × 2240"].exists)
+                controlScreenshot(app, "ssd-raw-info-\(file)-\(language)")
+                app.swipeUp(velocity: .slow)
+                controlScreenshot(app, "ssd-raw-settings-\(file)-\(language)")
+                app.swipeUp(velocity: .slow)
+                controlScreenshot(app, "ssd-raw-slate-\(file)-\(language)")
+                app.buttons["mediaInformationDone"].tap()
+                XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 5))
+                app.buttons["mediaPlayerDone"].tap()
+                XCTAssertTrue(app.buttons["mediaDone"].waitForExistence(timeout: 5))
+            }
+            app.terminate()
+        }
+    }
+
+    func testCapturedMovieInformation() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        XCTAssertTrue(app.buttons["mediaOpen"].waitForExistence(timeout: 25))
+        app.buttons["mediaOpen"].tap()
+        let row = app.buttons["mediaRow.UITEST_METADATA_DEVICE.mov"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10)); row.tap()
+        XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 10)); app.buttons["mediaInfo"].tap()
+        XCTAssertTrue(app.buttons["mediaInformationDone"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["H.265"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["已嵌入"].exists || app.staticTexts["Embedded"].exists)
+        controlScreenshot(app, "device-metadata-video")
+        app.swipeUp(velocity: .slow)
+        controlScreenshot(app, "device-metadata-settings")
+        app.buttons["mediaInformationDone"].tap()
+        XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 5))
+        app.buttons["mediaPlayerDone"].tap()
+        XCTAssertTrue(app.buttons["mediaDone"].waitForExistence(timeout: 5))
+    }
+
+    func testMediaInformationBothLanguages() {
+        for language in ["zh-Hans", "en"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-testing", "-AppleLanguages", "(\(language))"]
+            app.launch()
+            XCTAssertTrue(app.buttons["mediaOpen"].waitForExistence(timeout: 25))
+            app.buttons["mediaOpen"].tap()
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "mediaRow.UITEST_METADATA")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.tap()
+            XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 10))
+            app.buttons["mediaInfo"].tap()
+            XCTAssertTrue(app.buttons["mediaInformationDone"].waitForExistence(timeout: 10))
+            let label = language == "en" ? "Original video" : "原始视频"
+            XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.staticTexts["H.264"].exists)
+            controlScreenshot(app, "metadata-information-\(language)")
+            for _ in 0..<3 {
+                if app.staticTexts["5600 K"].isHittable { break }
+                app.swipeUp(velocity: .slow)
+            }
+            XCTAssertTrue(app.staticTexts["5600 K"].exists)
+            XCTAssertTrue(app.staticTexts["1/60 s"].exists)
+            controlScreenshot(app, "metadata-settings-\(language)")
+            app.buttons["mediaInformationDone"].tap()
+            XCTAssertTrue(app.buttons["mediaInfo"].waitForExistence(timeout: 5))
+            app.buttons["mediaPlayerDone"].tap()
+            XCTAssertTrue(app.buttons["mediaDone"].waitForExistence(timeout: 5))
+            app.terminate()
+        }
+    }
+
     func testExplicitColorSpaceMenuBothLanguages() {
         for language in ["zh-Hans", "en"] {
             let app = XCUIApplication()
@@ -87,9 +236,13 @@ final class IMURecordingUITests: XCTestCase {
             func setToggle(_ toggle: XCUIElement, _ on: Bool) {
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))
                 if (toggle.value as? String == "1") != on {
-                    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                    // Tap the leading edge of the actual switch, avoiding AssistiveTouch
+                    // overlapping its trailing edge. The label is not tappable on iOS 26.
+                    toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.84, dy: 0.3)).tap()
                 }
-                XCTAssertEqual(toggle.value as? String, on ? "1" : "0")
+                let changed = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "value == %@", on ? "1" : "0"), object: toggle)
+                XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
             }
             openManagement()
             XCTAssertTrue(app.staticTexts[group].exists)

@@ -1,0 +1,10 @@
+{
+  "focus": "passed",
+  "media_cards": "passed",
+  "lut_management_zh_en": "passed",
+  "full_color_menu_matrix": "incomplete_native_menu_animation_timeout",
+  "xcresult": [
+    "/tmp/gyrocine17-ui-20261024.xcresult",
+    "/tmp/gyrocine17-lut-final-20261024.xcresult"
+  ]
+}

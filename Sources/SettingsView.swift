@@ -6,6 +6,8 @@ struct SettingsView: View {
     var quickCapture = false
     @EnvironmentObject private var camera: CameraManager
     @ObservedObject private var proStore = ProStore.shared
+    @ObservedObject private var recordingLocation = RecordingLocation.shared
+    @AppStorage("recordLocation") private var recordLocation = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @AppStorage("storageLocation") private var storageLocation = "内部文件"
@@ -429,6 +431,23 @@ struct SettingsView: View {
         Section(t("录制", "RECORDING")) {
                     lockedRow(t("记录 IMU", "Record IMU"), t("始终开启", "Always on"))
                     lockedRow(t("录制声音", "Record audio"), camera.audioAvailable ? t("始终开启", "Always on") : t("无权限", "No permission"))
+                    Toggle(t("记录位置", "Record location"), isOn: $recordLocation)
+                        .accessibilityIdentifier("recordLocationToggle")
+                        .disabled(locked)
+                        .onChange(of: recordLocation) { _, enabled in
+                            recordingLocation.refresh(requestPermission: enabled)
+                        }
+                    if recordLocation {
+                        if recordingLocation.status == .denied {
+                            Link(t("定位未授权，前往系统设置", "Location access denied. Open Settings"),
+                                 destination: URL(string: UIApplication.openSettingsURLString)!)
+                        } else {
+                            Text(recordingLocation.status == .ready
+                                 ? t("拍摄地点会随视频一起分享。", "The recording location will be shared with the video.")
+                                 : t("正在获取位置；未获取到时视频不含位置。", "Acquiring location; videos omit location until available."))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
         }
     }
     private var viewfinderSection: some View {
