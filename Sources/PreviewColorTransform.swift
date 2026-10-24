@@ -176,6 +176,20 @@ struct ImportedPreviewLUT: Codable, Equatable, Identifiable {
 }
 
 enum PreviewLUTLibrary {
+    // A former UI smoke test imported this fixture into persistent app storage.
+    // Remove only the exact generated cube; user-imported LUTs are left intact.
+    static func removeSyntheticTestLUTs(in directory: URL = directory) -> [String] {
+        let fixture = "LUT_3D_SIZE 2\n" + Array(repeating: "1 0 0", count: 8).joined(separator: "\n")
+        let matches = load(in: directory).filter { item in
+            item.name == "UITEST_PreviewRed" &&
+                (try? String(contentsOf: item.file(in: directory), encoding: .utf8)) == fixture
+        }
+        return matches.compactMap { item in
+            do { try remove(item, in: directory); return item.selectionID }
+            catch { return nil }
+        }
+    }
+
     static var directory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("PreviewLUTs", isDirectory: true)

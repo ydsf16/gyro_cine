@@ -300,7 +300,7 @@ final class IMURecordingUITests: XCTestCase {
 
     func testLUTManagementAndBurnControls() {
         let app = XCUIApplication()
-        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launchArguments = ["--ui-testing", "--lut-import-smoke", "-AppleLanguages", "(en)"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
         app.buttons["parameter.LUT"].tap()
@@ -323,7 +323,9 @@ final class IMURecordingUITests: XCTestCase {
         if item.value as? String == "1" { item.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
         XCTAssertEqual(item.value as? String, "0")
         controlScreenshot(app, "lut-management-hidden")
-        app.terminate(); app.launch()
+        app.terminate()
+        app.launchArguments = ["--ui-testing", "-AppleLanguages", "(en)"]
+        app.launch()
         XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
         app.buttons["settingsOpen"].tap()
         for _ in 0..<5 where !manage.isHittable { app.swipeUp() }
@@ -335,6 +337,10 @@ final class IMURecordingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
         app.buttons["Cancel"].tap()
         controlScreenshot(app, "lut-management-enabled")
+        app.terminate()
+        app.launchArguments = ["--cleanup-lut-smoke", "-AppleLanguages", "(en)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
     }
 
     func testPointFocusHoldAndRelease() {

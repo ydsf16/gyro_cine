@@ -323,7 +323,7 @@ final class IntrinsicsPreviewFanout: NSObject, AVCaptureVideoDataOutputSampleBuf
 /// Recording owns a full-resolution GPU pipeline. No rendered preview frames enter it.
 /// Admission is bounded across queued, rendering and encoder-backpressured frames.
 final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
-    let audioOutput = AVCaptureAudioDataOutput()
+    let audioOutput: AVCaptureAudioDataOutput
     private let queue = DispatchQueue(label: "GyroCine.LUTRecording", qos: .userInitiated)
     private let audioQueue = DispatchQueue(label: "GyroCine.LUTAudio", qos: .userInitiated)
     private let admission = NSLock()
@@ -356,6 +356,7 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
 
     init(url: URL, recipe: LUTBurnRecipe?, settings: [String: Any], width: Int, height: Int,
          fps: Double, orientation: RecordingOrientation, dedicated: Bool, metadata: [AVMetadataItem],
+         preconfiguredAudioOutput: AVCaptureAudioDataOutput? = nil,
          started: @escaping (CMTime) -> Void,
          finished: @escaping (Error?, [String: Any]) -> Void) throws {
         guard !["aprn", "aprh"].contains(settings[AVVideoCodecKey] as? String ?? ""), let gpu = MTLCreateSystemDefaultDevice(),
@@ -363,6 +364,7 @@ final class RealtimeLUTWriter: NSObject, AVCaptureAudioDataOutputSampleBufferDel
             throw RecorderError.unavailable("LUT GPU recording unavailable")
         }
         self.width = width; self.height = height; self.fps = fps
+        audioOutput = preconfiguredAudioOutput ?? AVCaptureAudioDataOutput()
         appliesLUT = recipe != nil
         self.started = started; self.finished = finished
         context = CIContext(mtlDevice: gpu, options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull(), .cacheIntermediates: false])

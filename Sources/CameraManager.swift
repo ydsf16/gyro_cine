@@ -305,6 +305,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var recordingOrientation: RecordingOrientation = .portrait
     private let output = AVCaptureMovieFileOutput()
     private let intrinsicOutput = AVCaptureVideoDataOutput()
+    private let proResWriterAudioOutput = AVCaptureAudioDataOutput()
     private let intrinsicRecorder = CameraIntrinsicsRecorder()
     private lazy var previewFanout = IntrinsicsPreviewFanout(recorder: intrinsicRecorder, preview: lutPreview)
     #if DEBUG
@@ -392,6 +393,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var isRAWWriterActive: Bool { rawWriterExperiment != nil }
     private var recordingLens = ""
     private var realtimeLUTVideoSettings: [String: Any]?
+    private var proResWriterVideoSettings: [String: Any]?
     private var realtimeLUTWriter: RealtimeLUTWriter?
     private var recordingLUTBurn: LUTBurnRecipe?
     private var audioReady = false
@@ -420,6 +422,22 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     override init() {
         super.init()
+        if !ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            let removed = Set(PreviewLUTLibrary.removeSyntheticTestLUTs())
+            if !removed.isEmpty {
+                importedLUTs = PreviewLUTLibrary.load()
+                if let selected = importedLUTID, removed.contains(selected) {
+                    importedLUTID = nil
+                    UserDefaults.standard.removeObject(forKey: "previewImportedLUTID")
+                    lutEnabled = false
+                    lutBurnEnabled = false
+                    UserDefaults.standard.set(false, forKey: "previewLUTEnabled")
+                    UserDefaults.standard.set(false, forKey: "lutBurnEnabled")
+                }
+                disabledLUTIDs.subtract(removed)
+                UserDefaults.standard.set(Array(disabledLUTIDs), forKey: "disabledLUTIDs")
+            }
+        }
         CaptureDefaults.restoreIfNeeded()
         savedControls = SavedCameraControls.load()
         chosenWhiteBalance = WhiteBalanceChoice(rawValue: savedControls.whiteBalance) ?? .autoLock
@@ -1385,7 +1403,6 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             UserDefaults.standard.set(true, forKey: "previewLUTEnabled")
             publish { self.setLUTLook(.rec709); self.setLUTBurnEnabled(true) }
         }
-        prepareImportedLUTSmoke()
         if ProcessInfo.processInfo.arguments.contains("--whitebalance-autol-smoke") {
             chosenWhiteBalance = .autoLock
             savedControls.whiteBalance = WhiteBalanceChoice.autoLock.rawValue
@@ -1861,6 +1878,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") }) {
                 runProRes422Smoke()
             }
+            if ProcessInfo.processInfo.arguments.contains("--lut-import-smoke") { prepareImportedLUTSmoke() }
             if ProcessInfo.processInfo.arguments.contains("--lut-prores-file-smoke") {
                 finalizationQueue.async {
                     let source = RecordingStoragePaths.movieDirectory.appendingPathComponent("UITEST_LUT_PRORES.mov")
@@ -2255,6 +2273,37 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }?.index
     }
 
+    // Configure the internal ProRes sample path while changing capture format.
+    // Reconfiguring these outputs at REC can interrupt the live preview and
+    // admit a sensor frame before exposure has settled.
+    private func configureProResWriterInputs(colorSpace: RecordingColorSpace) throws {
+        if let settings = proResWriterVideoSettings {
+            intrinsicOutput.videoSettings = settings
+            proResWriterVideoSettings = nil
+        }
+        if session.outputs.contains(proResWriterAudioOutput) {
+            session.removeOutput(proResWriterAudioOutput)
+        }
+        guard usesProResDataWriter else { return }
+        guard session.canAddOutput(proResWriterAudioOutput) else {
+            throw RecorderError.unavailable("ProRes 音频输出暂不可用")
+        }
+        session.addOutput(proResWriterAudioOutput)
+        let needsTenBit = [.rec2020HDR, .appleLog, .appleLog2].contains(colorSpace)
+        let pixelFormat = [kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+                           kCVPixelFormatType_420YpCbCr10BiPlanarFullRange]
+            .first { intrinsicOutput.availableVideoPixelFormatTypes.contains($0) }
+        if let pixelFormat {
+            var restoreSettings = intrinsicOutput.videoSettings ?? [:]
+            restoreSettings.removeValue(forKey: kCVPixelBufferWidthKey as String)
+            restoreSettings.removeValue(forKey: kCVPixelBufferHeightKey as String)
+            proResWriterVideoSettings = restoreSettings
+            intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
+        } else if needsTenBit {
+            throw RecorderError.unavailable("当前配置不支持 10-bit ProRes 采集")
+        }
+    }
+
     @discardableResult private func applyFormat(_ requestedIndex: Int, reason: String,
                                                 manualExposure: ManualExposurePreference? = nil) -> Bool {
         if !chosenEncoding.isRAW, chosenRecordingColorSpace == .systemDefault { chosenRecordingColorSpace = .rec709 }
@@ -2270,6 +2319,9 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let previousMax = camera.activeVideoMaxFrameDuration
         let previousColorSpace = camera.activeColorSpace
         let previousAutomaticWideColor = session.automaticallyConfiguresCaptureDeviceForWideColor
+        let previousWriterAudioConfigured = session.outputs.contains(proResWriterAudioOutput)
+        let previousIntrinsicSettings = intrinsicOutput.videoSettings
+        let previousProResWriterVideoSettings = proResWriterVideoSettings
         let requestedColorSpace: RecordingColorSpace = chosenRecordingColorSpace.isAvailable(for: info.format, encoding: chosenEncoding)
             ? chosenRecordingColorSpace
             : (RecordingColorSpace.selectableCases(for: chosenEncoding).first {
@@ -2317,6 +2369,7 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
                 self.output.setOutputSettings(settings, for: connection)
             }) { throw CameraError.unsupportedFocus("Encoding settings: \(exception)") }
+            try configureProResWriterInputs(colorSpace: requestedColorSpace)
             logProVideoStorage("format_after_encoder_change")
             try resetCameraControls(camera, fps: targetFPS, manualExposure: exposureToRestore)
             chosenIndex = index; chosenFPS = targetFPS
@@ -2346,6 +2399,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             return true
         } catch {
+            if !previousWriterAudioConfigured, session.outputs.contains(proResWriterAudioOutput) {
+                session.removeOutput(proResWriterAudioOutput)
+            } else if previousWriterAudioConfigured, !session.outputs.contains(proResWriterAudioOutput),
+                      session.canAddOutput(proResWriterAudioOutput) {
+                session.addOutput(proResWriterAudioOutput)
+            }
+            intrinsicOutput.videoSettings = previousIntrinsicSettings ?? [:]
+            proResWriterVideoSettings = previousProResWriterVideoSettings
             session.automaticallyConfiguresCaptureDeviceForWideColor = previousAutomaticWideColor
             do {
                 try camera.lockForConfiguration()
@@ -3495,10 +3556,13 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 if recipe?.highBitDepth == true { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
                 settings[AVVideoCompressionPropertiesKey] = compression
             }
+            let preconfiguredAudio = usesProResDataWriter && session.outputs.contains(proResWriterAudioOutput)
+                ? proResWriterAudioOutput : nil
             let writer = try RealtimeLUTWriter(url: url, recipe: recipe, settings: settings,
                 width: Int(format.width), height: Int(format.height), fps: chosenFPS, orientation: recordingOrientation,
                 dedicated: UserDefaults.standard.string(forKey: "storageLocation") == "专用视频存储",
-                metadata: movieMetadata(url: url, burnedLUT: recipe != nil), started: { [weak self] pts in
+                metadata: movieMetadata(url: url, burnedLUT: recipe != nil),
+                preconfiguredAudioOutput: preconfiguredAudio, started: { [weak self] pts in
                     guard let self else { return }
                     self.fileOutput(self.output, didStartRecordingTo: url, startPTS: pts, from: [])
                 }, finished: { [weak self] error, details in
@@ -3506,24 +3570,29 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.queue.async {
                         self.previewFanout.setRecordingWriter(nil)
                         if let writer = self.realtimeLUTWriter {
-                            self.session.beginConfiguration()
-                            self.session.removeOutput(writer.audioOutput)
-                            if let settings = self.realtimeLUTVideoSettings { self.intrinsicOutput.videoSettings = settings }
-                            self.realtimeLUTVideoSettings = nil
-                            self.session.commitConfiguration()
-                            self.enableIntrinsicDelivery()
+                            writer.audioOutput.setSampleBufferDelegate(nil, queue: nil)
+                            if writer.audioOutput !== self.proResWriterAudioOutput {
+                                self.session.beginConfiguration()
+                                self.session.removeOutput(writer.audioOutput)
+                                if let settings = self.realtimeLUTVideoSettings { self.intrinsicOutput.videoSettings = settings }
+                                self.realtimeLUTVideoSettings = nil
+                                self.session.commitConfiguration()
+                                self.enableIntrinsicDelivery()
+                            }
                         }
                         self.realtimeLUTWriter = nil
                         self.logger.event("lut_realtime_finished", details)
                         self.fileOutput(self.output, didFinishRecordingTo: url, from: [], error: error)
                     }
                 })
-            session.beginConfiguration()
-            guard session.canAddOutput(writer.audioOutput) else {
-                session.commitConfiguration()
-                throw RecorderError.unavailable("LUT audio capture unavailable")
+            if preconfiguredAudio == nil {
+                session.beginConfiguration()
+                guard session.canAddOutput(writer.audioOutput) else {
+                    session.commitConfiguration()
+                    throw RecorderError.unavailable("LUT audio capture unavailable")
+                }
             }
-            if recipe?.highBitDepth == true || chosenEncoding.isProRes422 {
+            if preconfiguredAudio == nil && (recipe?.highBitDepth == true || chosenEncoding.isProRes422) {
                 let pixelFormat = [kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
                                    kCVPixelFormatType_420YpCbCr10BiPlanarFullRange]
                     .first { intrinsicOutput.availableVideoPixelFormatTypes.contains($0) }
@@ -3545,9 +3614,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     throw RecorderError.unavailable("当前配置不支持高位深 LUT 实时录制")
                 }
             }
-            session.addOutput(writer.audioOutput)
-            session.commitConfiguration()
-            enableIntrinsicDelivery()
+            if preconfiguredAudio == nil {
+                session.addOutput(writer.audioOutput)
+                session.commitConfiguration()
+                enableIntrinsicDelivery()
+            }
             captureFinishing = true
             recordingTimeSource = recipe == nil ? "ProRes writer; original VideoDataOutput capture PTS preserved" : "Realtime LUT writer; original VideoDataOutput capture PTS preserved"
             realtimeLUTWriter = writer
@@ -3700,7 +3771,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             if !ProcessInfo.processInfo.arguments.contains("--ssd-matrix") &&
                (ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
                ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ||
-               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke")) {
+               ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
+               ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") })) {
                 let smokeSeconds: Double = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--lut-test-seconds=") }
                     .flatMap { Double($0.dropFirst("--lut-test-seconds=".count)) }
                     .map { min(120, max(3, $0)) } ?? (ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20)
