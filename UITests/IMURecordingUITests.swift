@@ -1,6 +1,35 @@
 import XCTest
 
 final class IMURecordingUITests: XCTestCase {
+    func testProRes422OpenGateFormatSwitchDoesNotCrash() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "-storageLocation", "内部文件",
+                               "-AppleLanguages", "(en)"]
+        app.launch()
+        XCTAssertTrue(app.buttons["settingsOpen"].waitForExistence(timeout: 30))
+        app.buttons["settingsOpen"].tap()
+
+        func select(_ menu: String, matching label: String) {
+            let row = app.buttons[menu]
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.tap()
+            let predicate = menu == "resolutionMenu"
+                ? NSPredicate(format: "label BEGINSWITH %@", label)
+                : NSPredicate(format: "label == %@", label)
+            let option = app.buttons.matching(predicate).firstMatch
+            XCTAssertTrue(option.waitForExistence(timeout: 5), "Missing \(label)")
+            option.tap()
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "App exited while selecting \(label)")
+        }
+
+        select("resolutionMenu", matching: "Open Gate")
+        select("codecMenu", matching: "ProRes 422")
+        XCTAssertTrue(app.buttons["codecMenu"].label.contains("ProRes 422"))
+        select("codecMenu", matching: "H.265")
+        select("codecMenu", matching: "ProRes 422")
+        XCTAssertTrue(app.buttons["resolutionMenu"].label.contains("Open Gate"))
+    }
+
     func testLocationSettingBothLanguages() {
         addUIInterruptionMonitor(withDescription: "Location permission") { alert in
             for name in ["Allow While Using App", "使用 App 时允许", "使用App时允许", "使用期间允许"] {

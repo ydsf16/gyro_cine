@@ -2294,7 +2294,8 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
         if let settings = proResWriterVideoSettings {
             // The saved 422 pixel format may be invalid for a RAW sensor format.
             // RAW metadata/K capture lets AVFoundation choose its native format.
-            intrinsicOutput.videoSettings = chosenEncoding.isRAW ? [:] : settings
+            try setIntrinsicVideoSettings(chosenEncoding.isRAW ? [:] : settings,
+                                          context: "restore capture format")
             proResWriterVideoSettings = nil
         }
         if session.outputs.contains(proResWriterAudioOutput) {
@@ -2313,10 +2314,28 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             var restoreSettings = intrinsicOutput.videoSettings ?? [:]
             restoreSettings.removeValue(forKey: kCVPixelBufferWidthKey as String)
             restoreSettings.removeValue(forKey: kCVPixelBufferHeightKey as String)
-            proResWriterVideoSettings = restoreSettings
-            intrinsicOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
+            do {
+                try setIntrinsicVideoSettings([kCVPixelBufferPixelFormatTypeKey as String: pixelFormat],
+                                              context: "ProRes capture format")
+                proResWriterVideoSettings = restoreSettings
+            } catch {
+                // Some Open Gate sensor formats advertise a 10-bit pixel type
+                // but reject it when AVFoundation configures the data output.
+                // SDR can still be encoded into ProRes from the native sample.
+                if needsTenBit { throw error }
+                logger.event("prores_native_pixel_fallback", ["error": String(describing: error)])
+                try setIntrinsicVideoSettings([:], context: "native ProRes capture format")
+            }
         } else if needsTenBit {
             throw RecorderError.unavailable("当前配置不支持 10-bit ProRes 采集")
+        }
+    }
+
+    private func setIntrinsicVideoSettings(_ settings: [String: Any], context: String) throws {
+        if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
+            self.intrinsicOutput.videoSettings = settings
+        }) {
+            throw RecorderError.unavailable("\(context): \(exception)")
         }
     }
 
@@ -2357,6 +2376,12 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 session.addOutput(intrinsicOutput)
             }
             logProVideoStorage("format_before_sensor_change")
+            if proResWriterVideoSettings != nil {
+                // Release the old ProRes pixel constraint while the old sensor
+                // format is still active. It may be invalid for Open Gate.
+                try setIntrinsicVideoSettings([:], context: "release previous ProRes format")
+                proResWriterVideoSettings = nil
+            }
             session.automaticallyConfiguresCaptureDeviceForWideColor = requestedColorSpace == .systemDefault
             try camera.lockForConfiguration()
             camera.activeFormat = info.format
@@ -2446,7 +2471,11 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 applyWhiteBalancePreferenceLocked(camera)
                 camera.unlockForConfiguration()
             } catch { logger.event("configuration_rollback_error", ["error": String(describing: error)]) }
-            intrinsicOutput.videoSettings = previousIntrinsicSettings ?? [:]
+            if let exception = RecordingExceptionCatcher.exceptionMessage(for: {
+                self.intrinsicOutput.videoSettings = previousIntrinsicSettings ?? [:]
+            }) {
+                logger.event("configuration_video_settings_rollback_error", ["error": exception])
+            }
             proResWriterVideoSettings = previousProResWriterVideoSettings
             logger.event("configuration_result", ["kind": reason, "success": false, "error": String(describing: error), "after": configurationSnapshot()])
             fail("Format configuration: \(error)")
@@ -3826,12 +3855,14 @@ final class CameraManager: NSObject, ObservableObject, AVCaptureFileOutputRecord
             }
             if !ProcessInfo.processInfo.arguments.contains("--ssd-matrix") &&
                (ProcessInfo.processInfo.arguments.contains("--hevc-4k60-smoke") ||
+               ProcessInfo.processInfo.arguments.contains("--format-matrix") ||
                ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ||
                ProcessInfo.processInfo.arguments.contains("--hevc-1080p120-smoke") ||
                ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--prores422-smoke=") })) {
                 let smokeSeconds: Double = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--lut-test-seconds=") }
                     .flatMap { Double($0.dropFirst("--lut-test-seconds=".count)) }
-                    .map { min(120, max(3, $0)) } ?? (ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20)
+                    .map { min(120, max(3, $0)) } ?? (ProcessInfo.processInfo.arguments.contains("--format-matrix") ? 5 :
+                        (ProcessInfo.processInfo.arguments.contains("--first-buffer-probe") ? 4 : 20))
                 self.queue.asyncAfter(deadline: .now() + smokeSeconds) {
                     if self.output.isRecording || self.realtimeLUTWriter != nil { self.toggleRecording() }
                 }
