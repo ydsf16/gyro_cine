@@ -148,6 +148,8 @@ struct SettingsView: View {
                         Link(t("问题反馈", "Send Feedback"), destination: URL(string: "https://my.feishu.cn/share/base/form/shrcnMISOxXt3zudB5W3uaFd5Zb")!)
                             .accessibilityIdentifier("settings.feedback")
                         Link(t("隐私政策", "Privacy Policy"), destination: URL(string: "https://tinygrapelab.com/gyro_cine/privacy.html")!)
+                        Link("TinyGrapeLab", destination: URL(string: "https://tinygrapelab.com/")!)
+                            .accessibilityIdentifier("settings.tinyGrapeLabWebsite")
                     }.tint(.primary)
                     Section {
                         VStack(spacing: 4) {

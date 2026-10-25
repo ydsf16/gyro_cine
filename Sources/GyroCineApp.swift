@@ -47,7 +47,7 @@ struct GyroCineApp: App {
 private struct ProAccessPreviewHost: View {
     @State private var showingPro = true
     var body: some View {
-        CameraView()
+        Color.clear
             .sheet(isPresented: $showingPro) { ProAccessView() }
             .task {
                 if ProcessInfo.processInfo.arguments.contains("--pro-sandbox-restore") {
